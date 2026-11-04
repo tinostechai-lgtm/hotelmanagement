@@ -12,7 +12,7 @@ import warnings
 
 import dj_database_url
 
-warnings.filterwarnings("ignore", message="No directory at", module="whitenoise.base")
+warnings.filterwarnings("ignore", message="No directory at")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

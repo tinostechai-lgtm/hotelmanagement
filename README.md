@@ -11,7 +11,7 @@ Servora is a multi-tenant SaaS for restaurants, cafés, cloud kitchens, bars and
 | Mobile / tablet app | Flutter (Dart) — POS, captain, KDS, delivery ops, rider | `mobile/` |
 | Hardware agent | Python (stdlib only) for Windows / Linux / Raspberry Pi | `hardware-agent/` |
 | Brand | Logo SVG + animated logo (web CSS + Flutter `CustomPainter`) | `brand/` |
-| Deployment | Vercel (Python serverless) + Postgres | `vercel.json`, `api/index.py` |
+| Deployment | Vercel (Django service) + Postgres | `vercel.json` |
 
 ## Name & logo
 
@@ -114,7 +114,7 @@ python -m unittest discover -s hardware-agent/tests
 
 ## Deploy to Vercel
 
-1. Import this GitHub repo in Vercel. `vercel.json` routes every request to `api/index.py`, which serves Django.
+1. Import this GitHub repo in Vercel. `vercel.json` defines a single Django service rooted at `backend/` (entrypoint `servora.wsgi.application`, dependencies from `backend/requirements.txt`) and routes every path — pages, `/static/` and `/api/` — to it. Keep the root directory as the repo root.
 2. Add a Postgres database (Vercel Postgres, Neon or Supabase) and set the environment variables from `.env.example`. You need at least `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=false`, `DATABASE_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`.
 3. Create the tables once from your machine, or let the GitHub Action do it (set the `DATABASE_URL` and `DJANGO_SECRET_KEY` repo secrets):
    ```bash
