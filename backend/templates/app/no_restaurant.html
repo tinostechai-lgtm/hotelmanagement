@@ -1,0 +1,1 @@
+{% extends "base.html" %}{% block body %}<div class="empty" style="padding-top:120px"><h2>No restaurant linked to this account</h2><p>Ask your restaurant owner to add you as staff, or <a href="{% url 'web:signup' %}">create your own restaurant</a>.</p><a href="{% url 'web:logout' %}" class="btn">Log out</a></div>{% endblock %}

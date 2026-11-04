@@ -1,0 +1,58 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Dashboard{% endblock %}
+{% block heading %}Good {% now "H" as h %}{% if h < "12" %}morning{% elif h < "17" %}afternoon{% else %}evening{% endif %}, {{ request.user.first_name|default:"there" }}{% endblock %}
+{% block topbar_actions %}{% if 'pos' in perms %}<a class="btn btn-primary" href="{% url 'web:pos' %}"><i data-lucide="plus"></i>New order</a>{% endif %}{% endblock %}
+{% block content %}
+<div class="grid g4" id="kpis">
+  <div class="card kpi"><span class="l">Today's sales</span><span class="v" data-k="sales">—</span><span class="small muted" data-k="sales_sub"></span></div>
+  <div class="card kpi"><span class="l">Orders completed</span><span class="v" data-k="orders">—</span><span class="small muted" data-k="guests"></span></div>
+  <div class="card kpi"><span class="l">Avg. order value</span><span class="v" data-k="aov">—</span><span class="small muted">per completed order</span></div>
+  <div class="card kpi"><span class="l">Running now</span><span class="v" data-k="open">—</span><span class="small muted" data-k="pending"></span></div>
+</div>
+<div class="grid" style="grid-template-columns:2fr 1fr;margin-top:16px" id="dash-grid">
+  <div class="card"><div class="card-h"><h3>Live orders</h3><a href="{% url 'web:orders' %}" class="small">View all</a></div><div id="live"></div></div>
+  <div class="stack">
+    <div class="card"><div class="card-h"><h3>Quick actions</h3></div>
+      <div class="grid g2">
+        {% if 'pos' in perms %}<a class="btn" href="{% url 'web:pos' %}"><i data-lucide="monitor-smartphone"></i>POS</a>{% endif %}
+        {% if 'kitchen' in perms %}<a class="btn" href="{% url 'web:kitchen' %}"><i data-lucide="chef-hat"></i>Kitchen</a>{% endif %}
+        {% if 'menu' in perms %}<a class="btn" href="{% url 'web:menu' %}"><i data-lucide="utensils-crossed"></i>Menu</a>{% endif %}
+        {% if 'tables' in perms %}<a class="btn" href="{% url 'web:qr_sheet' %}"><i data-lucide="qr-code"></i>Table QRs</a>{% endif %}
+        <a class="btn" href="/s/{{ restaurant.slug }}/" target="_blank"><i data-lucide="store"></i>Online store</a>
+        {% if 'reports' in perms %}<a class="btn" href="{% url 'web:reports' %}"><i data-lucide="chart-column"></i>Reports</a>{% endif %}
+      </div></div>
+    {% if 'reports' in perms %}<div class="card"><div class="card-h"><h3>Top sellers today</h3></div><div id="top"></div></div>
+    <div class="card"><div class="card-h"><h3><i data-lucide="sparkles" style="width:16px;color:var(--primary)"></i> Smart insights</h3></div><div id="tips" class="small"></div></div>{% endif %}
+  </div>
+</div>
+<style>@media (max-width:980px){#dash-grid{grid-template-columns:1fr!important}}</style>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  const canReports = SV.perms.includes("reports");
+  const statusBadge = (o) => `<span class="badge ${o.status === "pending" ? "b-warning" : o.status === "ready" ? "b-success" : "b-info"}">${S.esc(o.status_display)}</span>`;
+  S.poll(async () => {
+    const live = await S.api("orders/live", { quiet: true });
+    S.$('[data-k="open"]').textContent = live.orders.length;
+    S.$('[data-k="pending"]').textContent = live.pending_online ? `${live.pending_online} awaiting acceptance` : "all accepted";
+    S.$("#live").innerHTML = live.orders.length ? `<div class="table-wrap"><table class="data"><tbody>${live.orders.slice(0, 12).map((o) => `<tr onclick="location='/app/pos/?order=${o.id}'" style="cursor:pointer">
+      <td><b>#${S.esc(o.number)}</b><div class="tiny muted">${S.esc(o.source_display)}</div></td><td>${S.esc(o.label)}<div class="tiny muted">${S.esc(o.customer_name || "")}</div></td>
+      <td>${statusBadge(o)}</td><td class="muted small">${S.ago(o.created_at)}</td><td class="right"><b>${S.money(o.total)}</b></td></tr>`).join("")}</tbody></table></div>`
+      : '<div class="empty"><i data-lucide="coffee"></i><div>No running orders. Quiet moment!</div></div>';
+    S.icons();
+  }, 10000);
+  if (canReports) {
+    const r = await S.api("reports/summary");
+    S.$('[data-k="sales"]').textContent = S.money(r.sales);
+    S.$('[data-k="sales_sub"]').textContent = `GST ${S.money(r.tax)} · discounts ${S.money(r.discount)}`;
+    S.$('[data-k="orders"]').textContent = r.orders;
+    S.$('[data-k="guests"]').textContent = `${r.guests} guests · ${r.cancelled} cancelled`;
+    S.$('[data-k="aov"]').textContent = S.money(r.avg_order_value);
+    S.$("#top").innerHTML = r.top_items.length ? r.top_items.slice(0, 5).map((t) => `<div class="row between" style="padding:6px 0"><span>${S.esc(t.name)}</span><b>${S.qty(t.qty)}</b></div>`).join("") : '<div class="muted small">No sales yet today.</div>';
+    S.api("reports/insights", { quiet: true }).then((i) => { S.$("#tips").innerHTML = i.tips.map((t) => `<p>• ${S.esc(t)}</p>`).join("") || "Not enough data yet."; })
+      .catch((e) => { S.$("#tips").innerHTML = e.data && e.data.upgrade ? 'AI forecasting is on the <a href="/app/billing/">Pro plan</a>.' : "—"; });
+  } else S.$$("#kpis .card").slice(0, 3).forEach((c) => c.remove());
+})();
+</script>
+{% endblock %}

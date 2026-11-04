@@ -1,0 +1,55 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Tables & Rooms{% endblock %}
+{% block heading %}Tables & rooms{% endblock %}
+{% block topbar_actions %}<a class="btn" href="{% url 'web:qr_sheet' %}" target="_blank"><i data-lucide="qr-code"></i>Print QR codes</a>{% endblock %}
+{% block content %}
+<div class="tabs" id="tabs"><button class="tab active" data-t="tables">Tables</button><button class="tab" data-t="areas">Areas / sections</button><button class="tab" data-t="rooms">Hotel rooms</button><button class="tab" data-t="res">Reservations</button></div>
+<section data-p="tables"><div id="tables"></div></section>
+<section data-p="areas" class="hidden"><div id="areas"></div></section>
+<section data-p="rooms" class="hidden"><div id="rooms"></div></section>
+<section data-p="res" class="hidden"><div id="res"></div></section>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
+  let areas = await S.list("areas"), tables = [];
+  const statusOpts = [["free", "Available"], ["occupied", "Occupied"], ["billed", "Bill printed"], ["reserved", "Reserved"], ["cleaning", "Cleaning"]];
+  S.crud(S.$("#tables"), { endpoint: "tables", title: "Table", onLoad: (r) => (tables = r),
+    toolbar: '<button class="btn" id="bulk-tables"><i data-lucide="copy-plus"></i>Add many</button>',
+    columns: [{ key: "name", label: "Table", render: (t) => `<b>${S.esc(t.name)}</b>` }, { key: "area_name", label: "Area" }, { key: "seats", label: "Seats" },
+      { key: "status", label: "Status", render: (t) => `<span class="badge st-${t.status}" style="background:var(--st-bg);color:var(--st)">${S.esc(t.status)}</span>` },
+      { key: "qr", label: "QR order link", render: (t) => `<a href="/s/${SV.slug}/?table=${t.qr_token}" target="_blank" class="small">Open ↗</a>` }],
+    fields: () => [{ name: "name", label: "Table name / number", required: true, half: true }, { name: "seats", label: "Seats", type: "number", half: true, default: 4 },
+      { name: "area", label: "Area", type: "select", half: true, options: areas.map((a) => [a.id, a.name]) }, { name: "shape", label: "Shape", type: "select", half: true, options: [["square", "Square"], ["round", "Round"], ["long", "Long"]] },
+      { name: "status", label: "Status", type: "select", required: true, options: statusOpts, default: "free" }] });
+  S.$("#tables").addEventListener("click", async (e) => {
+    if (!e.target.closest("#bulk-tables")) return;
+    const v = await S.prompt("Add many tables", [{ name: "prefix", label: "Name prefix (e.g. T or Patio-)", default: "T" }, { name: "from", label: "From number", type: "number", default: 1 }, { name: "to", label: "To number", type: "number", default: 10 },
+      { name: "seats", label: "Seats each", type: "number", default: 4 }, { name: "area", label: "Area", type: "select", options: areas.map((a) => [a.id, a.name]) }], "Create");
+    if (!v) return;
+    for (let i = Number(v.from); i <= Number(v.to); i++) await S.api("tables", { body: { name: `${v.prefix}${i}`, seats: v.seats, area: v.area } });
+    location.reload();
+  });
+  S.crud(S.$("#areas"), { endpoint: "areas", title: "Area", onLoad: (r) => (areas = r), columns: [{ key: "name", label: "Area" }, { key: "sort", label: "Order" }], fields: [{ name: "name", label: "Area name (Indoor, Patio, AC hall…)", required: true }, { name: "sort", label: "Display order", type: "number" }] });
+  S.api("rooms", { quiet: true }).then(() => {
+    S.crud(S.$("#rooms"), { endpoint: "rooms", title: "Room",
+      columns: [{ key: "number", label: "Room", render: (r) => `<b>${S.esc(r.number)}</b> <span class="muted small">${S.esc(r.room_type)}</span>` },
+        { key: "guest_name", label: "Guest", render: (r) => (r.is_occupied ? `${S.esc(r.guest_name || "Guest")} <span class="badge b-success">In-house</span>` : '<span class="badge">Vacant</span>') },
+        { key: "open_charges", label: "F&B posted to room", render: (r) => S.money(r.open_charges) },
+        { key: "qr", label: "Room-service QR", render: (r) => `<a href="/s/${SV.slug}/?room=${r.qr_token}" target="_blank" class="small">Open ↗</a>` }],
+      fields: [{ name: "number", label: "Room number", required: true, half: true }, { name: "room_type", label: "Room type", half: true }, { name: "floor", label: "Floor", half: true }, { name: "pms_reference", label: "PMS / folio ref", half: true }],
+      actions: [
+        { label: "Check in", icon: "log-in", run: async (r, reload) => { const v = await S.prompt(`Check in to room ${r.number}`, [{ name: "guest_name", label: "Guest name", required: true }, { name: "guest_phone", label: "Mobile", type: "tel" }, { name: "pms_reference", label: "PMS reservation / folio no." }], "Check in"); if (v) { await S.api(`rooms/${r.id}/checkin`, { body: v }); reload(); } } },
+        { label: "Check out & folio", icon: "log-out", run: async (r, reload) => { if (!(await S.confirm(`Check out room ${r.number}?`, "Check out"))) return; const f = await S.api(`rooms/${r.id}/checkout`, { body: {} });
+          S.modal({ title: `Room ${f.room} — F&B folio`, body: f.folio.length ? `<table class="data"><tr><th>Order</th><th>Date</th><th class="right">Total</th><th class="right">Posted to room</th></tr>${f.folio.map((x) => `<tr><td>#${S.esc(x.order)}</td><td>${S.date(x.date)}</td><td class="right">${S.money(x.total)}</td><td class="right">${S.money(x.posted_to_room)}</td></tr>`).join("")}</table>` : "No F&B charges.", footer: '<button class="btn" onclick="window.print()">Print</button><button class="btn btn-primary" data-close>Done</button>' }); reload(); } }] });
+  }).catch((e) => { S.$("#rooms").innerHTML = `<div class="card empty"><i data-lucide="lock"></i><div>Room service & posting charges to rooms is on the <a href="/app/billing/">Pro plan</a>.</div></div>`; S.icons(); });
+  S.crud(S.$("#res"), { endpoint: "reservations", title: "Reservation",
+    columns: [{ key: "reserved_for", label: "When", render: (r) => `<b>${S.date(r.reserved_for)}</b>` }, { key: "customer_name", label: "Guest", render: (r) => `${S.esc(r.customer_name)}<div class="tiny muted">${S.esc(r.phone)}</div>` }, { key: "guests", label: "Pax" },
+      { key: "table", label: "Table", render: (r) => S.esc((tables.find((t) => t.id === r.table) || {}).name || "—") }, { key: "status", label: "Status", render: (r) => `<span class="badge">${S.esc(r.status)}</span>` }],
+    fields: () => [{ name: "customer_name", label: "Guest name", required: true, half: true }, { name: "phone", label: "Mobile", type: "tel", required: true, half: true }, { name: "reserved_for", label: "Date & time", type: "datetime-local", required: true, half: true },
+      { name: "guests", label: "Guests", type: "number", half: true, default: 2 }, { name: "table", label: "Table", type: "select", options: tables.map((t) => [t.id, t.name]) },
+      { name: "status", label: "Status", type: "select", required: true, default: "booked", options: [["booked", "Booked"], ["seated", "Seated"], ["no_show", "No show"], ["cancelled", "Cancelled"]] }, { name: "notes", label: "Notes" }] });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Settings{% endblock %}
+{% block heading %}Restaurant settings{% endblock %}
+{% block content %}
+<form id="f" class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+  <div class="card"><h3>Business details</h3><div id="g1"></div></div>
+  <div class="card"><h3>Billing & tax</h3><div id="g2"></div></div>
+  <div class="card"><h3>Online ordering & home delivery</h3><div id="g3"></div>
+    <p class="small muted">Your online store: <a href="/s/{{ restaurant.slug }}/" target="_blank">{{ request.scheme }}://{{ request.get_host }}/s/{{ restaurant.slug }}/</a> — share it on WhatsApp, Instagram & Google Business.</p></div>
+  <div class="card"><h3>Location</h3><div id="g4"></div><button type="button" class="btn" id="geo"><i data-lucide="locate-fixed"></i>Use my current location</button>
+    <p class="small muted" style="margin-top:8px">Used to calculate delivery distance & charges and to show riders on the map.</p></div>
+  <div style="grid-column:1/-1" class="row"><button class="btn btn-primary btn-lg" type="submit"><i data-lucide="save"></i>Save settings</button></div>
+</form>
+<style>@media(max-width:900px){#f{grid-template-columns:1fr!important}}</style>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  const groups = {
+    g1: [{ name: "name", label: "Restaurant name", required: true }, { name: "business_type", label: "Business type", type: "select", required: true, options: [["restaurant", "Restaurant"], ["hotel", "Hotel F&B"], ["cafe", "Cafe / QSR"], ["cloud_kitchen", "Cloud kitchen"], ["bar", "Bar & lounge"], ["bakery", "Bakery"]] },
+      { name: "phone", label: "Phone", type: "tel" }, { name: "email", label: "Email", type: "email" }, { name: "logo_url", label: "Logo URL", type: "url" }, { name: "brand_color", label: "Brand colour (online store)", type: "text" }],
+    g2: [{ name: "gstin", label: "GSTIN" }, { name: "fssai", label: "FSSAI licence no." }, { name: "prices_include_tax", label: "Menu prices include GST", type: "checkbox" },
+      { name: "service_charge_percent", label: "Service charge % (dine-in)", type: "number" }, { name: "round_off_bills", label: "Round off bill totals", type: "checkbox" }, { name: "bill_footer", label: "Bill footer message" }],
+    g3: [{ name: "is_open", label: "Store is open now (accepting online orders)", type: "checkbox" }, { name: "online_ordering_enabled", label: "Online ordering", type: "checkbox" },
+      { name: "delivery_enabled", label: "Home delivery", type: "checkbox" }, { name: "pickup_enabled", label: "Takeaway / pickup", type: "checkbox" }, { name: "accept_cod", label: "Accept cash on delivery", type: "checkbox" },
+      { name: "delivery_radius_km", label: "Delivery radius (km)", type: "number" }, { name: "delivery_fee", label: "Default delivery fee (₹)", type: "number" }, { name: "free_delivery_above", label: "Free delivery above (₹, 0 = never)", type: "number" },
+      { name: "delivery_min_order", label: "Minimum order for delivery (₹)", type: "number" }, { name: "packaging_charge", label: "Packaging charge (₹)", type: "number" }, { name: "avg_prep_minutes", label: "Average preparation time (min)", type: "number" }],
+    g4: [{ name: "address", label: "Address", type: "textarea" }, { name: "city", label: "City" }, { name: "state", label: "State" }, { name: "pincode", label: "Pincode" }, { name: "latitude", label: "Latitude", type: "number", nullable: true }, { name: "longitude", label: "Longitude", type: "number", nullable: true }],
+  };
+  const r = await S.api("restaurant");
+  Object.entries(groups).forEach(([id, f]) => (S.$("#" + id).innerHTML = S.formFields(f, r)));
+  S.$("#geo").onclick = () => navigator.geolocation.getCurrentPosition((p) => { S.$('[name="latitude"]').value = p.coords.latitude.toFixed(6); S.$('[name="longitude"]').value = p.coords.longitude.toFixed(6); }, () => S.toast("Location permission denied", "err"));
+  S.$("#f").onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.values(groups).reduce((acc, f) => ({ ...acc, ...S.readForm(S.$("#f"), f) }), {});
+    await S.api("restaurant", { method: "PATCH", body }); S.toast("Settings saved", "ok");
+  };
+})();
+</script>
+{% endblock %}

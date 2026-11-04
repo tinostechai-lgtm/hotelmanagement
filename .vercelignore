@@ -1,0 +1,9 @@
+mobile/
+hardware-agent/
+brand/*.png
+**/__pycache__/
+**/*.pyc
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+.github/

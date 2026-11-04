@@ -1,0 +1,47 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Customers{% endblock %}
+{% block heading %}Customers & loyalty{% endblock %}
+{% block content %}
+<div class="tabs" id="tabs"><button class="tab active" data-t="c">Customers</button><button class="tab" data-t="cp">Coupons & offers</button><button class="tab" data-t="fb">Feedback</button></div>
+<section data-p="c"><div id="customers"></div></section>
+<section data-p="cp" class="hidden"><div id="coupons"></div></section>
+<section data-p="fb" class="hidden"><div id="feedback"></div></section>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
+  const tierCls = { Platinum: "b-info", Gold: "b-warning", Silver: "", Bronze: "b-primary" };
+  S.crud(S.$("#customers"), { endpoint: "customers", title: "Customer",
+    toolbar: '<button class="btn" id="export"><i data-lucide="download"></i>Export CSV</button>',
+    columns: [{ key: "name", label: "Customer", render: (c) => `<b>${S.esc(c.name || "Guest")}</b> <span class="badge ${tierCls[c.tier]}">${c.tier}</span><div class="tiny muted">${S.esc(c.phone)} ${S.esc(c.email)}</div>` },
+      { key: "visits", label: "Visits" }, { key: "total_spent", label: "Lifetime spend", render: (c) => S.money(c.total_spent) }, { key: "loyalty_points", label: "Points" },
+      { key: "last_visit", label: "Last visit", render: (c) => (c.last_visit ? S.date(c.last_visit) : "—") }],
+    fields: [{ name: "name", label: "Name", half: true }, { name: "phone", label: "Mobile", type: "tel", required: true, half: true }, { name: "email", label: "Email", type: "email", half: true },
+      { name: "birthday", label: "Birthday", type: "date", half: true }, { name: "anniversary", label: "Anniversary", type: "date", half: true }, { name: "tags", label: "Tags (VIP, corporate…)", half: true },
+      { name: "notes", label: "Notes / preferences", type: "textarea" }, { name: "marketing_opt_in", label: "OK to send offers (SMS / WhatsApp)", type: "checkbox", default: true }],
+    beforeSave: (b) => { ["birthday", "anniversary"].forEach((k) => { if (!b[k]) b[k] = null; }); return b; },
+    actions: [{ label: "Order history", icon: "history", run: async (c) => { const o = await S.api(`customers/${c.id}/orders`);
+      S.modal({ title: `${c.name || c.phone} — orders`, body: o.length ? o.map((x) => `<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span>#${S.esc(x.number)} · ${S.esc(x.label)}<div class="tiny muted">${S.date(x.created_at)}</div></span><b>${S.money(x.total)}</b></div>`).join("") : "No orders yet." }); } }] });
+  S.$("#customers").addEventListener("click", async (e) => {
+    if (!e.target.closest("#export")) return;
+    const rows = await S.list("customers");
+    const csv = ["name,phone,email,visits,total_spent,points,tier"].concat(rows.map((c) => [c.name, c.phone, c.email, c.visits, c.total_spent, c.loyalty_points, c.tier].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))).join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "customers.csv"; a.click();
+  });
+  S.crud(S.$("#coupons"), { endpoint: "coupons", title: "Coupon",
+    columns: [{ key: "code", label: "Code", render: (c) => `<b class="mono">${S.esc(c.code)}</b><div class="tiny muted">${S.esc(c.description)}</div>` },
+      { key: "value", label: "Offer", render: (c) => (c.is_percent ? `${Number(c.value)}% off${c.max_discount ? ` (max ${S.money(c.max_discount)})` : ""}` : `${S.money(c.value)} off`) },
+      { key: "min_order", label: "Min order", render: (c) => S.money(c.min_order) }, { key: "used_count", label: "Used", render: (c) => `${c.used_count}${c.usage_limit ? " / " + c.usage_limit : ""}` },
+      { key: "is_active", label: "Status", render: (c) => (c.is_active ? '<span class="badge b-success">Active</span>' : '<span class="badge">Paused</span>') }],
+    fields: [{ name: "code", label: "Code", required: true, half: true }, { name: "description", label: "Description", half: true }, { name: "is_percent", label: "Percentage discount", type: "checkbox", default: true },
+      { name: "value", label: "Value (% or ₹)", type: "number", required: true, half: true }, { name: "max_discount", label: "Max discount ₹ (optional)", type: "number", half: true, nullable: true },
+      { name: "min_order", label: "Minimum order ₹", type: "number", half: true }, { name: "usage_limit", label: "Usage limit (0 = unlimited)", type: "number", half: true },
+      { name: "valid_from", label: "Valid from", type: "datetime-local", half: true }, { name: "valid_to", label: "Valid till", type: "datetime-local", half: true },
+      { name: "online_only", label: "Online orders only", type: "checkbox" }, { name: "is_active", label: "Active", type: "checkbox", default: true }],
+    beforeSave: (b) => { ["valid_from", "valid_to"].forEach((k) => { if (!b[k]) b[k] = null; }); b.code = b.code.toUpperCase(); return b; } });
+  S.crud(S.$("#feedback"), { endpoint: "feedback", title: "Feedback", noDelete: true,
+    columns: [{ key: "rating", label: "Rating", render: (f) => "★".repeat(f.rating) + '<span class="muted">' + "★".repeat(5 - f.rating) + "</span>" }, { key: "customer_name", label: "Customer" }, { key: "comment", label: "Comment" }, { key: "created_at", label: "Date", render: (f) => S.date(f.created_at) }] });
+})();
+</script>
+{% endblock %}

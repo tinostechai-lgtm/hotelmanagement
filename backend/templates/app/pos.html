@@ -1,0 +1,430 @@
+{% extends "app/shell.html" %}
+{% block page_title %}POS{% endblock %}
+{% block heading %}<span id="pos-title">POS & Tables</span>{% endblock %}
+{% block topbar_actions %}
+<div class="row" style="gap:6px">
+  <button class="btn btn-sm" data-new="takeaway"><i data-lucide="shopping-bag"></i><span class="hide-sm">Takeaway</span></button>
+  <button class="btn btn-sm" data-new="delivery"><i data-lucide="bike"></i><span class="hide-sm">Delivery</span></button>
+  <button class="btn btn-sm hidden" data-new="room_service" id="btn-room"><i data-lucide="bed-double"></i><span class="hide-sm">Room</span></button>
+</div>
+{% endblock %}
+{% block head %}
+<style>
+  .content { padding: 0 !important; }
+  .pos-floor { padding: 20px; }
+  .tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; margin-top: 16px; }
+  .tbl { border-radius: 16px; padding: 14px; background: var(--surface); border: 2px solid var(--st-bg); cursor: pointer; min-height: 118px; display: flex; flex-direction: column; gap: 6px; transition: .15s; position: relative; text-align: left; font-family: var(--font); color: var(--text); }
+  .tbl:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--st); }
+  .tbl .nm { font-size: 22px; font-weight: 800; }
+  .tbl .stt { display: inline-flex; align-self: flex-start; background: var(--st-bg); color: var(--st); font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: .03em; }
+  .tbl .amt { margin-top: auto; font-weight: 700; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--st); margin-right: 6px; }
+  .pos-order { display: grid; grid-template-columns: 180px 1fr 380px; height: calc(100vh - 65px); }
+  .cats { border-right: 1px solid var(--line); overflow-y: auto; padding: 12px 8px; background: var(--surface); }
+  .cats button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 11px 12px; border-radius: 10px; font: 600 14px var(--font); color: var(--text); cursor: pointer; margin-bottom: 2px; }
+  .cats button.active { background: var(--primary-soft); color: var(--primary); }
+  .items-pane { overflow-y: auto; padding: 14px; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .it { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; text-align: left; cursor: pointer; font-family: var(--font); color: var(--text); display: flex; flex-direction: column; gap: 6px; min-height: 96px; transition: .12s; position: relative; }
+  .it:hover { border-color: var(--primary); box-shadow: var(--shadow); }
+  .it:active { transform: scale(.98); }
+  .it .n { font-weight: 600; font-size: 14px; line-height: 1.25; }
+  .it .p { margin-top: auto; font-weight: 800; }
+  .it.off { opacity: .45; }
+  .it .code { position: absolute; top: 8px; right: 8px; font-size: 10px; color: var(--muted); font-weight: 700; }
+  .cart { border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+  .cart-h { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .cart-lines { flex: 1; overflow-y: auto; padding: 6px 16px; }
+  .line { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); align-items: flex-start; }
+  .line .nm { font-weight: 600; font-size: 14px; }
+  .line .meta { font-size: 12px; color: var(--muted); }
+  .line.draft { background: linear-gradient(90deg, var(--primary-soft), transparent); margin: 0 -16px; padding: 10px 16px; }
+  .line.void .nm { text-decoration: line-through; opacity: .5; }
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .stepper button { width: 30px; height: 30px; border: 0; background: var(--surface-2); cursor: pointer; font-size: 16px; color: var(--text); }
+  .stepper span { min-width: 30px; text-align: center; font-weight: 700; font-size: 14px; }
+  .totals { padding: 12px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+  .totals .row { justify-content: space-between; padding: 2px 0; }
+  .totals .grand { font-size: 20px; font-weight: 800; padding-top: 6px; }
+  .cart-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 12px 16px 16px; }
+  .mobile-tabs { display: none; }
+  @media (max-width: 1100px) { .pos-order { grid-template-columns: 1fr 360px; } .cats { display: none; } .items-pane .chips { display: flex !important; } }
+  @media (max-width: 760px) {
+    .pos-order { grid-template-columns: 1fr; height: auto; }
+    .cart { display: none; } .pos-order.show-cart .cart { display: flex; min-height: calc(100vh - 120px); } .pos-order.show-cart .items-pane { display: none; }
+    .mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 8px; gap: 8px; z-index: 5; }
+    .hide-sm { display: none; }
+  }
+  .pay-methods { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .pay-methods button.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+  .numpad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+</style>
+{% endblock %}
+{% block content %}
+<section id="floor" class="pos-floor">
+  <div class="row between wrap">
+    <div class="chips" id="areas"></div>
+    <div class="legend"><span class="st-free">Free</span><span class="st-occupied">Running</span><span class="st-billed">Billed</span><span class="st-reserved">Reserved</span><span class="st-cleaning">Cleaning</span></div>
+  </div>
+  <div class="tables" id="tables"><div class="skeleton" style="height:118px"></div></div>
+  <h3 style="margin-top:28px">Running takeaway, delivery & room orders</h3>
+  <div class="tables" id="other-orders"></div>
+</section>
+
+<section id="order" class="pos-order hidden">
+  <div class="cats" id="cats"></div>
+  <div class="items-pane">
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn icon-btn" id="back" title="Back to tables"><i data-lucide="arrow-left"></i></button>
+      <input type="search" id="search" placeholder="Search item, short code or scan barcode…  ( / )" autocomplete="off">
+      <button class="btn icon-btn" id="weigh" title="Read weighing scale" class="hidden"><i data-lucide="scale"></i></button>
+    </div>
+    <div class="chips" id="cat-chips" style="display:none;margin-bottom:12px"></div>
+    <div class="items" id="items"></div>
+  </div>
+  <aside class="cart">
+    <div class="cart-h">
+      <div class="row between"><div><div style="font-weight:800;font-size:18px" id="o-label">New order</div><div class="small muted" id="o-meta"></div></div>
+        <button class="btn btn-sm btn-ghost" id="o-more" title="More actions"><i data-lucide="more-vertical"></i></button></div>
+      <div class="row" style="margin-top:10px;gap:8px">
+        <input type="tel" id="c-phone" placeholder="Customer mobile" style="min-height:36px;padding:6px 10px;font-size:14px">
+        <input type="text" id="c-name" placeholder="Name" style="min-height:36px;padding:6px 10px;font-size:14px">
+      </div>
+      <textarea id="c-address" class="hidden" placeholder="Delivery address" style="margin-top:8px;min-height:60px;font-size:14px"></textarea>
+    </div>
+    <div class="cart-lines" id="lines"></div>
+    <div class="totals" id="totals"></div>
+    <div class="cart-actions">
+      <button class="btn" id="a-kot" title="Send to kitchen (F2)"><i data-lucide="chef-hat"></i>KOT</button>
+      <button class="btn btn-dark" id="a-bill" title="Print bill (F3)"><i data-lucide="receipt"></i>Bill</button>
+      <button class="btn btn-primary" id="a-pay" title="Settle (F4)"><i data-lucide="indian-rupee"></i>Pay</button>
+    </div>
+  </aside>
+  <div class="mobile-tabs"><button class="btn" id="m-items">Menu</button><button class="btn btn-primary" id="m-cart">Cart · <span id="m-total">₹0</span></button></div>
+</section>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(function () {
+  const st = { boot: null, menu: [], items: {}, area: "all", order: null, ctx: null, draft: [], cat: null };
+  const $ = S.$;
+
+  async function boot() {
+    st.boot = await S.api("bootstrap");
+    st.menu = st.boot.menu;
+    st.menu.forEach((c) => c.items.forEach((i) => (st.items[i.id] = { ...i, category: c.id })));
+    if (st.boot.features.includes("room_service") && st.boot.rooms.length) $("#btn-room").classList.remove("hidden");
+    renderAreas(); loadFloor();
+    S.poll(loadFloor, 8000);
+    const params = new URLSearchParams(location.search);
+    if (params.get("order")) openOrder(Number(params.get("order")));
+  }
+
+  /* ---------------- Floor ---------------- */
+  function renderAreas() {
+    $("#areas").innerHTML = [`<button class="chip ${st.area === "all" ? "active" : ""}" data-area="all">All</button>`]
+      .concat(st.boot.areas.map((a) => `<button class="chip ${st.area == a.id ? "active" : ""}" data-area="${a.id}">${S.esc(a.name)}</button>`)).join("");
+  }
+  $("#areas").onclick = (e) => { const b = e.target.closest("[data-area]"); if (!b) return; st.area = b.dataset.area; renderAreas(); loadFloor(); };
+
+  async function loadFloor() {
+    if (!$("#order").classList.contains("hidden")) return;
+    const [tables, live] = await Promise.all([S.list("tables"), S.api("orders/live", { quiet: true })]);
+    const shown = tables.filter((t) => st.area === "all" || String(t.area) === String(st.area));
+    $("#tables").innerHTML = shown.map((t) => {
+      const o = t.active_order;
+      const status = o ? (o.billed ? "billed" : "occupied") : t.status;
+      return `<button class="tbl st-${status}" data-table="${t.id}">
+        <div class="row between"><span class="nm">${S.esc(t.name)}</span><span class="small muted"><i data-lucide="users" style="width:14px"></i> ${o ? o.guests : t.seats}</span></div>
+        <span class="stt">${status === "occupied" ? "Running" : status}</span>
+        ${o ? `<div class="small muted">${S.ago(o.since)} · ${o.items} items</div><div class="amt">${S.money(o.total)}</div>` : `<div class="small muted amt" style="font-weight:500">${S.esc(t.area_name || "")}</div>`}
+      </button>`;
+    }).join("") || '<div class="empty">No tables yet. Add them under Tables & Rooms.</div>';
+    const others = live.orders.filter((o) => !o.table);
+    $("#other-orders").innerHTML = others.map((o) => `<button class="tbl st-${o.status === "pending" ? "reserved" : "occupied"}" data-order="${o.id}">
+      <div class="row between"><span class="nm" style="font-size:16px">#${S.esc(o.number)}</span><span class="badge">${S.esc(o.source_display)}</span></div>
+      <span class="stt">${S.esc(o.status_display)}</span><div class="small muted">${S.esc(o.label)} · ${S.esc(o.customer_name || "")}</div><div class="amt">${S.money(o.total)} ${o.is_paid ? '<span class="badge b-success">Paid</span>' : ""}</div></button>`).join("")
+      || '<div class="muted small">None right now.</div>';
+    S.icons();
+  }
+  $("#tables").onclick = (e) => {
+    const b = e.target.closest("[data-table]"); if (!b) return;
+    const t = Number(b.dataset.table);
+    S.list("tables").then((ts) => { const tb = ts.find((x) => x.id === t); tb.active_order ? openOrder(tb.active_order.id) : newOrder("dine_in", tb); });
+  };
+  $("#other-orders").onclick = (e) => { const b = e.target.closest("[data-order]"); b && openOrder(Number(b.dataset.order)); };
+  S.$$("[data-new]").forEach((b) => (b.onclick = async () => {
+    if (b.dataset.new === "room_service") {
+      const rooms = st.boot.rooms.filter((r) => r.is_occupied);
+      const v = await S.prompt("Room service", [{ name: "room", label: "Room", type: "select", required: true, options: rooms.map((r) => [r.id, `Room ${r.number} — ${r.guest_name || "Guest"}`]) }], "Start order");
+      v && newOrder("room_service", null, st.boot.rooms.find((r) => r.id == v.room));
+    } else newOrder(b.dataset.new);
+  }));
+
+  /* ---------------- Order screen ---------------- */
+  function showOrder() { $("#floor").classList.add("hidden"); $("#order").classList.remove("hidden"); renderCats(); renderItems(); renderCart(); setTimeout(() => $("#search").focus(), 50); }
+  function newOrder(type, table = null, room = null) {
+    st.order = null; st.draft = []; st.ctx = { type, table, room, guests: 2 };
+    $("#c-phone").value = ""; $("#c-name").value = ""; $("#c-address").value = "";
+    showOrder();
+    if (type === "dine_in") S.prompt(`Table ${table.name}`, [{ name: "guests", label: "Number of guests", type: "number", default: table.seats }], "Start").then((v) => { if (v) st.ctx.guests = Number(v.guests) || 1; renderCart(); });
+  }
+  async function openOrder(id) {
+    st.order = await S.api(`orders/${id}`); st.draft = [];
+    st.ctx = { type: st.order.order_type, table: st.order.table ? { id: st.order.table, name: st.order.table_name } : null, room: st.order.room ? { id: st.order.room, number: st.order.room_number } : null, guests: st.order.guests };
+    $("#c-phone").value = st.order.customer_phone || ""; $("#c-name").value = st.order.customer_name || ""; $("#c-address").value = st.order.delivery_address || "";
+    showOrder();
+  }
+  function back() { $("#order").classList.add("hidden"); $("#floor").classList.remove("hidden"); history.replaceState(null, "", location.pathname); loadFloor(); }
+  $("#back").onclick = async () => { if (st.draft.length && !(await S.confirm("Discard items not yet saved?", "Discard", true))) return; back(); };
+
+  function renderCats() {
+    const html = [`<button class="${!st.cat ? "active" : ""}" data-cat="">All items</button>`].concat(st.menu.map((c) => `<button class="${st.cat == c.id ? "active" : ""}" data-cat="${c.id}">${S.esc(c.name)} <span class="muted small">${c.items.length}</span></button>`)).join("");
+    $("#cats").innerHTML = html;
+    $("#cat-chips").innerHTML = html.replaceAll("<button class=\"", "<button class=\"chip ");
+  }
+  [$("#cats"), $("#cat-chips")].forEach((el) => (el.onclick = (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; st.cat = b.dataset.cat || null; renderCats(); renderItems(); }));
+
+  function filtered() {
+    const q = $("#search").value.trim().toLowerCase();
+    return Object.values(st.items).filter((i) => (!st.cat || i.category == st.cat) &&
+      (!q || i.name.toLowerCase().includes(q) || (i.short_code || "").toLowerCase() === q || i.barcode === q));
+  }
+  function renderItems() {
+    const list = filtered();
+    $("#items").innerHTML = list.map((i) => `<button class="it ${i.available ? "" : "off"}" data-item="${i.id}" title="${i.available ? "Long-press to mark unavailable" : "Unavailable — long-press to enable"}">
+      ${i.short_code ? `<span class="code">${S.esc(i.short_code)}</span>` : ""}
+      <div class="row" style="gap:6px"><span class="diet ${i.diet}"></span>${i.bestseller ? '<span class="badge b-primary" style="padding:1px 6px">★</span>' : ""}</div>
+      <div class="n">${S.esc(i.name)}</div><div class="p">${S.money(i.price)}${i.variants.length ? '<span class="muted small"> +</span>' : ""}</div></button>`).join("")
+      || '<div class="empty" style="grid-column:1/-1">No items match.</div>';
+  }
+  $("#search").oninput = renderItems;
+  $("#search").onkeydown = (e) => { if (e.key === "Enter") { const f = filtered().filter((i) => i.available); if (f.length) { addItem(f[0]); $("#search").value = ""; renderItems(); } } };
+
+  let pressTimer = null, longPressed = false;
+  $("#items").addEventListener("pointerdown", (e) => {
+    const b = e.target.closest("[data-item]"); if (!b) return; longPressed = false;
+    pressTimer = setTimeout(async () => {
+      longPressed = true; const it = st.items[b.dataset.item];
+      const r = await S.api(`items/${it.id}/toggle`, { body: { available: !it.available } });
+      it.available = r.is_available; renderItems(); S.toast(`${it.name} is now ${r.is_available ? "available" : "unavailable"}`);
+    }, 650);
+  });
+  ["pointerup", "pointerleave"].forEach((ev) => $("#items").addEventListener(ev, () => clearTimeout(pressTimer)));
+  $("#items").onclick = (e) => { const b = e.target.closest("[data-item]"); if (!b || longPressed) return; const it = st.items[b.dataset.item]; if (!it.available) return S.toast(`${it.name} is unavailable`, "err"); addItem(it); };
+
+  function addItem(it) {
+    if (it.variants.length || it.addon_groups.length || it.is_weighted) return customize(it);
+    const same = st.draft.find((d) => d.item_id === it.id && !d.variant_id && !(d.addon_ids || []).length && !d.notes);
+    same ? same.quantity++ : st.draft.push({ item_id: it.id, quantity: 1, name: it.name, price: Number(it.price), addon_ids: [] });
+    renderCart();
+  }
+  function customize(it) {
+    const body = `${it.variants.length ? `<label>Size / variant</label><div class="pay-methods" style="margin-bottom:14px">${it.variants.map((v, i) => `<button type="button" class="btn ${i === it.variants.length - 1 ? "active" : ""}" data-v="${v.id}" data-p="${v.price}">${S.esc(v.name)}<br><b>${S.money(v.price)}</b></button>`).join("")}</div>` : ""}
+      ${it.addon_groups.map((g) => `<label>${S.esc(g.name)} <span class="muted">(up to ${g.max})</span></label>${g.addons.map((a) => `<label class="check" style="margin-bottom:6px"><input type="checkbox" data-a="${a.id}" data-p="${a.price}" data-n="${S.esc(a.name)}"> ${S.esc(a.name)} <span class="muted">+${S.money(a.price)}</span></label>`).join("")}`).join("")}
+      ${it.is_weighted ? `<div class="field"><label>Weight (kg)</label><div class="row"><input type="number" step="0.001" data-w value="1"><button type="button" class="btn" data-scale><i data-lucide="scale"></i>Read scale</button></div></div>` : `<div class="field"><label>Quantity</label><input type="number" data-q value="1" min="1"></div>`}
+      <div class="field"><label>Cooking note</label><input type="text" data-note placeholder="e.g. less spicy, no onion"></div>`;
+    const m = S.modal({ title: it.name, body, footer: `<button class="btn" data-close>Cancel</button><button class="btn btn-primary" data-add>Add to order</button>` });
+    m.$$("[data-v]").forEach((b) => (b.onclick = () => { m.$$("[data-v]").forEach((x) => x.classList.remove("active")); b.classList.add("active"); }));
+    m.$("[data-scale]") && (m.$("[data-scale]").onclick = async () => { try { const w = await S.hw.readScale(); if (w) m.$("[data-w]").value = w; } catch (e) { S.toast(e.message, "err"); } });
+    m.$("[data-add]").onclick = () => {
+      const v = m.$("[data-v].active");
+      const addons = m.$$("[data-a]:checked");
+      const qty = Number((m.$("[data-q]") || m.$("[data-w]")).value) || 1;
+      st.draft.push({ item_id: it.id, quantity: qty, variant_id: v ? Number(v.dataset.v) : null, addon_ids: addons.map((a) => Number(a.dataset.a)),
+        notes: m.$("[data-note]").value, name: it.name + (v ? ` (${v.textContent.trim().split("\n")[0].replace(/₹.*/, "").trim()})` : ""),
+        price: Number(v ? v.dataset.p : it.price) + addons.reduce((s, a) => s + Number(a.dataset.p), 0), addonNames: addons.map((a) => a.dataset.n) });
+      m.close(); renderCart();
+    };
+  }
+
+  function draftTotal() { return st.draft.reduce((s, d) => s + d.price * d.quantity, 0); }
+  function renderCart() {
+    const o = st.order, c = st.ctx;
+    const label = c.table ? `Table ${c.table.name}` : c.room ? `Room ${c.room.number}` : { takeaway: "Takeaway", delivery: "Home delivery", dine_in: "Dine-in", room_service: "Room service" }[c.type];
+    $("#o-label").textContent = o ? `${label} · #${o.number}` : label;
+    $("#pos-title").textContent = o ? `Order #${o.number}` : "New order";
+    $("#o-meta").innerHTML = o ? `${S.esc(o.status_display)} · ${S.esc(o.source_display)} · ${o.guests} guests · ${S.time(o.created_at)} ${o.is_paid ? '<span class="badge b-success">Paid</span>' : ""}` : `${c.guests || 1} guests`;
+    $("#c-address").classList.toggle("hidden", c.type !== "delivery");
+    const lines = (o ? o.items : []).map((li) => `<div class="line ${li.is_void ? "void" : ""}" data-line="${li.id}">
+        <div class="grow"><div class="nm">${S.esc(li.display_name)}</div>
+        <div class="meta">${li.addons.map((a) => "+ " + S.esc(a.name)).join(", ")} ${li.notes ? "· " + S.esc(li.notes) : ""}</div>
+        <div class="meta">${li.is_void ? "Void" : li.status === "new" ? "Saved" : '<span style="color:var(--success)">● ' + S.esc(li.status) + "</span>"}</div></div>
+        ${li.is_void ? "" : li.status === "new" ? `<div class="stepper"><button data-dec>−</button><span>${S.qty(li.quantity)}</span><button data-inc>+</button></div>` : `<b>× ${S.qty(li.quantity)}</b>`}
+        <div class="right" style="min-width:70px"><b>${S.money(li.line_total)}</b>${li.is_void ? "" : `<div><button class="btn btn-ghost btn-sm" data-void title="Void"><i data-lucide="x" style="width:14px"></i></button></div>`}</div></div>`).join("")
+      + st.draft.map((d, i) => `<div class="line draft" data-draft="${i}"><div class="grow"><div class="nm">${S.esc(d.name)}</div><div class="meta">${(d.addonNames || []).map((n) => "+ " + S.esc(n)).join(", ")} ${d.notes ? "· " + S.esc(d.notes) : ""} <span style="color:var(--primary)">● new</span></div></div>
+        <div class="stepper"><button data-dec>−</button><span>${S.qty(d.quantity)}</span><button data-inc>+</button></div><div class="right" style="min-width:70px"><b>${S.money(d.price * d.quantity)}</b></div></div>`).join("");
+    $("#lines").innerHTML = lines || '<div class="empty"><i data-lucide="mouse-pointer-click"></i><div>Tap items to add them</div></div>';
+    const T = (l, v, cls = "") => (Number(v) ? `<div class="row ${cls}"><span>${l}</span><span>${S.money(v)}</span></div>` : "");
+    if (o) {
+      $("#totals").innerHTML = T("Subtotal", o.subtotal) + (Number(o.discount) ? `<div class="row" style="color:var(--success)"><span>Discount ${S.esc(o.discount_reason)}</span><span>−${S.money(o.discount)}</span></div>` : "") +
+        T("Service charge", o.service_charge) + T("GST", o.tax) + T("Delivery fee", o.delivery_fee) + T("Packaging", o.packaging_charge) + T("Round off", o.round_off) +
+        (st.draft.length ? `<div class="row" style="color:var(--primary)"><span>Unsaved items</span><span>+${S.money(draftTotal())}</span></div>` : "") +
+        `<div class="row grand"><span>Total</span><span>${S.money(Number(o.total) + draftTotal())}</span></div>` + (Number(o.paid_amount) ? T("Paid", o.paid_amount) + `<div class="row" style="font-weight:700"><span>Balance</span><span>${S.money(o.balance)}</span></div>` : "");
+    } else $("#totals").innerHTML = `<div class="row grand"><span>Total (before tax)</span><span>${S.money(draftTotal())}</span></div>`;
+    $("#m-total").textContent = S.money((o ? Number(o.total) : 0) + draftTotal());
+    S.icons();
+  }
+  $("#lines").onclick = async (e) => {
+    const d = e.target.closest("[data-draft]");
+    if (d) {
+      const it = st.draft[d.dataset.draft];
+      if (e.target.closest("[data-inc]")) it.quantity++;
+      if (e.target.closest("[data-dec]")) { it.quantity--; if (it.quantity <= 0) st.draft.splice(d.dataset.draft, 1); }
+      return renderCart();
+    }
+    const l = e.target.closest("[data-line]"); if (!l) return;
+    const li = st.order.items.find((x) => x.id == l.dataset.line);
+    if (e.target.closest("[data-inc]")) st.order = await S.api(`orders/${st.order.id}/items/${li.id}`, { body: { quantity: Number(li.quantity) + 1 } });
+    else if (e.target.closest("[data-dec]")) st.order = await S.api(`orders/${st.order.id}/items/${li.id}`, { body: { quantity: Number(li.quantity) - 1 } });
+    else if (e.target.closest("[data-void]")) {
+      const v = await S.prompt(`Void ${li.display_name}?`, [{ name: "reason", label: "Reason", type: "select", required: true, options: [["Customer changed mind", "Customer changed mind"], ["Wrong item", "Wrong item"], ["Quality issue", "Quality issue"], ["Delay", "Delay"]] }], "Void item");
+      if (v) st.order = await S.api(`orders/${st.order.id}/items/${li.id}`, { body: { void: true, reason: v.reason } });
+    }
+    renderCart();
+  };
+
+  async function save(sendKot) {
+    const items = st.draft.map(({ item_id, quantity, variant_id, addon_ids, notes }) => ({ item_id, quantity, variant_id, addon_ids, notes }));
+    const phone = $("#c-phone").value.trim(), name = $("#c-name").value.trim();
+    if (!st.order) {
+      if (!items.length) { S.toast("Add at least one item", "err"); return false; }
+      if (st.ctx.type === "delivery" && (!phone || !$("#c-address").value.trim())) { S.toast("Customer mobile & address are needed for delivery", "err"); return false; }
+      st.order = await S.api("orders", { body: { order_type: st.ctx.type, table: st.ctx.table?.id, room: st.ctx.room?.id, guests: st.ctx.guests,
+        customer_phone: phone, customer_name: name, delivery_address: $("#c-address").value, items, send_kot: sendKot, client_ref: "web-" + Date.now() } });
+    } else {
+      if (phone !== (st.order.customer_phone || "") || name !== (st.order.customer_name || "")) st.order = await S.api(`orders/${st.order.id}`, { method: "PATCH", body: { customer_phone: phone, customer_name: name, delivery_address: $("#c-address").value } });
+      if (items.length) st.order = await S.api(`orders/${st.order.id}/items`, { body: { items, send_kot: sendKot } });
+      else if (sendKot) st.order = await S.api(`orders/${st.order.id}/kot`, { body: {} });
+    }
+    st.draft = []; renderCart(); history.replaceState(null, "", `?order=${st.order.id}`);
+    return true;
+  }
+  $("#a-kot").onclick = async () => { if (await save(true).catch(() => false)) { S.toast("KOT sent to kitchen", "ok"); if (st.ctx.type === "dine_in") back(); } };
+  $("#a-bill").onclick = async () => {
+    if (st.draft.length && !(await save(true).catch(() => false))) return;
+    if (!st.order) return S.toast("Add items first", "err");
+    st.order = await S.api(`orders/${st.order.id}/bill`, { body: {} });
+    renderCart(); S.toast("Bill generated & sent to printer", "ok"); previewBill();
+  };
+  $("#a-pay").onclick = async () => {
+    if (st.draft.length && !(await save(true).catch(() => false))) return;
+    if (!st.order) return S.toast("Add items first", "err");
+    if (!st.order.bills.some((b) => b.status !== "void")) st.order = await S.api(`orders/${st.order.id}/bill`, { body: { print: false } });
+    payDialog();
+  };
+  $("#m-items").onclick = () => $("#order").classList.remove("show-cart");
+  $("#m-cart").onclick = () => $("#order").classList.add("show-cart");
+
+  function previewBill() {
+    S.api(`orders/${st.order.id}/print`, { body: {}, quiet: true }).then((r) => {
+      if (r.preview) S.modal({ title: "Bill preview", body: `<pre class="mono" style="font-size:12px;background:var(--surface-2);padding:14px;border-radius:12px;overflow:auto">${S.esc(r.preview)}</pre>`,
+        footer: `<button class="btn" onclick="window.print()"><i data-lucide="printer"></i>Browser print</button><button class="btn btn-primary" data-close>Done</button>` });
+    }).catch(() => {});
+  }
+
+  function payDialog() {
+    const o = st.order;
+    const bills = o.bills.filter((b) => b.status !== "void" && b.status !== "paid");
+    const methods = st.boot.payment_methods.filter((m) => m.code !== "room" || o.room);
+    let bill = bills[0], method = "cash", entries = [];
+    const m = S.modal({ title: `Settle #${o.number}`, wide: true, body: `
+      ${bills.length > 1 ? `<label>Bill</label><div class="chips" style="margin-bottom:12px">${bills.map((b, i) => `<button class="chip ${i === 0 ? "active" : ""}" data-bill="${b.id}">${S.esc(b.label || b.number)} · ${S.money(b.balance)}</button>`).join("")}</div>` : ""}
+      <div class="grid g2"><div>
+        <label>Payment method</label><div class="pay-methods" id="pm">${methods.map((pm) => `<button class="btn ${pm.code === "cash" ? "active" : ""}" data-m="${pm.code}">${S.esc(pm.name)}</button>`).join("")}</div>
+        <div class="field" style="margin-top:14px"><label>Amount</label><input type="number" step="0.01" id="p-amt"></div>
+        <div class="field" id="tender-wrap"><label>Cash received</label><input type="number" step="1" id="p-tender"><div class="numpad">${[10, 20, 50, 100, 200, 500, 2000].map((n) => `<button class="btn btn-sm" data-t="${n}">+${n}</button>`).join("")}<button class="btn btn-sm" data-t="exact">Exact</button></div><div class="help" id="change"></div></div>
+        <div class="field hidden" id="ref-wrap"><label>Reference / UTR / last 4 digits</label><input type="text" id="p-ref"></div>
+        <button class="btn btn-block" id="p-add"><i data-lucide="plus"></i>Add another payment (split tender)</button>
+      </div><div>
+        <div class="card" style="background:var(--surface-2)"><div class="row between"><span>Bill total</span><b id="p-total"></b></div><div class="row between"><span>Already paid</span><span id="p-paid"></span></div>
+        <div id="p-entries"></div><div class="row between" style="font-size:20px;font-weight:800;margin-top:8px"><span>Due</span><span id="p-due"></span></div></div>
+        <div class="row wrap" style="margin-top:14px">
+          <button class="btn btn-sm" id="p-disc"><i data-lucide="percent"></i>Discount</button>
+          <button class="btn btn-sm" id="p-split"><i data-lucide="split"></i>Split bill</button>
+          <button class="btn btn-sm" id="p-print"><i data-lucide="printer"></i>Print</button>
+        </div>
+      </div></div>`,
+      footer: `<button class="btn" data-close>Cancel</button><button class="btn btn-success btn-lg" id="p-done"><i data-lucide="check"></i>Complete payment</button>` });
+    const due = () => Math.max(0, Number(bill.balance) - entries.reduce((s, e) => s + Number(e.amount), 0));
+    const refresh = () => {
+      m.$("#p-total").textContent = S.money(bill.total); m.$("#p-paid").textContent = S.money(bill.paid);
+      m.$("#p-entries").innerHTML = entries.map((e) => `<div class="row between small"><span>${S.esc(e.method)}</span><span>${S.money(e.amount)}</span></div>`).join("");
+      m.$("#p-due").textContent = S.money(due()); m.$("#p-amt").value = due().toFixed(2);
+      m.$("#tender-wrap").classList.toggle("hidden", method !== "cash"); m.$("#ref-wrap").classList.toggle("hidden", ["cash", "room", "loyalty", "credit"].includes(method));
+      calcChange();
+    };
+    const calcChange = () => { const t = Number(m.$("#p-tender").value), a = Number(m.$("#p-amt").value); m.$("#change").innerHTML = t > a ? `Return change: <b style="color:var(--success);font-size:16px">${S.money(t - a)}</b>` : ""; };
+    m.$("#p-tender").oninput = calcChange;
+    m.$$("[data-t]").forEach((b) => (b.onclick = () => { const v = b.dataset.t; m.$("#p-tender").value = v === "exact" ? m.$("#p-amt").value : Number(m.$("#p-tender").value || 0) + Number(v); calcChange(); }));
+    m.$("#pm").onclick = (e) => { const b = e.target.closest("[data-m]"); if (!b) return; method = b.dataset.m; m.$$("#pm [data-m]").forEach((x) => x.classList.toggle("active", x === b)); refresh(); };
+    m.$$("[data-bill]").forEach((b) => (b.onclick = () => { bill = bills.find((x) => x.id == b.dataset.bill); entries = []; m.$$("[data-bill]").forEach((x) => x.classList.toggle("active", x === b)); refresh(); }));
+    const current = () => ({ method, amount: m.$("#p-amt").value, reference: m.$("#p-ref").value, tendered: method === "cash" ? m.$("#p-tender").value || null : null, bill: bill.id });
+    m.$("#p-add").onclick = () => { const c = current(); if (Number(c.amount) <= 0) return; entries.push(c); m.$("#p-tender").value = ""; refresh(); };
+    m.$("#p-done").onclick = async () => {
+      const c = current(); const pays = entries.concat(Number(c.amount) > 0 ? [c] : []);
+      if (!pays.length) return S.toast("Nothing to pay", "err");
+      st.order = await S.api(`orders/${o.id}/pay`, { body: { payments: pays } });
+      m.close();
+      if (st.order.is_paid || st.order.status === "completed") { S.toast("Payment complete. Thank you!", "ok"); back(); }
+      else { renderCart(); payDialog(); }
+    };
+    m.$("#p-disc").onclick = async () => {
+      const v = await S.prompt("Discount", [{ name: "percent", label: "Percent off (%)", type: "number" }, { name: "amount", label: "or flat amount (₹)", type: "number" }, { name: "coupon", label: "or coupon code" }, { name: "reason", label: "Reason" }], "Apply");
+      if (!v) return;
+      const body = v.coupon ? { coupon: v.coupon } : Number(v.percent) ? { percent: v.percent, reason: v.reason } : { amount: v.amount, reason: v.reason };
+      st.order = await S.api(`orders/${o.id}/discount`, { body }); st.order = await S.api(`orders/${o.id}/bill`, { body: { print: false } });
+      m.close(); renderCart(); payDialog();
+    };
+    m.$("#p-split").onclick = async () => {
+      const v = await S.prompt("Split bill", [{ name: "mode", label: "How?", type: "select", required: true, options: [["equal", "Equally between guests"], ["seat", "By seat number"]] }, { name: "parts", label: "Number of people (for equal split)", type: "number", default: o.guests || 2 }], "Split");
+      if (!v) return;
+      st.order = await S.api(`orders/${o.id}/split`, { body: v }); m.close(); renderCart(); payDialog();
+    };
+    m.$("#p-print").onclick = previewBill;
+    refresh();
+  }
+
+  $("#o-more").onclick = () => {
+    if (!st.order) return S.toast("Save the order first", "err");
+    const o = st.order;
+    const m = S.modal({ title: `Order #${o.number}`, body: `<div class="grid g2">
+      <button class="btn" data-x="move"><i data-lucide="arrow-right-left"></i>Move / merge table</button>
+      <button class="btn" data-x="guests"><i data-lucide="users"></i>Change guests</button>
+      <button class="btn" data-x="note"><i data-lucide="sticky-note"></i>Order note</button>
+      <button class="btn" data-x="print"><i data-lucide="printer"></i>Reprint bill</button>
+      <button class="btn" data-x="drawer"><i data-lucide="archive"></i>Open cash drawer</button>
+      <button class="btn" data-x="history"><i data-lucide="history"></i>Order timeline</button>
+      <button class="btn btn-danger" data-x="cancel"><i data-lucide="ban"></i>Cancel order</button></div>` });
+    m.el.onclick = async (e) => {
+      const b = e.target.closest("[data-x]"); if (!b) return; const x = b.dataset.x; m.close();
+      if (x === "move") {
+        const ts = await S.list("tables");
+        const v = await S.prompt("Move to table", [{ name: "table", label: "Table (occupied tables will be merged)", type: "select", required: true, options: ts.filter((t) => t.id !== o.table).map((t) => [t.id, `${t.name}${t.active_order ? " (running — merge)" : ""}`]) }], "Move");
+        if (v) { st.order = await S.api(`orders/${o.id}/move`, { body: v }); S.toast("Moved", "ok"); back(); }
+      } else if (x === "guests" || x === "note") {
+        const v = await S.prompt(x === "guests" ? "Guests" : "Order note", [x === "guests" ? { name: "guests", label: "Guests", type: "number", default: o.guests } : { name: "notes", label: "Note for kitchen", default: o.notes }]);
+        if (v) { st.order = await S.api(`orders/${o.id}`, { method: "PATCH", body: v }); renderCart(); }
+      } else if (x === "print") previewBill();
+      else if (x === "drawer") { await S.api("devices/open-drawer", { body: {} }); S.toast("Drawer opened"); }
+      else if (x === "history") S.modal({ title: "Timeline", body: `<div class="small">${S.esc(o.status_display)} — created ${S.date(o.created_at)}<br>KOTs: ${o.kots.map((k) => `#${k.number} ${k.station} (${k.status})`).join(", ") || "none"}<br>Payments: ${o.payments.map((p) => `${p.method_display} ${S.money(p.amount)}`).join(", ") || "none"}</div>` });
+      else if (x === "cancel") {
+        const v = await S.prompt("Cancel order", [{ name: "reason", label: "Reason", required: true }], "Cancel order");
+        if (v) { await S.api(`orders/${o.id}/status`, { body: { status: "cancelled", reason: v.reason } }); S.toast("Order cancelled"); back(); }
+      }
+    };
+  };
+
+  $("#weigh").onclick = async () => { try { const w = await S.hw.readScale(); S.toast(w ? `Scale: ${w} kg` : "No reading"); } catch (e) { S.toast(e.message, "err"); } };
+  document.addEventListener("keydown", (e) => {
+    if ($("#order").classList.contains("hidden") || document.querySelector(".modal-bg")) return;
+    if (e.key === "/" && document.activeElement !== $("#search")) { e.preventDefault(); $("#search").focus(); }
+    if (e.key === "F2") { e.preventDefault(); $("#a-kot").click(); }
+    if (e.key === "F3") { e.preventDefault(); $("#a-bill").click(); }
+    if (e.key === "F4") { e.preventDefault(); $("#a-pay").click(); }
+  });
+  boot();
+})();
+</script>
+{% endblock %}

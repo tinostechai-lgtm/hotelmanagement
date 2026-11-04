@@ -1,0 +1,9 @@
+{
+  "name": "Servora POS",
+  "short_name": "Servora",
+  "start_url": "/app/",
+  "display": "standalone",
+  "background_color": "#14123A",
+  "theme_color": "#14123A",
+  "icons": [{"src": "/static/brand/servora-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+}

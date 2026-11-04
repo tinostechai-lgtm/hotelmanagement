@@ -1,0 +1,30 @@
+name: servora
+description: Servora POS - restaurant & hotel F&B point of sale, KDS, delivery and rider app.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  shared_preferences: ^2.3.2
+  provider: ^6.1.2
+  intl: ^0.19.0
+  url_launcher: ^6.3.0
+  geolocator: ^13.0.1
+  mobile_scanner: ^5.2.3
+  print_bluetooth_thermal: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand/

@@ -1,0 +1,71 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Delivery{% endblock %}
+{% block heading %}Home delivery{% endblock %}
+{% block head %}<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>#map{height:420px;border-radius:14px;z-index:0}.rider-pin{background:var(--grad);color:#fff;border-radius:50%;display:grid!important;place-items:center;font-weight:800;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}</style>{% endblock %}
+{% block content %}
+<div class="tabs" id="tabs"><button class="tab active" data-t="ops">Live operations</button><button class="tab" data-t="riders">Riders</button><button class="tab" data-t="zones">Zones & charges</button><button class="tab" data-t="settlements">Settlements</button></div>
+<section data-p="ops">
+  <div class="grid" style="grid-template-columns:1.2fr 1fr" id="ops-grid">
+    <div class="card"><div class="card-h"><h3>Active deliveries</h3><span class="muted small" id="online"></span></div><div id="tasks"></div></div>
+    <div class="card"><div class="card-h"><h3>Live map</h3></div><div id="map"></div></div>
+  </div>
+</section>
+<section data-p="riders" class="hidden"><div id="riders"></div></section>
+<section data-p="zones" class="hidden"><div id="zones"></div></section>
+<section data-p="settlements" class="hidden"><div id="settlements"></div></section>
+<style>@media(max-width:980px){#ops-grid{grid-template-columns:1fr!important}}</style>
+{% endblock %}
+{% block page_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); map && map.invalidateSize(); };
+  let map = null, layer = null, riders = [];
+  const stBadge = { unassigned: "b-danger", assigned: "b-warning", accepted: "b-info", picked_up: "b-primary", delivered: "b-success", failed: "b-danger" };
+  async function load() {
+    const d = await S.api("delivery/live-map");
+    riders = d.riders;
+    S.$("#online").textContent = `${riders.filter((r) => r.online).length} of ${riders.length} riders online`;
+    S.$("#tasks").innerHTML = d.tasks.length ? d.tasks.map((t) => `<div style="padding:12px 0;border-bottom:1px solid var(--line)">
+      <div class="row between"><b>#${S.esc(t.order_number)} · ${S.esc(t.customer_name)}</b><span class="badge ${stBadge[t.status]}">${S.esc(t.status.replace("_", " "))}</span></div>
+      <div class="small muted">${S.esc(t.address)} ${t.distance_km ? "· " + t.distance_km + " km" : ""}</div>
+      <div class="small">${t.items.map(S.esc).join(", ")}</div>
+      <div class="row between" style="margin-top:8px"><span><b>${S.money(t.total)}</b> ${t.is_paid ? '<span class="badge b-success">Prepaid</span>' : `<span class="badge b-warning">COD ${S.money(t.cod_amount)}</span>`} · order ${S.esc(t.order_status.replaceAll("_", " "))}</span>
+      <span class="row" style="gap:6px">${t.rider_name ? `<span class="small">🛵 ${S.esc(t.rider_name)}</span>` : ""}
+      ${["unassigned", "assigned"].includes(t.status) ? `<button class="btn btn-sm" data-assign="${t.id}">${t.rider_name ? "Reassign" : "Assign"}</button><button class="btn btn-sm btn-primary" data-auto="${t.id}">Auto</button>` : ""}
+      ${["assigned", "accepted"].includes(t.status) ? `<button class="btn btn-sm" data-pick="${t.id}">Picked up</button>` : ""}
+      ${t.status === "picked_up" ? `<button class="btn btn-sm btn-success" data-done="${t.id}">Delivered</button>` : ""}</span></div></div>`).join("")
+      : '<div class="empty"><i data-lucide="bike"></i><div>No active deliveries</div></div>';
+    S.icons();
+    if (!window.L) return;
+    if (!map) { map = L.map("map").setView([Number(d.restaurant.lat) || 20.59, Number(d.restaurant.lng) || 78.96], d.restaurant.lat ? 13 : 4);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map); layer = L.layerGroup().addTo(map); }
+    layer.clearLayers();
+    if (d.restaurant.lat) L.marker([d.restaurant.lat, d.restaurant.lng]).bindPopup(S.esc(d.restaurant.name)).addTo(layer);
+    riders.filter((r) => r.lat).forEach((r) => L.marker([r.lat, r.lng], { icon: L.divIcon({ className: "rider-pin", html: S.esc(r.name[0]), iconSize: [30, 30] }) }).bindPopup(`${S.esc(r.name)} · ${r.active} active`).addTo(layer));
+    d.tasks.filter((t) => t.lat).forEach((t) => L.circleMarker([t.lat, t.lng], { radius: 8, color: "#F4632F" }).bindPopup(`#${S.esc(t.order_number)} ${S.esc(t.customer_name)}`).addTo(layer));
+  }
+  S.$("#tasks").onclick = async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.auto) await S.api(`delivery/tasks/${b.dataset.auto}/assign`, { body: { auto: true } });
+    if (b.dataset.assign) { const v = await S.prompt("Assign rider", [{ name: "rider", label: "Rider", type: "select", required: true, options: riders.map((r) => [r.id, `${r.name} ${r.online ? "🟢" : "⚪"} (${r.active} active)`]) }], "Assign"); if (!v) return; await S.api(`delivery/tasks/${b.dataset.assign}/assign`, { body: v }); }
+    if (b.dataset.pick) await S.api(`delivery/tasks/${b.dataset.pick}/pickup`, { body: {} });
+    if (b.dataset.done) await S.api(`delivery/tasks/${b.dataset.done}/deliver`, { body: {} });
+    load();
+  };
+  S.poll(load, 10000);
+  S.crud(S.$("#riders"), { endpoint: "delivery/riders", title: "Rider", columns: [
+      { key: "name", label: "Name", render: (r) => `<b>${S.esc(r.name)}</b> ${r.is_online ? '<span class="badge b-success">Online</span>' : '<span class="badge">Offline</span>'}<div class="tiny muted">${S.esc(r.phone)}</div>` },
+      { key: "vehicle", label: "Vehicle", render: (r) => `${S.esc(r.vehicle)} <span class="muted small">${S.esc(r.vehicle_number)}</span>` },
+      { key: "active_tasks", label: "Active" }, { key: "cash_in_hand", label: "Cash in hand", render: (r) => S.money(r.cash_in_hand) }],
+    fields: [{ name: "name", label: "Name", required: true }, { name: "phone", label: "Mobile", type: "tel", required: true, half: true }, { name: "vehicle", label: "Vehicle", half: true },
+      { name: "vehicle_number", label: "Vehicle number", half: true }, { name: "per_delivery_pay", label: "Pay per delivery (₹)", type: "number", half: true }, { name: "is_active", label: "Active", type: "checkbox", default: true }],
+    help: "", actions: [{ label: "Settle cash", icon: "hand-coins", run: async (r, reload) => { if (await S.confirm(`Settle ${r.name}: collect ${S.money(r.cash_in_hand)} cash?`, "Settle")) { const s = await S.api(`delivery/riders/${r.id}/settle`, { body: {} }); S.toast(`Settled ${s.deliveries} deliveries · payout ${S.money(s.rider_payout)}`, "ok"); reload(); } } }],
+    empty: "Add riders. To give them the rider app, add them as staff with the 'Delivery Rider' role using the same mobile number." });
+  S.crud(S.$("#zones"), { endpoint: "delivery/zones", title: "Zone", columns: [{ key: "name", label: "Zone" }, { key: "max_km", label: "Up to (km)" }, { key: "fee", label: "Fee", render: (z) => S.money(z.fee) }, { key: "min_order", label: "Min order", render: (z) => S.money(z.min_order) }, { key: "eta_minutes", label: "ETA (min)" }, { key: "pincodes", label: "Pincodes" }],
+    fields: [{ name: "name", label: "Zone name", required: true }, { name: "max_km", label: "Max distance (km)", type: "number", half: true }, { name: "fee", label: "Delivery fee (₹)", type: "number", half: true }, { name: "min_order", label: "Minimum order (₹)", type: "number", half: true }, { name: "eta_minutes", label: "ETA (minutes)", type: "number", half: true }, { name: "pincodes", label: "Pincodes (optional, comma separated)" }, { name: "is_active", label: "Active", type: "checkbox", default: true }] });
+  S.crud(S.$("#settlements"), { endpoint: "delivery/settlements", title: "Settlement", noDelete: true, columns: [{ key: "created_at", label: "Date", render: (s) => S.date(s.created_at) }, { key: "rider_name", label: "Rider" }, { key: "deliveries", label: "Deliveries" }, { key: "cash_collected", label: "Cash collected", render: (s) => S.money(s.cash_collected) }, { key: "rider_payout", label: "Rider payout", render: (s) => S.money(s.rider_payout) }] });
+})();
+</script>
+{% endblock %}

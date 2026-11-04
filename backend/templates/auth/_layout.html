@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block head %}<style>
+  .auth { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+  .auth-brand { background: radial-gradient(800px 400px at 20% 0%, rgba(255, 138, 61, .3), transparent), #14123A; color: #fff; padding: 48px; display: flex; flex-direction: column; justify-content: space-between; }
+  .auth-brand .sv-mark { width: 72px; height: 72px; }
+  .auth-brand .word { font-size: 36px; }
+  .auth-brand ul { list-style: none; padding: 0; color: #CFCDEB; } .auth-brand li { padding: 6px 0; }
+  .auth-form { display: grid; place-items: center; padding: 32px 20px; background: var(--surface); }
+  .auth-form .box { width: min(440px, 100%); }
+  @media (max-width: 860px) { .auth { grid-template-columns: 1fr; } .auth-brand { padding: 28px 20px; } .auth-brand ul, .auth-brand .foot { display: none; } }
+  .err { background: var(--danger-soft); color: var(--danger); padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 14px; }
+</style>{% endblock %}
+{% block body %}
+<div class="auth">
+  <div class="auth-brand">
+    <a href="/" class="sv-logo" style="color:#fff">{% include "partials/logo_svg.html" with cls="sv-anim" uid="au" %}<span class="word">Servora</span></a>
+    <div>
+      <h2 style="font-size:32px;letter-spacing:-.02em">{% block pitch %}The operating system for modern restaurants & hotels.{% endblock %}</h2>
+      <ul><li>✓ Bill in seconds — even offline</li><li>✓ QR, online ordering & your own delivery fleet</li><li>✓ Works with every ESC/POS printer</li><li>✓ Razorpay payments built in</li></ul>
+    </div>
+    <div class="small foot" style="color:#8987B5">© Servora</div>
+  </div>
+  <div class="auth-form"><div class="box">{% block form %}{% endblock %}</div></div>
+</div>
+{% endblock %}

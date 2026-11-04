@@ -1,0 +1,19 @@
+# systemd unit for the Servora Hardware Agent.
+# install_linux.sh fills in @INSTALL_DIR@ / @PYTHON@ / @USER@ and copies this to
+# /etc/systemd/system/servora-agent.service
+[Unit]
+Description=Servora Hardware Agent (printers, cash drawer, scale, pole display)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@INSTALL_DIR@
+ExecStart=@PYTHON@ @INSTALL_DIR@/servora_agent.py --config @INSTALL_DIR@/config.json run
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

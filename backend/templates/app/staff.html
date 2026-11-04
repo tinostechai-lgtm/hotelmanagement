@@ -1,0 +1,42 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Staff{% endblock %}
+{% block heading %}Staff & roles{% endblock %}
+{% block content %}
+<div class="tabs" id="tabs"><button class="tab active" data-t="s">Team members</button><button class="tab" data-t="r">Roles & permissions</button><button class="tab" data-t="sh">Cash shifts</button></div>
+<section data-p="s"><div id="staff"></div><p class="small muted" style="margin-top:12px">Staff log in on the web or the Servora app with their mobile number and password. A 4–6 digit PIN lets them switch quickly on a shared POS terminal.</p></section>
+<section data-p="r" class="hidden"><div id="roles"></div></section>
+<section data-p="sh" class="hidden"><div id="shifts"></div></section>
+{{ permission_catalog|json_script:"perm-catalog" }}
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
+  const catalog = JSON.parse(S.$("#perm-catalog").textContent);
+  let roles = await S.list("roles");
+  S.crud(S.$("#staff"), { endpoint: "staff", title: "Team member",
+    columns: [{ key: "name", label: "Name", render: (s) => `<b>${S.esc(s.name)}</b><div class="tiny muted">${S.esc(s.phone)}</div>` }, { key: "role_name", label: "Role", render: (s) => `<span class="badge b-primary">${S.esc(s.role_name)}</span>` },
+      { key: "has_pin", label: "PIN", render: (s) => (s.has_pin ? "✓" : "—") }, { key: "is_active", label: "Status", render: (s) => (s.is_active ? '<span class="badge b-success">Active</span>' : '<span class="badge">Disabled</span>') }],
+    fields: () => [{ name: "name", label: "Full name", required: true, half: true }, { name: "phone", label: "Mobile number (login)", type: "tel", required: true, half: true },
+      { name: "role", label: "Role", type: "select", required: true, half: true, options: roles.map((r) => [r.id, r.name]) }, { name: "pin", label: "Quick PIN (4–6 digits)", half: true },
+      { name: "password", label: "Password (leave blank to keep)", type: "password" }, { name: "is_active", label: "Active", type: "checkbox", default: true }] });
+  const permFields = Object.entries(catalog).map(([k, v]) => ({ name: "p_" + k, label: v, type: "checkbox" }));
+  S.crud(S.$("#roles"), { endpoint: "roles", title: "Role", onLoad: (r) => (roles = r),
+    columns: [{ key: "name", label: "Role", render: (r) => `<b>${S.esc(r.name)}</b> ${r.is_system ? '<span class="badge">default</span>' : ""}` }, { key: "members", label: "People" },
+      { key: "permissions", label: "Can", render: (r) => `<span class="small">${r.permissions.map((p) => S.esc(catalog[p] || p)).join(" · ")}</span>` }],
+    fields: [{ name: "name", label: "Role name", required: true }, { type: "section", label: "Permissions" }].concat(permFields),
+    beforeSave: (b) => { const perms = Object.keys(catalog).filter((k) => b["p_" + k]); Object.keys(catalog).forEach((k) => delete b["p_" + k]); return { ...b, permissions: perms }; } });
+  // pre-tick permission checkboxes when editing a role
+  S.$("#roles").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]"); if (!tr || !e.target.closest("[data-edit]")) return;
+    setTimeout(() => { const role = roles.find((r) => r.id == tr.dataset.id); role.permissions.forEach((p) => { const c = document.querySelector(`.modal [name="p_${p}"]`); if (c) c.checked = true; }); }, 0);
+  });
+  S.crud(S.$("#shifts"), { endpoint: "shifts", title: "Shift", noDelete: true,
+    columns: [{ key: "created_at", label: "Opened", render: (s) => `${S.date(s.created_at)}<div class="tiny muted">${S.esc(s.opened_by_name)}</div>` }, { key: "opening_cash", label: "Opening cash", render: (s) => S.money(s.opening_cash) },
+      { key: "expected_cash", label: "Expected", render: (s) => (s.expected_cash ? S.money(s.expected_cash) : "—") }, { key: "closing_cash", label: "Counted", render: (s) => (s.closing_cash ? S.money(s.closing_cash) : "—") },
+      { key: "diff", label: "Difference", render: (s) => (s.closed_at ? `<b style="color:${Number(s.closing_cash) - Number(s.expected_cash) < 0 ? "var(--danger)" : "var(--success)"}">${S.money(Number(s.closing_cash) - Number(s.expected_cash))}</b>` : '<span class="badge b-warning">Open</span>') }],
+    fields: [{ name: "opening_cash", label: "Opening cash in drawer (₹)", type: "number", required: true }, { name: "notes", label: "Notes" }],
+    actions: [{ label: "Close shift", icon: "lock", run: async (s, reload) => { if (s.closed_at) return S.toast("Already closed"); const v = await S.prompt("Close shift — count the cash", [{ name: "closing_cash", label: "Cash counted (₹)", type: "number", required: true }, { name: "notes", label: "Notes" }], "Close shift"); if (v) { await S.api(`shifts/${s.id}/close`, { body: v }); reload(); } } }] });
+})();
+</script>
+{% endblock %}

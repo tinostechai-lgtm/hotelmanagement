@@ -1,0 +1,81 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{% block page_title %}{% endblock %} · {{ restaurant.name }} · Servora{% endblock %}
+{% block body %}
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="{% url 'web:dashboard' %}">{% include "partials/logo_svg.html" with cls="sv-static" uid="nav" %}<span>Servora</span></a>
+    {% if memberships|length > 1 %}
+    <form method="post" action="{% url 'web:switch' %}" style="padding:0 6px 8px">{% csrf_token %}
+      <select name="restaurant" onchange="this.form.submit()" style="background:rgba(255,255,255,.06);color:#fff;border-color:rgba(255,255,255,.12)">
+        {% for m in memberships %}<option value="{{ m.restaurant_id }}" {% if m.restaurant_id == restaurant.id %}selected{% endif %}>{{ m.restaurant.name }}</option>{% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    {% for section, items in nav %}
+      <div class="nav-section">{{ section }}</div>
+      <nav class="nav">
+        {% for n in items %}
+        <a href="{% url 'web:'|add:n.key %}" class="{% if page == n.key %}active{% endif %}">
+          <i data-lucide="{{ n.icon }}"></i>{{ n.label }}{% if n.locked %}<i data-lucide="lock" style="margin-left:auto;width:14px;opacity:.6"></i>{% endif %}
+          {% if n.key == 'orders' %}<span class="count hidden" id="nav-pending"></span>{% endif %}
+        </a>
+        {% endfor %}
+      </nav>
+    {% endfor %}
+    <div class="plan">
+      {% if subscription %}
+        <div style="color:#fff;font-weight:700">{{ subscription.plan.name }} plan</div>
+        <div class="tiny" style="opacity:.75">{% if subscription.status == 'trial' %}Trial · {{ subscription.days_left }} days left{% elif subscription.is_active %}Active till {{ subscription.current_period_end|date:"d M Y" }}{% else %}Expired — renew now{% endif %}</div>
+        {% if 'billing' in perms %}<a href="{% url 'web:billing' %}" class="btn btn-primary btn-sm btn-block" style="margin-top:10px">{% if subscription.status == 'active' %}Manage plan{% else %}Upgrade{% endif %}</a>{% endif %}
+      {% endif %}
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost icon-btn menu-toggle" data-menu-toggle aria-label="Menu"><i data-lucide="menu"></i></button>
+      <h1 class="grow">{% block heading %}{% endblock %}</h1>
+      {% block topbar_actions %}{% endblock %}
+      <a class="btn btn-ghost icon-btn" href="/s/{{ restaurant.slug }}/" target="_blank" title="Open online store"><i data-lucide="store"></i></a>
+      <button class="btn btn-ghost icon-btn" id="bell" title="Notifications" style="position:relative"><i data-lucide="bell"></i><span id="bell-dot" class="hidden" style="position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--primary)"></span></button>
+      <button class="btn btn-ghost icon-btn" data-theme-toggle title="Light / dark"><i data-lucide="moon"></i></button>
+      <div class="row" style="gap:8px">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:700">{{ request.user.first_name|default:request.user.username|first|upper }}</div>
+        <div class="small" style="line-height:1.2"><b>{{ request.user.first_name|default:request.user.username }}</b><div class="muted tiny">{{ membership.role.name }}</div></div>
+      </div>
+      <a class="btn btn-ghost icon-btn" href="{% url 'web:logout' %}" title="Log out"><i data-lucide="log-out"></i></a>
+    </header>
+    <main class="content">
+      {% if messages %}{% for m in messages %}<div class="card" style="margin-bottom:16px;border-color:var(--success);background:var(--success-soft)">{{ m }}</div>{% endfor %}{% endif %}
+      {% if subscription and not subscription.is_active %}<div class="card" style="margin-bottom:16px;border-color:var(--danger);background:var(--danger-soft)"><b>Your subscription has expired.</b> Billing keeps working for 7 days — <a href="{% url 'web:billing' %}">renew now</a> to avoid interruption.</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% csrf_token %}{{ perms|json_script:"sv-perms" }}
+{% endblock %}
+{% block scripts %}
+<script>
+window.SV = { restaurant: {{ restaurant.id }}, slug: "{{ restaurant.slug }}", perms: JSON.parse(document.getElementById("sv-perms").textContent) };
+// notifications bell + pending online orders badge
+(function () {
+  let lastPending = null;
+  S.poll(async () => {
+    const live = await S.api("orders/live", { quiet: true });
+    const badge = S.$("#nav-pending");
+    if (badge) { badge.textContent = live.pending_online; badge.classList.toggle("hidden", !live.pending_online); }
+    S.$("#bell-dot").classList.toggle("hidden", !live.unread_notifications);
+    if (lastPending !== null && live.pending_online > lastPending) { S.beep(); S.toast("New online order received!", "ok"); }
+    lastPending = live.pending_online;
+  }, 10000);
+  S.$("#bell").onclick = async () => {
+    const list = await S.list("notifications");
+    const m = S.modal({ title: "Notifications", body: list.length ? list.slice(0, 30).map((n) => `<a href="${S.esc(n.link || '#')}" class="row" style="padding:10px 0;border-bottom:1px solid var(--line);color:inherit;align-items:flex-start">
+        <span class="badge ${n.is_read ? '' : 'b-primary'}">${S.esc(n.kind.replace('_', ' '))}</span><div class="grow"><b>${S.esc(n.title)}</b><div class="small muted">${S.esc(n.body)} · ${S.date(n.created_at)}</div></div></a>`).join("") : '<div class="empty">No notifications</div>',
+      footer: '<button class="btn" data-read>Mark all as read</button>' });
+    m.$("[data-read]").onclick = async () => { await S.api("notifications/read-all", { body: {} }); m.close(); S.$("#bell-dot").classList.add("hidden"); };
+  };
+  S.startBrowserPrinting();
+})();
+</script>
+{% block page_scripts %}{% endblock %}
+{% endblock %}

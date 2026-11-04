@@ -1,0 +1,26 @@
+{% extends "auth/_layout.html" %}
+{% block title %}Start your free trial · Servora{% endblock %}
+{% block pitch %}14 days of Pro, free. No card required.{% endblock %}
+{% block form %}
+<h1 style="font-size:28px">Create your restaurant</h1>
+<p class="muted">You'll be billing in under 10 minutes.</p>
+{% if errors %}<div class="err">{% for f, e in errors.items %}{{ e|join:" " }}<br>{% endfor %}</div>{% endif %}
+<form method="post">{% csrf_token %}
+  <div class="field"><label>Your name</label><input type="text" name="name" required value="{{ data.name|default:'' }}"></div>
+  <div class="grid g2" style="gap:0 12px">
+    <div class="field"><label>Mobile number</label><input type="tel" name="phone" required pattern="\+?\d{10,13}" value="{{ data.phone|default:'' }}" inputmode="numeric"></div>
+    <div class="field"><label>Email (optional)</label><input type="email" name="email" value="{{ data.email|default:'' }}"></div>
+  </div>
+  <div class="field"><label>Restaurant / hotel name</label><input type="text" name="restaurant_name" required value="{{ data.restaurant_name|default:'' }}"></div>
+  <div class="grid g2" style="gap:0 12px">
+    <div class="field"><label>Business type</label><select name="business_type">
+      <option value="restaurant">Restaurant</option><option value="hotel">Hotel F&B</option><option value="cafe">Cafe / QSR</option><option value="cloud_kitchen">Cloud kitchen</option><option value="bar">Bar & lounge</option><option value="bakery">Bakery</option></select></div>
+    <div class="field"><label>City</label><input type="text" name="city" value="{{ data.city|default:'' }}"></div>
+  </div>
+  <div class="field"><label>Password</label><input type="password" name="password" required minlength="8" autocomplete="new-password"><div class="help">At least 8 characters.</div></div>
+  <input type="hidden" name="plan" value="{{ data.plan|default:'growth' }}">
+  <button class="btn btn-primary btn-lg btn-block" type="submit">Start free trial</button>
+  <p class="tiny muted center" style="margin-top:10px">By continuing you agree to the Terms of Service and Privacy Policy.</p>
+</form>
+<p class="center">Already have an account? <a href="{% url 'web:login' %}"><b>Log in</b></a></p>
+{% endblock %}

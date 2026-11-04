@@ -1,0 +1,70 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Kitchen{% endblock %}
+{% block heading %}Kitchen display{% endblock %}
+{% block topbar_actions %}
+<select id="station" style="width:auto;min-height:38px"><option value="">All stations</option></select>
+<button class="btn btn-sm" id="fs" title="Full screen"><i data-lucide="maximize"></i></button>
+{% endblock %}
+{% block head %}<style>
+  .kds { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .kot { background: var(--surface); border-radius: 16px; border: 1px solid var(--line); overflow: hidden; box-shadow: var(--shadow); }
+  .kot-h { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; color: #fff; background: var(--info); }
+  .kot.late .kot-h { background: var(--warning); } .kot.very-late .kot-h { background: var(--danger); animation: pulse 1.2s infinite; }
+  .kot.ready .kot-h { background: var(--success); }
+  @keyframes pulse { 50% { filter: brightness(1.2); } }
+  .kot ul { list-style: none; margin: 0; padding: 10px 14px; }
+  .kot li { padding: 6px 0; border-bottom: 1px dashed var(--line); font-weight: 600; }
+  .kot li small { display: block; color: var(--warning); font-weight: 500; }
+  .kot .q { display: inline-block; min-width: 28px; font-weight: 800; color: var(--primary); }
+  .kot-f { padding: 10px 14px 14px; }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } }
+  .col-h { font-weight: 800; margin-bottom: 10px; display: flex; gap: 8px; align-items: center; }
+</style>{% endblock %}
+{% block content %}
+<div class="cols">
+  <div><div class="col-h"><span class="badge b-info" id="n-pending">0</span> New</div><div class="kds" data-col="pending"></div></div>
+  <div><div class="col-h"><span class="badge b-warning" id="n-preparing">0</span> Preparing</div><div class="kds" data-col="preparing"></div></div>
+  <div><div class="col-h"><span class="badge b-success" id="n-ready">0</span> Ready to serve</div><div class="kds" data-col="ready"></div></div>
+</div>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  const stations = await S.list("stations");
+  S.$("#station").innerHTML += stations.map((s) => `<option value="${s.id}">${S.esc(s.name)}</option>`).join("");
+  S.$("#station").value = localStorage.getItem("sv_station") || "";
+  S.$("#station").onchange = () => { localStorage.setItem("sv_station", S.$("#station").value); load(); };
+  S.$("#fs").onclick = () => document.documentElement.requestFullscreen?.();
+  let seen = null;
+  const next = { pending: ["preparing", "Start cooking"], preparing: ["ready", "Mark ready"], ready: ["served", "Picked up"] };
+  async function load() {
+    const st = S.$("#station").value;
+    const kots = await S.list(`kots?status=pending,preparing,ready${st ? "&station=" + st : ""}`);
+    const ids = new Set(kots.filter((k) => k.status === "pending").map((k) => k.id));
+    if (seen && [...ids].some((i) => !seen.has(i))) { S.beep(); }
+    seen = ids;
+    ["pending", "preparing", "ready"].forEach((s) => {
+      const list = kots.filter((k) => k.status === s);
+      S.$("#n-" + s).textContent = list.length;
+      S.$(`[data-col="${s}"]`).innerHTML = list.map((k) => {
+        const mins = (Date.now() - new Date(k.created_at)) / 60000;
+        const cls = s === "ready" ? "ready" : mins > 25 ? "very-late" : mins > 15 ? "late" : "";
+        return `<div class="kot ${cls}"><div class="kot-h"><div><b>KOT ${k.number}</b> · ${S.esc(k.order_label)}<div class="tiny" style="opacity:.85">#${S.esc(k.order_number)} · ${S.esc(k.station_name || "Kitchen")} · ${S.esc(k.source)}</div></div><b>${S.ago(k.created_at)}</b></div>
+          <ul>${k.lines.filter((l) => !l.is_void).map((l) => `<li><span class="q">${S.qty(l.quantity)}×</span>${S.esc(l.display_name)}${l.addons.length ? `<small>+ ${l.addons.map((a) => S.esc(a.name)).join(", ")}</small>` : ""}${l.notes ? `<small>⚠ ${S.esc(l.notes)}</small>` : ""}</li>`).join("")}</ul>
+          ${k.order_notes ? `<div class="small" style="padding:0 14px;color:var(--warning)">Note: ${S.esc(k.order_notes)}</div>` : ""}
+          <div class="kot-f row"><button class="btn ${s === "preparing" ? "btn-success" : "btn-primary"} btn-block" data-kot="${k.id}" data-to="${next[s][0]}">${next[s][1]}</button><button class="btn icon-btn" data-reprint="${k.id}" title="Reprint"><i data-lucide="printer"></i></button></div></div>`;
+      }).join("") || '<div class="muted small">—</div>';
+    });
+    S.icons();
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-kot]");
+    if (b) { b.disabled = true; await S.api(`kots/${b.dataset.kot}/status`, { body: { status: b.dataset.to } }); load(); }
+    const r = e.target.closest("[data-reprint]");
+    if (r) { await S.api(`kots/${r.dataset.reprint}/reprint`, { body: {} }); S.toast("Sent to printer"); }
+  });
+  S.poll(load, 5000);
+})();
+</script>
+{% endblock %}

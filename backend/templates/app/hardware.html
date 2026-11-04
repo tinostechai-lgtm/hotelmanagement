@@ -1,0 +1,69 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Hardware{% endblock %}
+{% block heading %}Hardware & devices{% endblock %}
+{% block content %}
+<div class="grid g3" style="margin-bottom:16px">
+  <div class="card"><div class="row" style="gap:10px"><i data-lucide="wifi" style="color:var(--primary)"></i><b>1. Network printers</b></div><p class="small muted" style="margin:8px 0 0">LAN/Wi-Fi ESC/POS printers (Epson, TVS, Posiflex, Xprinter…). Add the printer's IP and install the Servora Agent on any counter PC or Raspberry Pi.</p></div>
+  <div class="card"><div class="row" style="gap:10px"><i data-lucide="usb" style="color:var(--primary)"></i><b>2. Plug into this computer</b></div><p class="small muted" style="margin:8px 0 0">USB, serial or Bluetooth printers, weighing scales and cash drawers work straight from Chrome/Edge — no software needed. Enable "Print from this browser" below.</p></div>
+  <div class="card"><div class="row" style="gap:10px"><i data-lucide="smartphone" style="color:var(--primary)"></i><b>3. Servora app</b></div><p class="small muted" style="margin:8px 0 0">Android tablets print to LAN & Bluetooth printers directly. Barcode scanners work everywhere as a keyboard — just scan into the search box.</p></div>
+</div>
+<div class="tabs" id="tabs"><button class="tab active" data-t="dev">Devices</button><button class="tab" data-t="browser">This browser</button><button class="tab" data-t="agent">Servora Agent</button><button class="tab" data-t="jobs">Print log</button></div>
+<section data-p="dev"><div id="devices"></div></section>
+<section data-p="browser" class="hidden"><div class="card" style="max-width:640px">
+  <label class="check"><input type="checkbox" id="bp"> Print queued KOTs & bills from this browser</label>
+  <p class="small muted">Use for printers connected to this computer. Keep this tab open on the counter PC.</p>
+  <div class="field"><label>Printer connection</label><select id="via"><option value="usb">USB (WebUSB)</option><option value="serial">Serial / COM / USB-serial (WebSerial)</option><option value="bluetooth">Bluetooth (Web Bluetooth)</option></select></div>
+  <div class="field"><label>Serial baud rate</label><input type="number" id="baud" value="9600"></div>
+  <div class="row wrap"><button class="btn btn-primary" id="tp"><i data-lucide="printer"></i>Test print</button><button class="btn" id="dr"><i data-lucide="archive"></i>Open cash drawer</button><button class="btn" id="sc"><i data-lucide="scale"></i>Read weighing scale</button></div>
+</div></section>
+<section data-p="agent" class="hidden"><div class="card" style="max-width:760px">
+  <h3>Servora Hardware Agent</h3>
+  <p>A tiny program for your counter PC / Raspberry Pi that connects <b>all</b> local hardware — network, USB, serial & Bluetooth printers, cash drawers, customer displays and weighing scales — to Servora in the cloud.</p>
+  <ol><li>Download the agent from the <code>hardware-agent/</code> folder of your Servora installation (Windows: run <code>install_windows.bat</code>; Linux / Raspberry Pi: <code>sudo ./install_linux.sh</code>).</li>
+    <li>When asked, paste this restaurant's device key:</li></ol>
+  <div class="row"><input type="text" id="key" readonly class="mono"><button class="btn" id="copy"><i data-lucide="copy"></i>Copy</button><button class="btn" id="rotate"><i data-lucide="refresh-cw"></i>New key</button></div>
+  <p class="small muted" style="margin-top:10px">Server URL: <code id="srv"></code>. The agent polls every 2 seconds and reports device health; online devices show a green dot.</p>
+</div></section>
+<section data-p="jobs" class="hidden"><div id="jobs"></div></section>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
+  const stations = await S.list("stations");
+  const kinds = [["receipt_printer", "Receipt / bill printer"], ["kot_printer", "KOT / kitchen printer"], ["label_printer", "Label printer"], ["kds", "Kitchen display screen"], ["cash_drawer", "Cash drawer"], ["customer_display", "Customer display"], ["weighing_scale", "Weighing scale"], ["barcode_scanner", "Barcode / QR scanner"], ["card_terminal", "Card / UPI terminal"], ["token_display", "Token display"], ["pos_terminal", "POS terminal / tablet"]];
+  const conns = [["network", "LAN / Wi-Fi (IP)"], ["usb", "USB"], ["bluetooth", "Bluetooth"], ["serial", "Serial / COM"], ["browser", "This browser"], ["cloud", "Cloud / SDK"], ["hid", "Keyboard (HID)"]];
+  let devices = [];
+  S.crud(S.$("#devices"), { endpoint: "devices", title: "Device", onLoad: (r) => { devices = r; const hub = r[0]; S.$("#key").value = hub ? hub.agent_key : "Add a device first"; },
+    columns: [{ key: "name", label: "Device", render: (d) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.is_online ? "var(--success)" : "var(--line)"}"></span> <b>${S.esc(d.name)}</b><div class="tiny muted">${S.esc(d.vendor)}</div>` },
+      { key: "kind_display", label: "Type" }, { key: "connection_display", label: "Connection", render: (d) => `${S.esc(d.connection_display)}<div class="tiny muted mono">${S.esc(d.address)}</div>` },
+      { key: "stations", label: "Routes", render: (d) => d.stations.map((s) => S.esc((stations.find((x) => x.id === s) || {}).name)).join(", ") || (d.is_default ? "Default" : "—") },
+      { key: "paper_width", label: "Paper", render: (d) => (d.kind.includes("printer") ? d.paper_width + " mm" : "—") }],
+    fields: () => [{ name: "name", label: "Name", required: true, half: true }, { name: "vendor", label: "Brand / model", half: true }, { name: "kind", label: "Type", type: "select", required: true, half: true, options: kinds },
+      { name: "connection", label: "Connection", type: "select", required: true, half: true, options: conns }, { name: "address", label: "Address", help: "Network: 192.168.1.50:9100 · USB: 04b8:0202 · Serial: COM3@9600 · Bluetooth: MAC · Windows printer: win:EPSON TM-T82" },
+      { name: "paper_width", label: "Paper width", type: "select", required: true, half: true, options: [[80, "80 mm"], [58, "58 mm"]], default: 80 }, { name: "copies", label: "Copies", type: "number", half: true, default: 1 },
+      { name: "stations", label: "Kitchen stations routed here (KOT printers / KDS)", type: "multiselect", options: stations.map((s) => [s.id, s.name]) },
+      { name: "is_default", label: "Default bill printer", type: "checkbox" }, { name: "opens_drawer", label: "Kick cash drawer on cash payments", type: "checkbox" }, { name: "is_active", label: "Active", type: "checkbox", default: true }],
+    actions: [{ label: "Test print", icon: "printer", run: async (d) => { const r = await S.api(`devices/${d.id}/test`, { body: {} }); S.modal({ title: "Test page queued", body: `<pre class="mono small" style="background:var(--surface-2);padding:12px;border-radius:10px">${S.esc(r.preview)}</pre>` }); } }] });
+  S.$("#srv").textContent = location.origin;
+  S.$("#copy").onclick = () => { navigator.clipboard.writeText(S.$("#key").value); S.toast("Copied"); };
+  S.$("#rotate").onclick = async () => { if (!devices.length || !(await S.confirm("Generate a new key? The agent must be set up again.", "New key"))) return; const r = await S.api(`devices/${devices[0].id}/rotate-key`, { body: {} }); S.$("#key").value = r.agent_key; };
+  const ls = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : localStorage.setItem(k, v); } catch (e) { return null; } };
+  S.$("#bp").checked = ls("sv_browser_print") === "1"; S.$("#via").value = ls("sv_print_via") || "usb"; S.$("#baud").value = ls("sv_baud") || 9600;
+  S.$("#bp").onchange = () => { ls("sv_browser_print", S.$("#bp").checked ? "1" : "0"); S.toast("Saved — reload the page to apply"); };
+  S.$("#via").onchange = () => ls("sv_print_via", S.$("#via").value);
+  S.$("#baud").onchange = () => ls("sv_baud", S.$("#baud").value);
+  // "Rs. test" receipt bytes built client side
+  const testBytes = () => { const enc = new TextEncoder(); const parts = [[0x1b, 0x40], [0x1b, 0x61, 1], [0x1d, 0x21, 0x11], ...enc.encode("SERVORA\n"), [0x1d, 0x21, 0], ...enc.encode("Browser printing works!\n\n\n\n"), [0x1d, 0x56, 0x41, 3]]; return btoa(String.fromCharCode(...parts.flat())); };
+  S.$("#tp").onclick = async () => { try { await S.hw.print(testBytes(), S.$("#via").value); S.toast("Printed", "ok"); } catch (e) { S.toast(e.message, "err"); } };
+  S.$("#dr").onclick = async () => { try { await S.hw.print(btoa(String.fromCharCode(0x1b, 0x70, 0, 25, 250)), S.$("#via").value); S.toast("Drawer kicked"); } catch (e) { S.toast(e.message, "err"); } };
+  S.$("#sc").onclick = async () => { try { const w = await S.hw.readScale(); S.toast(w ? `Weight: ${w} kg` : "No reading", w ? "ok" : "err"); } catch (e) { S.toast(e.message, "err"); } };
+  S.crud(S.$("#jobs"), { endpoint: "print-jobs", title: "Print job", noDelete: true,
+    columns: [{ key: "created_at", label: "Time", render: (j) => S.date(j.created_at) }, { key: "title", label: "Job" }, { key: "device_name", label: "Device", render: (j) => S.esc(j.device_name || "Browser / unrouted") },
+      { key: "status", label: "Status", render: (j) => `<span class="badge ${{ done: "b-success", failed: "b-danger", queued: "b-warning", sent: "b-info" }[j.status]}">${S.esc(j.status)}</span> <span class="tiny muted">${S.esc(j.error)}</span>` }],
+    actions: [{ label: "Preview", icon: "eye", run: (j) => S.modal({ title: j.title, body: `<pre class="mono small" style="background:var(--surface-2);padding:12px;border-radius:10px;overflow:auto">${S.esc(j.text)}</pre>` }) },
+      { label: "Retry", icon: "rotate-ccw", run: async (j, reload) => { await S.api(`print-jobs/${j.id}/retry`, { body: {} }); reload(); } },
+      { label: "Print here", icon: "usb", run: async (j) => { try { await S.hw.print(j.escpos_b64); await S.api(`print-jobs/${j.id}/ack`, { body: { ok: true } }); S.toast("Printed", "ok"); } catch (e) { S.toast(e.message, "err"); } } }] });
+})();
+</script>
+{% endblock %}

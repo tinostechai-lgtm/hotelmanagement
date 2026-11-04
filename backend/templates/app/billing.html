@@ -1,0 +1,55 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Plan & billing{% endblock %}
+{% block heading %}Plan & billing{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:18px" id="current"><div class="skeleton" style="height:40px"></div></div>
+<div class="row" style="justify-content:center;margin-bottom:18px"><div class="chips" style="background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px">
+  <button class="chip active" data-cycle="monthly">Monthly</button><button class="chip" data-cycle="yearly">Yearly · 2 months free</button></div></div>
+<div class="grid g4" id="plans">
+  {% for p in plans %}
+  <div class="card" style="{% if p.is_popular %}border:2px solid var(--primary);{% endif %}display:flex;flex-direction:column">
+    <div class="row between"><h3 style="margin:0">{{ p.name }}</h3>{% if p.is_popular %}<span class="badge b-primary">Most popular</span>{% endif %}</div>
+    <p class="small muted">{{ p.tagline }}</p>
+    {% if p.price_monthly %}
+    <div><span style="font-size:30px;font-weight:800" data-m="{{ p.price_monthly|floatformat:0 }}" data-y="{{ p.price_yearly|floatformat:0 }}">₹{{ p.price_monthly|floatformat:0 }}</span><span class="muted small" data-per>/month + GST</span></div>
+    {% else %}<div style="font-size:26px;font-weight:800">Custom</div>{% endif %}
+    <ul class="small" style="padding-left:18px;flex:1">
+      <li>{% if p.max_users %}Up to {{ p.max_users }} staff logins{% else %}Unlimited staff{% endif %}</li>
+      <li>{% if p.max_devices %}{{ p.max_devices }} hardware devices{% else %}Unlimited hardware{% endif %}</li>
+      {% for f in p.feature_labels %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+    {% if p.price_monthly %}<button class="btn {% if p.is_popular %}btn-primary{% endif %} btn-block" data-plan="{{ p.code }}">Choose {{ p.name }}</button>
+    {% else %}<a class="btn btn-block" href="mailto:sales@servora.app">Talk to sales</a>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+<div class="card" style="margin-top:18px"><div class="card-h"><h3>Payment history</h3></div><div id="history"></div></div>
+<p class="small muted center" style="margin-top:16px">Secure payments by Razorpay — UPI, cards, netbanking & wallets. GST invoice emailed after payment.</p>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(function () {
+  let cycle = "monthly";
+  S.$$("[data-cycle]").forEach((b) => (b.onclick = () => {
+    cycle = b.dataset.cycle; S.$$("[data-cycle]").forEach((x) => x.classList.toggle("active", x === b));
+    S.$$("[data-m]").forEach((el) => (el.textContent = S.money(cycle === "yearly" ? el.dataset.y : el.dataset.m)));
+    S.$$("[data-per]").forEach((el) => (el.textContent = cycle === "yearly" ? "/year + GST" : "/month + GST"));
+  }));
+  async function load() {
+    const s = await S.api("subscription");
+    S.$("#current").innerHTML = s.plan ? `<div class="row between wrap"><div><div class="small muted">Current plan</div><div style="font-size:22px;font-weight:800">${S.esc(s.plan.name)} <span class="badge ${s.is_active ? "b-success" : "b-danger"}">${S.esc(s.status)}</span></div>
+      <div class="small muted">${s.is_active ? `Valid till ${new Date(s.current_period_end).toLocaleDateString("en-IN")} · ${s.days_left} days left` : "Expired"}${s.cycle ? " · billed " + s.cycle : ""}</div></div></div>` : "No plan";
+    S.$("#history").innerHTML = s.payments.length ? `<table class="data">${s.payments.map((p) => `<tr><td>${S.date(p.date)}</td><td>${S.esc(p.plan)}</td><td>${S.money(p.amount)}</td><td><span class="badge ${p.status === "paid" ? "b-success" : p.status === "failed" ? "b-danger" : ""}">${S.esc(p.status)}</span></td></tr>`).join("")}</table>` : '<div class="muted small">No payments yet.</div>';
+  }
+  S.$("#plans").onclick = async (e) => {
+    const b = e.target.closest("[data-plan]"); if (!b) return;
+    b.disabled = true;
+    try {
+      const co = await S.api("subscription/checkout", { body: { plan: b.dataset.plan, cycle } });
+      S.razorpay(co, async (resp) => { await S.api("subscription/verify", { body: resp }); S.toast("Payment successful — plan activated!", "ok"); setTimeout(() => location.reload(), 900); });
+    } finally { b.disabled = false; }
+  };
+  load();
+})();
+</script>
+{% endblock %}

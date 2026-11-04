@@ -1,0 +1,13 @@
+# Servora Hardware Agent -- OPTIONAL extras.
+# The agent itself needs only Python 3.9+ (standard library). Install these only
+# for the hardware you use; missing ones are reported clearly in the log.
+
+# USB printers (address "vendor:product", e.g. 04b8:0202).
+# Windows also needs a libusb driver (e.g. via Zadig); most people use "win:<printer name>" instead.
+pyusb>=1.2
+
+# Serial / COM printers, Bluetooth COM ports, customer pole displays, weighing scales.
+pyserial>=3.5
+
+# Windows: RAW printing to any installed printer ("win:<printer name>").
+pywin32>=306; sys_platform == "win32"

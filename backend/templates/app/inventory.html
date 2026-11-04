@@ -1,0 +1,65 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Inventory{% endblock %}
+{% block heading %}Inventory{% endblock %}
+{% block content %}
+<div class="grid g3" style="margin-bottom:16px">
+  <div class="card kpi"><span class="l">Stock value</span><span class="v" id="k-value">—</span></div>
+  <div class="card kpi"><span class="l">Items to re-order</span><span class="v" id="k-low">—</span></div>
+  <div class="card kpi"><span class="l">Ingredients tracked</span><span class="v" id="k-count">—</span></div>
+</div>
+<div class="tabs" id="tabs"><button class="tab active" data-t="ing">Stock</button><button class="tab" data-t="rec">Recipes</button><button class="tab" data-t="po">Purchase orders</button><button class="tab" data-t="sup">Suppliers</button><button class="tab" data-t="mov">Stock ledger</button></div>
+<section data-p="ing"><div id="ing"></div></section>
+<section data-p="rec" class="hidden"><div class="card"><div class="row wrap"><select id="rec-item" style="max-width:320px"></select><button class="btn btn-primary" id="rec-add"><i data-lucide="plus"></i>Add ingredient</button></div><div id="rec-list" style="margin-top:14px"></div>
+  <p class="small muted" style="margin-top:12px">Recipes deduct stock automatically every time an order is completed, and raise a low-stock alert.</p></div></section>
+<section data-p="po" class="hidden"><div id="po"></div></section>
+<section data-p="sup" class="hidden"><div id="sup"></div></section>
+<section data-p="mov" class="hidden"><div id="mov"></div></section>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
+  let ings = [], sups = await S.list("inventory/suppliers");
+  const units = [["kg", "kg"], ["g", "g"], ["l", "litre"], ["ml", "ml"], ["pc", "piece"], ["pack", "pack"]];
+  const ing = S.crud(S.$("#ing"), { endpoint: "inventory/ingredients", title: "Ingredient",
+    onLoad: (r) => { ings = r; S.$("#k-value").textContent = S.money(r.reduce((s, i) => s + Number(i.stock_value), 0)); S.$("#k-low").textContent = r.filter((i) => i.is_low).length; S.$("#k-count").textContent = r.length; },
+    columns: [{ key: "name", label: "Ingredient", render: (i) => `<b>${S.esc(i.name)}</b> ${i.is_low ? '<span class="badge b-danger">Low</span>' : ""}` },
+      { key: "stock", label: "In stock", render: (i) => `${Number(i.stock)} ${S.esc(i.unit)}` }, { key: "reorder_level", label: "Re-order at", render: (i) => `${Number(i.reorder_level)} ${S.esc(i.unit)}` },
+      { key: "cost_per_unit", label: "Cost / unit", render: (i) => S.money(i.cost_per_unit) }, { key: "stock_value", label: "Value", render: (i) => S.money(i.stock_value) }],
+    fields: () => [{ name: "name", label: "Name", required: true }, { name: "unit", label: "Unit", type: "select", required: true, half: true, options: units },
+      { name: "reorder_level", label: "Re-order level", type: "number", half: true }, { name: "cost_per_unit", label: "Cost per unit (₹)", type: "number", half: true },
+      { name: "supplier", label: "Supplier", type: "select", half: true, options: sups.map((s) => [s.id, s.name]) }],
+    actions: [{ label: "Stock in / wastage", icon: "arrow-down-up", run: async (i, reload) => {
+      const v = await S.prompt(`Adjust ${i.name}`, [{ name: "kind", label: "Type", type: "select", required: true, options: [["purchase", "Purchase / stock in"], ["wastage", "Wastage / spoilage"], ["adjustment", "Physical count adjustment (+/−)"]] },
+        { name: "quantity", label: `Quantity (${i.unit})`, type: "number", required: true }, { name: "unit_cost", label: "Unit cost ₹ (purchases)", type: "number" }, { name: "reference", label: "Reference / bill no." }], "Save");
+      if (v) { await S.api(`inventory/ingredients/${i.id}/adjust`, { body: v }); reload(); } } }] });
+  const items = await S.list("items");
+  S.$("#rec-item").innerHTML = items.map((i) => `<option value="${i.id}">${S.esc(i.name)}</option>`).join("");
+  async function loadRecipe() {
+    const r = await S.list(`inventory/recipes?item=${S.$("#rec-item").value}`);
+    S.$("#rec-list").innerHTML = r.length ? `<table class="data">${r.map((x) => `<tr><td>${S.esc(x.ingredient_name)}</td><td>${Number(x.quantity)} ${S.esc(x.unit)} per portion</td><td class="right"><button class="btn btn-sm btn-ghost" data-del-rec="${x.id}"><i data-lucide="trash-2"></i></button></td></tr>`).join("")}</table>` : '<div class="muted">No recipe yet for this item.</div>';
+    S.icons();
+  }
+  S.$("#rec-item").onchange = loadRecipe;
+  S.$("#rec-add").onclick = async () => {
+    const v = await S.prompt("Add to recipe", [{ name: "ingredient", label: "Ingredient", type: "select", required: true, options: ings.map((i) => [i.id, `${i.name} (${i.unit})`]) }, { name: "quantity", label: "Quantity per portion", type: "number", required: true }], "Add");
+    if (v) { await S.api("inventory/recipes", { body: { ...v, item: S.$("#rec-item").value } }); loadRecipe(); }
+  };
+  S.$("#rec-list").onclick = async (e) => { const b = e.target.closest("[data-del-rec]"); if (b) { await S.api(`inventory/recipes/${b.dataset.delRec}`, { method: "DELETE" }); loadRecipe(); } };
+  loadRecipe();
+  S.crud(S.$("#po"), { endpoint: "inventory/purchase-orders", title: "Purchase order", canCreate: true,
+    columns: [{ key: "id", label: "PO", render: (p) => `<b>PO-${p.id}</b><div class="tiny muted">${S.date(p.created_at)}</div>` }, { key: "supplier_name", label: "Supplier" },
+      { key: "lines", label: "Items", render: (p) => p.lines.map((l) => `${S.esc(l.ingredient_name)} × ${Number(l.quantity)}`).join(", ") }, { key: "total", label: "Total", render: (p) => S.money(p.total) },
+      { key: "status", label: "Status", render: (p) => `<span class="badge ${p.status === "received" ? "b-success" : "b-warning"}">${S.esc(p.status)}</span>` }],
+    fields: () => [{ name: "supplier", label: "Supplier", type: "select", required: true, options: sups.map((s) => [s.id, s.name]) }, { name: "expected_on", label: "Expected on", type: "date" },
+      { name: "lines_text", label: "Lines — one per line: ingredient name, qty, unit cost", type: "textarea", help: ings.map((i) => i.name).join(", ") }, { name: "notes", label: "Notes" }],
+    beforeSave: (b) => { b.lines = (b.lines_text || "").split("\n").map((l) => l.split(",").map((x) => x.trim())).filter((x) => x[0]).map(([n, q, c]) => ({ ingredient: (ings.find((i) => i.name.toLowerCase() === n.toLowerCase()) || {}).id, quantity: q || 1, unit_cost: c || 0 })); delete b.lines_text; if (!b.expected_on) b.expected_on = null; return b; },
+    actions: [{ label: "Mark received (adds stock)", icon: "package-check", run: async (p, reload) => { await S.api(`inventory/purchase-orders/${p.id}/receive`, { body: {} }); S.toast("Stock updated", "ok"); reload(); ing.reload(); } }] });
+  S.crud(S.$("#sup"), { endpoint: "inventory/suppliers", title: "Supplier", onLoad: (r) => (sups = r), columns: [{ key: "name", label: "Supplier" }, { key: "phone", label: "Phone" }, { key: "gstin", label: "GSTIN" }],
+    fields: [{ name: "name", label: "Name", required: true }, { name: "phone", label: "Phone", type: "tel", half: true }, { name: "email", label: "Email", type: "email", half: true }, { name: "gstin", label: "GSTIN" }, { name: "address", label: "Address", type: "textarea" }] });
+  S.crud(S.$("#mov"), { endpoint: "inventory/movements", title: "Movement", noDelete: true,
+    columns: [{ key: "created_at", label: "Date", render: (m) => S.date(m.created_at) }, { key: "ingredient_name", label: "Ingredient" }, { key: "kind", label: "Type" },
+      { key: "quantity", label: "Qty", render: (m) => `<b style="color:${Number(m.quantity) < 0 ? "var(--danger)" : "var(--success)"}">${Number(m.quantity) > 0 ? "+" : ""}${Number(m.quantity)}</b>` }, { key: "reference", label: "Reference" }] });
+})();
+</script>
+{% endblock %}

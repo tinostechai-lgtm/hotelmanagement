@@ -1,0 +1,98 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Menu{% endblock %}
+{% block heading %}Menu{% endblock %}
+{% block content %}
+<div class="tabs" id="tabs"><button class="tab active" data-t="items">Items</button><button class="tab" data-t="cats">Categories</button><button class="tab" data-t="addons">Add-ons</button><button class="tab" data-t="hsn">HSN & GST</button><button class="tab" data-t="stations">Kitchen stations</button></div>
+<section data-p="items"><div id="items"></div></section>
+<section data-p="cats" class="hidden"><div id="cats"></div></section>
+<section data-p="addons" class="hidden"><div id="addons"></div></section>
+<section data-p="hsn" class="hidden"><div id="hsn"></div></section>
+<section data-p="stations" class="hidden"><div id="stations"></div></section>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(async function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
+  let cats = [], hsn = [], stations = [], items = [];
+  [cats, hsn, stations] = await Promise.all([S.list("categories"), S.list("hsn"), S.list("stations")]);
+  const diets = [["veg", "Veg"], ["non_veg", "Non-veg"], ["egg", "Egg"], ["vegan", "Vegan"]];
+  const parsePairs = (txt) => (txt || "").split(",").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, p] = s.split(":"); return { name: n.trim(), price: Number(p || 0) }; });
+
+  const itemsCrud = S.crud(S.$("#items"), {
+    endpoint: "items", title: "Item", onLoad: (r) => (items = r),
+    toolbar: '<button class="btn" id="bulk"><i data-lucide="upload"></i>Import CSV</button>',
+    columns: [
+      { key: "name", label: "Item", render: (i) => `<div class="row" style="gap:8px"><span class="diet ${i.diet}"></span><div><b>${S.esc(i.name)}</b> ${i.is_bestseller ? '<span class="badge b-primary">Bestseller</span>' : ""}<div class="tiny muted">${S.esc(i.short_code)} ${i.variants.length ? "· " + i.variants.map((v) => S.esc(v.name)).join("/") : ""}</div></div></div>` },
+      { key: "category_name", label: "Category" },
+      { key: "price", label: "Price", render: (i) => S.money(i.price) + (i.delivery_price ? `<div class="tiny muted">Online ${S.money(i.delivery_price)}</div>` : "") },
+      { key: "effective_tax", label: "GST", render: (i) => i.effective_tax + "%" },
+      { key: "is_available", label: "Available", render: (i) => `<label class="check"><input type="checkbox" data-toggle="${i.id}" ${i.is_available ? "checked" : ""}> ${i.track_stock ? `<span class="small muted">${i.stock_qty} left</span>` : ""}</label>` }],
+    fields: () => [
+      { name: "name", label: "Item name", required: true },
+      { name: "category", label: "Category", type: "select", required: true, half: true, options: cats.map((c) => [c.id, c.name]) },
+      { name: "diet", label: "Type", type: "select", required: true, half: true, options: diets },
+      { name: "price", label: "Price (₹)", type: "number", required: true, half: true },
+      { name: "delivery_price", label: "Online / delivery price (optional)", type: "number", half: true, nullable: true },
+      { name: "short_code", label: "Short code (type-to-bill)", half: true },
+      { name: "barcode", label: "Barcode", half: true },
+      { name: "hsn", label: "HSN code", type: "select", half: true, options: hsn.map((h) => [h.id, `${h.code} (${h.gst_percent}%)`]) },
+      { name: "tax_percent", label: "GST % (if no HSN)", type: "number", half: true, default: 5 },
+      { name: "station", label: "Kitchen station", type: "select", half: true, options: stations.map((s) => [s.id, s.name]) },
+      { name: "prep_minutes", label: "Prep time (min)", type: "number", half: true, default: 15 },
+      { name: "variants_text", label: "Variants (e.g. Half:180, Full:300)", help: "Leave empty if the item has a single price" },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "image_url", label: "Image URL", type: "url" },
+      { name: "is_available", label: "Available now", type: "checkbox", default: true },
+      { name: "available_online", label: "Show on online store", type: "checkbox", default: true },
+      { name: "is_bestseller", label: "Bestseller tag", type: "checkbox" },
+      { name: "is_weighted", label: "Sold by weight (kg) — uses weighing scale", type: "checkbox" },
+      { name: "track_stock", label: "Limited quantity today", type: "checkbox" },
+      { name: "stock_qty", label: "Quantity available", type: "number", half: true }],
+    beforeSave: (b) => { b.variants = parsePairs(b.variants_text); delete b.variants_text; return b; },
+  });
+  // Edit items with variants shown as text.
+  S.$("#items").addEventListener("click", (e) => {
+    if (!e.target.closest("[data-edit]")) return;
+    e.stopImmediatePropagation();
+    const it = items.find((x) => x.id == e.target.closest("tr").dataset.id);
+    itemsCrud.edit({ ...it, variants_text: it.variants.map((v) => `${v.name}:${Number(v.price)}`).join(", ") });
+  }, true);
+  S.$("#items").addEventListener("change", async (e) => {
+    const t = e.target.closest("[data-toggle]");
+    if (t) { await S.api(`items/${t.dataset.toggle}/toggle`, { body: { available: t.checked } }); S.toast(t.checked ? "Item available" : "Item marked unavailable"); }
+  });
+  S.$("#items").addEventListener("click", (e) => {
+    if (!e.target.closest("#bulk")) return;
+    const m = S.modal({ title: "Import items from CSV", body: '<p class="small muted">One item per line: <code>name,category,price,diet,short_code,gst</code>. Missing categories are created.</p><textarea id="csv" style="min-height:180px" placeholder="Masala Dosa,South Indian,90,veg,MD,5"></textarea>',
+      footer: '<button class="btn" data-close>Cancel</button><button class="btn btn-primary" id="go">Import</button>' });
+    m.$("#go").onclick = async () => {
+      let n = 0;
+      for (const line of m.$("#csv").value.split("\n").map((l) => l.trim()).filter(Boolean)) {
+        const [name, cat, price, diet, code, gst] = line.split(",").map((x) => (x || "").trim());
+        if (!name || !price || name.toLowerCase() === "name") continue;
+        let c = cats.find((x) => x.name.toLowerCase() === (cat || "General").toLowerCase());
+        if (!c) { c = await S.api("categories", { body: { name: cat || "General" } }); cats.push(c); }
+        await S.api("items", { body: { name, category: c.id, price, diet: diet || "veg", short_code: code || "", tax_percent: gst || 5 } });
+        n++;
+      }
+      m.close(); S.toast(`${n} items imported`, "ok"); itemsCrud.reload();
+    };
+  });
+
+  S.crud(S.$("#cats"), { endpoint: "categories", title: "Category", onLoad: (r) => (cats = r),
+    columns: [{ key: "name", label: "Category", render: (c) => `<b>${S.esc(c.name)}</b>` }, { key: "item_count", label: "Items" }, { key: "sort", label: "Order" }, { key: "is_active", label: "Active", render: (c) => (c.is_active ? "✓" : "—") }],
+    fields: () => [{ name: "name", label: "Name", required: true }, { name: "sort", label: "Display order", type: "number", half: true },
+      { name: "station", label: "Kitchen station", type: "select", half: true, options: stations.map((s) => [s.id, s.name]) }, { name: "description", label: "Description" }, { name: "is_active", label: "Active", type: "checkbox", default: true }] });
+  S.crud(S.$("#addons"), { endpoint: "addon-groups", title: "Add-on group",
+    columns: [{ key: "name", label: "Group", render: (g) => `<b>${S.esc(g.name)}</b><div class="tiny muted">${g.addons.map((a) => `${S.esc(a.name)} +${S.money(a.price)}`).join(", ")}</div>` }, { key: "items", label: "Items", render: (g) => g.items.length }, { key: "max_select", label: "Max" }],
+    fields: () => [{ name: "name", label: "Group name", required: true }, { name: "min_select", label: "Min choices", type: "number", half: true }, { name: "max_select", label: "Max choices", type: "number", half: true, default: 3 },
+      { name: "addons_text", label: "Add-ons (Extra cheese:40, Less spicy:0)" }, { name: "items", label: "Applies to items (Ctrl/Cmd-click to pick several)", type: "multiselect", options: items.map((i) => [i.id, i.name]) }],
+    beforeSave: (b, row) => { if (b.addons_text || !row) b.addons = parsePairs(b.addons_text); delete b.addons_text; return b; } });
+  S.crud(S.$("#hsn"), { endpoint: "hsn", title: "HSN code", onLoad: (r) => (hsn = r),
+    columns: [{ key: "code", label: "HSN / SAC" }, { key: "description", label: "Description" }, { key: "gst_percent", label: "GST %" }, { key: "cess_percent", label: "Cess %" }],
+    fields: [{ name: "code", label: "HSN / SAC code", required: true, half: true }, { name: "gst_percent", label: "GST %", type: "number", half: true, default: 5 }, { name: "description", label: "Description" }, { name: "cess_percent", label: "Cess %", type: "number" }] });
+  S.crud(S.$("#stations"), { endpoint: "stations", title: "Station", onLoad: (r) => (stations = r),
+    columns: [{ key: "name", label: "Station" }], fields: [{ name: "name", label: "Station name (e.g. Tandoor, Bar, Desserts)", required: true }] });
+})();
+</script>
+{% endblock %}

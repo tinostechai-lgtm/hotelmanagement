@@ -1,0 +1,3 @@
+{% extends "app/shell.html" %}{% block page_title %}Upgrade{% endblock %}{% block heading %}Unlock {{ feature_label }}{% endblock %}
+{% block content %}<div class="card empty" style="max-width:560px;margin:40px auto"><i data-lucide="sparkles"></i><h3>{{ feature_label }} isn't in your current plan</h3>
+<p>Upgrade in one click — your data and settings stay exactly as they are.</p><a class="btn btn-primary btn-lg" href="{% url 'web:billing' %}">See plans</a></div>{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}QR codes · {{ restaurant.name }}{% endblock %}
+{% block head %}<style>
+  body { background: #fff; color: #14123A; }
+  .sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; padding: 24px; }
+  .qr-card { border: 2px solid #14123A; border-radius: 18px; padding: 18px; text-align: center; break-inside: avoid; }
+  .qr-card .qr { display: grid; place-items: center; margin: 12px 0; }
+  .qr-card h2 { margin: 0; font-size: 28px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #eee; }
+  @media print { .bar { display: none; } .sheet { padding: 0; } }
+</style>{% endblock %}
+{% block body %}
+<div class="bar"><b>{{ restaurant.name }} — table & room QR codes</b><button class="btn btn-primary" onclick="window.print()">Print</button></div>
+<div class="sheet">
+  <div class="qr-card"><div class="small">Order online</div><h2>{{ restaurant.name }}</h2><div class="qr" data-url="{{ store_url }}"></div><div class="small">Scan for home delivery & takeaway</div></div>
+  {% for t, url in tables %}<div class="qr-card"><div class="small">{{ restaurant.name }}</div><h2>Table {{ t.name }}</h2><div class="qr" data-url="{{ url }}"></div><div class="small">Scan to view menu, order & pay</div><div class="tiny" style="margin-top:6px;opacity:.6">Powered by Servora</div></div>{% endfor %}
+  {% for r, url in rooms %}<div class="qr-card"><div class="small">{{ restaurant.name }} · In-room dining</div><h2>Room {{ r.number }}</h2><div class="qr" data-url="{{ url }}"></div><div class="small">Scan to order room service</div></div>{% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>document.querySelectorAll(".qr").forEach((el) => new QRCode(el, { text: el.dataset.url, width: 170, height: 170, colorDark: "#14123A", correctLevel: QRCode.CorrectLevel.M }));</script>
+{% endblock %}

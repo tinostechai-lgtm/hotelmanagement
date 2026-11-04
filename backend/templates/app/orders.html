@@ -1,0 +1,46 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Orders{% endblock %}
+{% block heading %}Orders{% endblock %}
+{% block content %}
+<div class="tabs" id="tabs">
+  <button class="tab active" data-f="status=pending">Awaiting acceptance <span class="badge b-warning" id="c-pending"></span></button>
+  <button class="tab" data-f="status=open">Running</button>
+  <button class="tab" data-f="source=online,app,qr">Online & QR</button>
+  <button class="tab" data-f="type=delivery">Delivery</button>
+  <button class="tab" data-f="status=completed">Completed</button>
+  <button class="tab" data-f="status=cancelled">Cancelled</button>
+  <button class="tab" data-f="">All</button>
+</div>
+<div class="row wrap" style="margin-bottom:14px"><input type="search" id="q" placeholder="Order no., phone or name" style="max-width:280px"><input type="date" id="d" style="max-width:180px"></div>
+<div id="list"></div>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(function () {
+  let filter = "status=pending";
+  const badge = (o) => `<span class="badge ${{ pending: "b-warning", completed: "b-success", cancelled: "b-danger", ready: "b-success" }[o.status] || "b-info"}">${S.esc(o.status_display)}</span>`;
+  async function load() {
+    const q = S.$("#q").value, d = S.$("#d").value;
+    const rows = await S.list(`orders?${filter}${q ? "&q=" + encodeURIComponent(q) : ""}${d ? "&date=" + d : ""}`);
+    S.$("#list").innerHTML = rows.length ? `<div class="table-wrap"><table class="data"><thead><tr><th>Order</th><th>Type</th><th>Customer</th><th>Status</th><th>Time</th><th class="right">Total</th><th></th></tr></thead><tbody>${rows.map((o) => `<tr>
+      <td><b>#${S.esc(o.number)}</b><div class="tiny muted">${S.esc(o.source_display)}</div></td><td>${S.esc(o.label)}</td>
+      <td>${S.esc(o.customer_name || "—")}<div class="tiny muted">${S.esc(o.customer_phone || "")}</div></td><td>${badge(o)} ${o.is_paid ? '<span class="badge b-success">Paid</span>' : o.payment_mode === "cod" ? '<span class="badge">COD</span>' : ""}</td>
+      <td class="small muted">${S.date(o.created_at)}</td><td class="right"><b>${S.money(o.total)}</b></td>
+      <td class="right nowrap">${o.status === "pending" ? `<button class="btn btn-sm btn-success" data-accept="${o.id}">Accept</button> <button class="btn btn-sm btn-danger" data-reject="${o.id}">Reject</button>` : ""}
+      <a class="btn btn-sm" href="/app/pos/?order=${o.id}">Open</a></td></tr>`).join("")}</tbody></table></div>` : '<div class="card empty"><i data-lucide="inbox"></i><div>No orders here.</div></div>';
+    S.icons();
+    const live = await S.api("orders/live", { quiet: true }); S.$("#c-pending").textContent = live.pending_online || "";
+  }
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-f]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); filter = t.dataset.f; load(); };
+  S.$("#q").oninput = () => { clearTimeout(window._qt); window._qt = setTimeout(load, 300); };
+  S.$("#d").onchange = load;
+  S.$("#list").onclick = async (e) => {
+    const a = e.target.closest("[data-accept]"), r = e.target.closest("[data-reject]");
+    if (a) { await S.api(`orders/${a.dataset.accept}/status`, { body: { status: "accepted", send_kot: true } }); S.toast("Accepted & sent to kitchen", "ok"); load(); }
+    if (r) { const v = await S.prompt("Reject order", [{ name: "reason", label: "Reason", type: "select", required: true, options: [["Item out of stock", "Item out of stock"], ["Kitchen busy", "Kitchen busy"], ["Outside delivery area", "Outside delivery area"], ["Store closing", "Store closing"]] }], "Reject");
+      if (v) { await S.api(`orders/${r.dataset.reject}/status`, { body: { status: "cancelled", reason: v.reason } }); load(); } }
+  };
+  S.poll(load, 15000);
+})();
+</script>
+{% endblock %}

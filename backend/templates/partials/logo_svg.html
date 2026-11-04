@@ -1,0 +1,9 @@
+<svg viewBox="0 0 120 120" class="sv-mark {{ cls|default:'sv-anim' }}" aria-hidden="true" {% if size %}width="{{ size }}" height="{{ size }}"{% endif %}>
+  <defs><linearGradient id="svg-{{ uid|default:'a' }}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A3D"/><stop offset="1" stop-color="#F0502A"/></linearGradient></defs>
+  <rect width="120" height="120" rx="30" fill="#14123A"/>
+  <path class="steam" d="M69 15C62 10 51 13 53 20C55 26 67 25 67 31C67 37 57 39 51 35" fill="none" stroke="#FFD2B3" stroke-width="5" stroke-linecap="round"/>
+  <path class="dome" d="M26 82a34 34 0 0 1 68 0z" fill="url(#svg-{{ uid|default:'a' }})"/>
+  <circle class="knob" cx="60" cy="46" r="4.5" fill="url(#svg-{{ uid|default:'a' }})"/>
+  <rect class="tray" x="18" y="86" width="84" height="8" rx="4" fill="#FFFFFF"/>
+  <path class="shine" d="M40 74a22 22 0 0 1 12-17" fill="none" stroke="#FFFFFF" stroke-opacity=".45" stroke-width="4" stroke-linecap="round"/>
+</svg>

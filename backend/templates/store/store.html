@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ r.name }} — Order online{% endblock %}
+{% block description %}Order from {{ r.name }} online — home delivery, takeaway and table ordering.{% endblock %}
+{% block head %}<style>
+  :root { --brand: {{ r.brand_color|default:"#F4632F" }}; }
+  body { background: var(--bg); padding-bottom: 96px; }
+  .st-wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  .st-hero { background: linear-gradient(160deg, #14123A, #2A2760); color: #fff; padding: 28px 0 70px; }
+  .st-hero h1 { font-size: 28px; margin: 0; }
+  .st-card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); margin-top: -50px; padding: 14px; position: relative; }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .modes button { border: 2px solid var(--line); border-radius: 12px; padding: 10px; background: var(--surface); font: 700 14px var(--font); cursor: pointer; color: var(--text); }
+  .modes button.active { border-color: var(--brand); background: var(--primary-soft); color: var(--brand); }
+  .cat-bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; }
+  .m-item { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .m-item .img { width: 104px; height: 104px; border-radius: 14px; background: var(--surface-2) center/cover; flex: none; position: relative; }
+  .m-item .add { position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); }
+  .add { background: var(--surface); border: 1px solid var(--line); color: var(--brand); font: 800 14px var(--font); border-radius: 10px; padding: 7px 18px; cursor: pointer; box-shadow: var(--shadow); }
+  .qtyb { display: inline-flex; align-items: center; background: var(--brand); color: #fff; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+  .qtyb button { background: none; border: 0; color: #fff; font: 800 16px var(--font); width: 32px; height: 32px; cursor: pointer; }
+  .qtyb span { min-width: 22px; text-align: center; font-weight: 800; }
+  .cartbar { position: fixed; left: 12px; right: 12px; bottom: 12px; max-width: 836px; margin: 0 auto; background: var(--brand); color: #fff; border-radius: 16px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; box-shadow: var(--shadow-lg); cursor: pointer; z-index: 20; }
+  .closed { background: var(--danger-soft); color: var(--danger); padding: 10px 14px; border-radius: 12px; margin-top: 12px; font-weight: 600; }
+  .sum .row { justify-content: space-between; padding: 3px 0; }
+</style>{% endblock %}
+{% block body %}
+<header class="st-hero"><div class="st-wrap">
+  <div class="row between"><div class="row">{% if r.logo_url %}<img src="{{ r.logo_url }}" alt="" style="width:52px;height:52px;border-radius:14px;object-fit:cover">{% endif %}
+    <div><h1>{{ r.name }}</h1><div class="small" style="color:#CFCDEB">{{ r.city }}{% if r.phone %} · {{ r.phone }}{% endif %}</div></div></div>
+    <span class="badge {% if r.is_open %}b-success{% else %}b-danger{% endif %}">{% if r.is_open %}Open now{% else %}Closed{% endif %}</span></div>
+</div></header>
+<main class="st-wrap">
+  <div class="st-card">
+    <div id="ctx" class="small" style="margin-bottom:10px"></div>
+    <div class="modes" id="modes"></div>
+    <div class="row" style="margin-top:12px"><input type="search" id="q" placeholder="Search dishes…"><label class="check nowrap"><input type="checkbox" id="veg"> Veg only</label></div>
+    <div id="closed"></div>
+  </div>
+  <div class="cat-bar"><div class="chips" id="cats"></div></div>
+  <div id="menu"><div class="skeleton" style="height:300px;margin-top:12px"></div></div>
+  <p class="center tiny muted" style="margin:30px 0">Powered by <b>Servora</b></p>
+</main>
+<div class="cartbar hidden" id="cartbar"><span id="cb-count"></span><span>View cart · <span id="cb-total"></span> →</span></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const slug = "{{ r.slug|escapejs }}";
+  const qs = new URLSearchParams(location.search);
+  const tableToken = qs.get("table"), roomToken = qs.get("room");
+  let data, items = {}, cart = [], mode = null, cat = null;
+  const key = `sv_cart_${slug}_${tableToken || roomToken || "web"}`;
+  const ls = { get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } } };
+  const api = (p, body) => fetch(`/api/public/${slug}/${p}`, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.detail || Object.values(d).flat().join(" ") || "Something went wrong"); return d; });
+
+  async function boot() {
+    data = await api(`store${tableToken ? "?table=" + tableToken : roomToken ? "?room=" + roomToken : ""}`);
+    data.menu.forEach((c) => c.items.forEach((i) => (items[i.id] = i)));
+    cart = (ls.get(key) || []).filter((l) => items[l.item_id]);
+    const s = data.store, modes = [];
+    if (data.table) { modes.push(["dine_in", `🍽 Table ${data.table.name}`]); S.$("#ctx").innerHTML = `Ordering for <b>Table ${S.esc(data.table.name)}</b> · <a href="#" id="call">🔔 Call waiter</a>`; }
+    else if (data.room) { modes.push(["room_service", `🛎 Room ${data.room.number}`]); S.$("#ctx").innerHTML = `In-room dining for <b>Room ${S.esc(data.room.number)}</b>`; }
+    else {
+      if (s.delivery) modes.push(["delivery", "🛵 Delivery"]);
+      if (s.pickup && s.online_ordering) modes.push(["takeaway", "🛍 Takeaway"]);
+      S.$("#ctx").innerHTML = s.delivery ? `Free delivery above ${S.money(s.free_delivery_above)} · ~${s.prep_minutes + 15} min` : "";
+      if (!s.is_open || !s.online_ordering) S.$("#closed").innerHTML = `<div class="closed">${s.online_ordering ? "We're closed right now — you can browse the menu." : "Online ordering isn't available — browse our menu."}</div>`;
+    }
+    mode = modes[0] ? modes[0][0] : null;
+    S.$("#modes").innerHTML = modes.map(([m, l]) => `<button data-mode="${m}" class="${m === mode ? "active" : ""}">${l}</button>`).join("");
+    S.$("#modes").onclick = (e) => { const b = e.target.closest("[data-mode]"); if (b) { mode = b.dataset.mode; S.$$("#modes button").forEach((x) => x.classList.toggle("active", x === b)); } };
+    S.$("#call") && (S.$("#call").onclick = async (e) => { e.preventDefault(); await api("call-waiter", { table_token: tableToken, request: "waiter" }); S.toast("A staff member is on the way 🙂", "ok"); });
+    renderCats(); renderMenu(); renderBar();
+  }
+  const canOrder = () => mode && (data.table || data.room || (data.store.is_open && data.store.online_ordering));
+  function renderCats() { S.$("#cats").innerHTML = [`<button class="chip ${!cat ? "active" : ""}" data-c="">All</button>`].concat(data.menu.map((c) => `<button class="chip ${cat == c.id ? "active" : ""}" data-c="${c.id}">${S.esc(c.name)}</button>`)).join(""); }
+  S.$("#cats").onclick = (e) => { const b = e.target.closest("[data-c]"); if (!b) return; cat = b.dataset.c || null; renderCats(); renderMenu(); };
+  const qtyOf = (id) => cart.filter((l) => l.item_id === id).reduce((s, l) => s + l.quantity, 0);
+  function renderMenu() {
+    const q = S.$("#q").value.toLowerCase(), veg = S.$("#veg").checked;
+    S.$("#menu").innerHTML = data.menu.filter((c) => !cat || c.id == cat).map((c) => {
+      const list = c.items.filter((i) => (!q || i.name.toLowerCase().includes(q)) && (!veg || ["veg", "vegan"].includes(i.diet)));
+      if (!list.length) return "";
+      return `<h3 style="margin-top:22px">${S.esc(c.name)}</h3>` + list.map((i) => {
+        const n = qtyOf(i.id);
+        const ctl = !i.available ? '<span class="badge">Sold out</span>' : !canOrder() ? "" : n && !i.variants.length && !i.addon_groups.length ? `<span class="qtyb"><button data-dec="${i.id}">−</button><span>${n}</span><button data-inc="${i.id}">+</button></span>` : `<button class="add" data-add="${i.id}">ADD${n ? " · " + n : ""}</button>`;
+        return `<div class="m-item" style="${i.available ? "" : "opacity:.55"}"><div class="grow"><div class="row" style="gap:6px"><span class="diet ${i.diet}"></span>${i.bestseller ? '<span class="badge b-primary">★ Bestseller</span>' : ""}</div>
+          <div style="font-weight:700;margin-top:4px">${S.esc(i.name)}</div><div style="font-weight:700">${S.money(i.price)}</div><div class="small muted" style="margin-top:4px">${S.esc(i.description)}</div></div>
+          <div class="img" style="${i.image_url ? `background-image:url('${encodeURI(i.image_url)}')` : ""}">${!i.image_url ? '<div style="display:grid;place-items:center;height:100%;font-size:34px">🍽</div>' : ""}<div class="add-wrap" style="position:absolute;bottom:-14px;left:50%;transform:translateX(-50%)">${ctl}</div></div></div>`;
+      }).join("");
+    }).join("") || '<div class="empty">No dishes found.</div>';
+  }
+  S.$("#q").oninput = renderMenu; S.$("#veg").onchange = renderMenu;
+  const save = () => { ls.set(key, cart); renderMenu(); renderBar(); };
+  const linePrice = (l) => { const i = items[l.item_id]; const v = i.variants.find((x) => x.id === l.variant_id); const add = i.addon_groups.flatMap((g) => g.addons).filter((a) => (l.addon_ids || []).includes(a.id)).reduce((s, a) => s + Number(a.price), 0); return (Number(v ? v.price : i.price) + add) * l.quantity; };
+  const subtotal = () => cart.reduce((s, l) => s + linePrice(l), 0);
+  function renderBar() { const n = cart.reduce((s, l) => s + l.quantity, 0); S.$("#cartbar").classList.toggle("hidden", !n); S.$("#cb-count").textContent = `${n} item${n > 1 ? "s" : ""}`; S.$("#cb-total").textContent = S.money(subtotal()); }
+  S.$("#menu").onclick = (e) => {
+    const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]"), add = e.target.closest("[data-add]");
+    if (inc) { cart.find((l) => l.item_id == inc.dataset.inc).quantity++; save(); }
+    if (dec) { const l = cart.find((x) => x.item_id == dec.dataset.dec); l.quantity--; if (!l.quantity) cart.splice(cart.indexOf(l), 1); save(); }
+    if (add) { const i = items[add.dataset.add]; if (i.variants.length || i.addon_groups.length) customize(i); else { cart.push({ item_id: i.id, quantity: 1 }); save(); } }
+  };
+  function customize(i) {
+    const m = S.modal({ title: i.name, body: `${i.variants.length ? `<label>Choose size</label>${i.variants.map((v, k) => `<label class="check" style="margin-bottom:8px"><input type="radio" name="v" value="${v.id}" ${k === i.variants.length - 1 ? "checked" : ""}> ${S.esc(v.name)} — ${S.money(v.price)}</label>`).join("")}` : ""}
+      ${i.addon_groups.map((g) => `<label style="margin-top:12px">${S.esc(g.name)}</label>${g.addons.map((a) => `<label class="check" style="margin-bottom:8px"><input type="checkbox" value="${a.id}"> ${S.esc(a.name)} ${Number(a.price) ? "+" + S.money(a.price) : ""}</label>`).join("")}`).join("")}
+      <div class="field" style="margin-top:12px"><label>Special instructions</label><input type="text" id="note" placeholder="e.g. less spicy"></div>`,
+      footer: '<button class="btn btn-primary btn-block" data-ok>Add to cart</button>' });
+    m.$("[data-ok]").onclick = () => { const v = m.$('input[name="v"]:checked'); cart.push({ item_id: i.id, quantity: 1, variant_id: v ? Number(v.value) : null, addon_ids: m.$$('input[type="checkbox"]:checked').map((x) => Number(x.value)), notes: m.$("#note").value }); m.close(); save(); };
+  }
+  S.$("#cartbar").onclick = checkout;
+  function checkout() {
+    const s = data.store, saved = ls.get("sv_customer") || {};
+    const isDel = mode === "delivery";
+    const m = S.modal({ title: "Your order", body: `
+      <div id="lines">${cart.map((l, k) => { const i = items[l.item_id]; const v = i.variants.find((x) => x.id === l.variant_id); return `<div class="row between" style="padding:8px 0;border-bottom:1px dashed var(--line)"><div><span class="diet ${i.diet}"></span> <b>${S.esc(i.name)}</b>${v ? ` <span class="muted small">(${S.esc(v.name)})</span>` : ""}<div class="tiny muted">${S.esc(l.notes || "")}</div></div><div class="row"><span class="qtyb"><button data-ld="${k}">−</button><span>${l.quantity}</span><button data-li="${k}">+</button></span><b style="min-width:64px;text-align:right">${S.money(linePrice(l))}</b></div></div>`; }).join("")}</div>
+      <div class="grid g2" style="gap:0 12px;margin-top:16px"><div class="field"><label>Name</label><input id="c-name" value="${S.esc(saved.name || "")}" required></div><div class="field"><label>Mobile</label><input id="c-phone" type="tel" value="${S.esc(saved.phone || "")}" required></div></div>
+      ${isDel ? `<div class="field"><label>Delivery address</label><textarea id="c-addr" placeholder="House / flat, street, landmark">${S.esc(saved.address || "")}</textarea><button type="button" class="btn btn-sm" id="loc" style="margin-top:6px">📍 Use my current location</button> <span class="small muted" id="loc-msg"></span></div>` : ""}
+      <div class="field"><label>Note for the restaurant</label><input id="c-note" placeholder="Optional"></div>
+      <div class="row"><input id="coupon" placeholder="Coupon code" style="text-transform:uppercase"></div>
+      <div class="sum card" style="margin-top:14px;background:var(--surface-2);box-shadow:none" id="sum"></div>
+      <label style="margin-top:14px">Payment</label><div class="modes" id="pay">
+        <button class="active" data-p="online">💳 Pay online (UPI / card)</button>
+        ${isDel && s.accept_cod ? '<button data-p="cod">💵 Cash on delivery</button>' : ""}${!isDel && mode !== "takeaway" ? '<button data-p="later">🧾 Pay at the end</button>' : ""}</div>`,
+      footer: '<button class="btn btn-primary btn-lg btn-block" id="place">Place order</button>' });
+    let pay = "online", lat = saved.lat || null, lng = saved.lng || null, fee = isDel ? Number(s.delivery_fee) : 0;
+    const sum = () => { const sub = subtotal(); const free = Number(s.free_delivery_above) && sub >= Number(s.free_delivery_above); const f = isDel ? (free ? 0 : fee) : 0; const pk = mode === "delivery" || mode === "takeaway" ? Number(s.packaging_charge) : 0;
+      m.$("#sum").innerHTML = `<div class="row"><span>Item total</span><span>${S.money(sub)}</span></div>${isDel ? `<div class="row"><span>Delivery fee</span><span>${f ? S.money(f) : "FREE"}</span></div>` : ""}${pk ? `<div class="row"><span>Packaging</span><span>${S.money(pk)}</span></div>` : ""}<div class="row"><span>Taxes</span><span>calculated at checkout</span></div>
+        <div class="row" style="font-weight:800;font-size:18px"><span>To pay (approx.)</span><span>${S.money(sub + f + pk)}</span></div>${isDel && Number(s.min_order) > sub ? `<div class="small" style="color:var(--danger)">Minimum order for delivery is ${S.money(s.min_order)}</div>` : ""}`; };
+    sum();
+    m.$("#lines").onclick = (e) => { const i = e.target.closest("[data-li]"), d = e.target.closest("[data-ld]"); if (i) cart[i.dataset.li].quantity++; if (d) { cart[d.dataset.ld].quantity--; if (!cart[d.dataset.ld].quantity) cart.splice(d.dataset.ld, 1); } save(); m.close(); if (cart.length) checkout(); };
+    m.$("#pay").onclick = (e) => { const b = e.target.closest("[data-p]"); if (!b) return; pay = b.dataset.p; m.$$("#pay button").forEach((x) => x.classList.toggle("active", x === b)); };
+    m.$("#loc") && (m.$("#loc").onclick = () => navigator.geolocation.getCurrentPosition(async (p) => {
+      lat = p.coords.latitude.toFixed(6); lng = p.coords.longitude.toFixed(6);
+      try { const q = await api("quote", { lat, lng, subtotal: subtotal() }); m.$("#loc-msg").textContent = q.serviceable ? `✓ ${q.distance_km ?? ""} km · ~${q.eta_minutes} min` : q.message; if (q.serviceable) { fee = Number(q.fee); sum(); } } catch (err) { m.$("#loc-msg").textContent = err.message; }
+    }, () => (m.$("#loc-msg").textContent = "Location permission denied")));
+    m.$("#place").onclick = async () => {
+      const body = { mode, table_token: tableToken || "", room_token: roomToken || "", name: m.$("#c-name").value.trim(), phone: m.$("#c-phone").value.trim(), address: isDel ? m.$("#c-addr").value.trim() : "",
+        lat, lng, notes: m.$("#c-note").value, coupon: m.$("#coupon").value.trim(), payment: pay, items: cart.map(({ item_id, quantity, variant_id, addon_ids, notes }) => ({ item_id, quantity, variant_id, addon_ids, notes })) };
+      if (!body.name || !body.phone) return S.toast("Please enter your name and mobile number", "err");
+      ls.set("sv_customer", { name: body.name, phone: body.phone, address: body.address, lat, lng });
+      m.$("#place").disabled = true; m.$("#place").innerHTML = '<span class="spin"></span>';
+      try {
+        const res = await api("order", body);
+        const done = () => { cart = []; save(); location.href = `/t/${res.order.token}/`; };
+        if (res.razorpay) {
+          S.razorpay({ ...res.razorpay, description: `Order #${res.order.number}` }, async (resp) => { await api("verify-payment", resp); done(); });
+          m.close();
+        } else done();
+      } catch (err) { S.toast(err.message, "err"); m.$("#place").disabled = false; m.$("#place").textContent = "Place order"; }
+    };
+  }
+  boot().catch((e) => (S.$("#menu").innerHTML = `<div class="empty">${S.esc(e.message)}</div>`));
+})();
+</script>
+{% endblock %}

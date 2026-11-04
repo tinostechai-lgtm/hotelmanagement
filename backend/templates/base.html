@@ -1,0 +1,24 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Servora{% endblock %}</title>
+  <meta name="description" content="{% block description %}Servora — the restaurant & hotel F&B operating system: POS billing, KOT, QR ordering, home delivery, inventory and analytics.{% endblock %}">
+  <meta name="theme-color" content="#14123A">
+  <link rel="icon" href="{% static 'brand/servora-mark.svg' %}" type="image/svg+xml">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/servora.css' %}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% block body %}{% endblock %}
+  <div id="toasts"></div>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="{% static 'js/servora.js' %}"></script>
+  {% block scripts %}{% endblock %}
+  <script>window.lucide && lucide.createIcons();</script>
+</body>
+</html>
