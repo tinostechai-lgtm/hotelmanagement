@@ -12,7 +12,21 @@ class AppConfig extends ChangeNotifier {
     kdsSound = _prefs.getBool(_kSound) ?? true;
   }
 
-  static const String defaultBaseUrl = 'https://servora.vercel.app';
+  static const String defaultBaseUrl = 'https://web-rust-six-43.vercel.app';
+
+  /// One-tap demo logins on the sign-in screen (the live test restaurant).
+  /// Set to false for a production build without demo accounts.
+  static const bool showDemoLogins = true;
+  static const String demoPassword = 'Live@Check2026';
+  static const List<List<String>> demoUsers = [
+    ['Owner', '9000000501'],
+    ['Manager', '9000000506'],
+    ['Captain', '9000000502'],
+    ['Cashier', '9000000503'],
+    ['Kitchen', '9000000504'],
+    ['Rider', '9000000505'],
+    ['Store', '9000000507'],
+  ];
   static const _kBaseUrl = 'cfg.base_url';
   static const _kPrint = 'cfg.print_from_device';
   static const _kBtMac = 'cfg.bt_mac';

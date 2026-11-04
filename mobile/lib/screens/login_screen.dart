@@ -138,6 +138,37 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                       const SizedBox(height: 22),
                       GradientButton(label: 'Sign in', icon: Icons.arrow_forward, busy: _busy, onPressed: _login),
+                      if (AppConfig.showDemoLogins) ...[
+                        const SizedBox(height: 22),
+                        Row(children: const [
+                          Expanded(child: Divider()),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Text('Try a demo account', style: TextStyle(color: Brand.muted, fontSize: 13, fontWeight: FontWeight.w600)),
+                          ),
+                          Expanded(child: Divider()),
+                        ]),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final u in AppConfig.demoUsers)
+                              ActionChip(
+                                avatar: Icon(_demoIcon(u[0]), size: 18, color: Brand.orangeDeep),
+                                label: Text(u[0], style: const TextStyle(fontWeight: FontWeight.w600)),
+                                onPressed: _busy
+                                    ? null
+                                    : () {
+                                        _phone.text = u[1];
+                                        _password.text = AppConfig.demoPassword;
+                                        _login();
+                                      },
+                              ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       Text(
                         server.replaceFirst(RegExp(r'^https?://'), ''),
@@ -162,5 +193,24 @@ class _LoginScreenState extends State<LoginScreen> {
         ]),
       ),
     );
+  }
+
+  static IconData _demoIcon(String role) {
+    switch (role) {
+      case 'Owner':
+        return Icons.workspace_premium_outlined;
+      case 'Manager':
+        return Icons.manage_accounts_outlined;
+      case 'Captain':
+        return Icons.room_service_outlined;
+      case 'Cashier':
+        return Icons.point_of_sale;
+      case 'Kitchen':
+        return Icons.soup_kitchen_outlined;
+      case 'Rider':
+        return Icons.delivery_dining_outlined;
+      default:
+        return Icons.inventory_2_outlined;
+    }
   }
 }
