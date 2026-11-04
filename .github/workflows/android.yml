@@ -36,7 +36,9 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
       - name: Rename
-        run: cp build/app/outputs/flutter-apk/app-release.apk build/servora-1.0.${{ github.run_number }}.apk
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk build/servora-1.0.${{ github.run_number }}.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/servora.apk
       - uses: actions/upload-artifact@v4
         with:
           name: servora-android-apk
@@ -49,5 +51,7 @@ jobs:
           body: |
             Servora POS for Android — connects to https://web-rust-six-43.vercel.app
             Demo logins are on the sign-in screen (Owner, Manager, Captain, Cashier, Kitchen, Rider, Store).
-          files: mobile/build/servora-1.0.${{ github.run_number }}.apk
+          files: |
+            mobile/build/servora-1.0.${{ github.run_number }}.apk
+            mobile/build/servora.apk
           make_latest: true

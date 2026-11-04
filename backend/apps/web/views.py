@@ -321,7 +321,7 @@ def sitemap_xml(request):
     from django.utils.html import escape
 
     base = request.build_absolute_uri("/").rstrip("/")
-    urls = [(f"{base}/", "1.0"), (f"{base}/signup/", "0.8"), (f"{base}/login/", "0.5"), (f"{base}/terms/", "0.2"), (f"{base}/privacy/", "0.2")]
+    urls = [(f"{base}/", "1.0"), (f"{base}/download/", "0.8"), (f"{base}/signup/", "0.8"), (f"{base}/login/", "0.5"), (f"{base}/terms/", "0.2"), (f"{base}/privacy/", "0.2")]
     for slug, updated in Restaurant.objects.filter(is_active=True, online_ordering_enabled=True).values_list("slug", "created_at"):
         urls.append((f"{base}/s/{slug}/", "0.7"))
     body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "".join(
@@ -352,3 +352,23 @@ def unsubscribe(request, token):
         c.save(update_fields=["marketing_opt_in"])
         return render(request, "store/unsubscribed.html", {"r": c.restaurant, "done": True})
     return render(request, "store/unsubscribed.html", {"r": c.restaurant, "done": False})
+
+
+def android_app_url():
+    from django.conf import settings
+
+    from apps.superadmin.models import get_settings
+
+    return get_settings().android_app_url or settings.ANDROID_APK_URL
+
+
+def download_android(request):
+    """Permanent link that always points at the newest Android app."""
+    return redirect(android_app_url())
+
+
+def download_page(request):
+    return render(request, "marketing/download.html", {
+        "apk_url": request.build_absolute_uri("/download/android"),
+        "is_play_store": "play.google.com" in android_app_url(),
+    })

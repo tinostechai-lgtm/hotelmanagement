@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Download the {{ platform.site_name|default:"Servora" }} app for Android{% endblock %}
+{% block description %}Get the {{ platform.site_name|default:"Servora" }} POS app for Android — billing, tables, kitchen display, home delivery and rider mode, even offline.{% endblock %}
+{% block analytics %}{% include "partials/analytics.html" %}{% endblock %}
+{% block head %}<style>
+  body { background: var(--surface); }
+  .dl-hero { position: relative; overflow: hidden; isolation: isolate; color: #fff; background: radial-gradient(700px 360px at 80% 0%, rgba(255, 122, 61, .4), transparent), linear-gradient(160deg, #14123A, #262361); }
+  .dl-hero .wrap { max-width: 1100px; margin: 0 auto; padding: 56px 20px 64px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; }
+  @media (max-width: 860px) { .dl-hero .wrap { grid-template-columns: 1fr; padding-top: 36px; } .qr-box { display: none; } }
+  .dl-hero h1 { font-size: clamp(32px, 5vw, 52px); letter-spacing: -.03em; margin: 18px 0 12px; }
+  .dl-hero p { color: #D9D7F2; font-size: 17px; max-width: 520px; }
+  .play-btn { display: inline-flex; align-items: center; gap: 12px; background: #000; color: #fff; border-radius: 14px; padding: 12px 22px; border: 1px solid rgba(255,255,255,.25); transition: transform .15s, box-shadow .2s; }
+  .play-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+  .play-btn svg { width: 30px; height: 30px; }
+  .play-btn small { display: block; font-size: 11px; opacity: .8; } .play-btn b { font-size: 18px; }
+  .qr-box { background: #fff; color: #14123A; border-radius: 22px; padding: 22px; text-align: center; box-shadow: 0 30px 70px rgba(0,0,0,.35); justify-self: center; }
+  .qr-box #qr { display: grid; place-items: center; margin: 10px 0; }
+  .phone { width: 250px; margin: 0 auto 18px; border-radius: 36px; background: #0B0A1F; padding: 12px; box-shadow: 0 30px 60px rgba(0,0,0,.4); }
+  .phone .scr { border-radius: 26px; background: #14123A; aspect-ratio: 9 / 18; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; overflow: hidden; position: relative; }
+  .phone .scr .sv-mark { width: 92px; height: 92px; }
+  .phone .scr b { font-size: 24px; color: #fff; } .phone .scr span { color: #CFCDEB; font-size: 12px; }
+  .steps { max-width: 1100px; margin: 0 auto; padding: 56px 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: s; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+  .steps .card::before { counter-increment: s; content: counter(s); display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--grad); color: #fff; font-weight: 800; margin-bottom: 10px; }
+  .feats { max-width: 1100px; margin: 0 auto; padding: 0 20px 56px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 860px) { .feats { grid-template-columns: 1fr 1fr; } }
+  .feats .card { display: flex; gap: 12px; align-items: flex-start; }
+  .feats svg { color: var(--primary); flex: none; }
+</style>{% endblock %}
+{% block body %}
+<section class="dl-hero"><div class="wrap">
+  <div>
+    <a href="/" class="sv-logo" style="color:#fff">{% include "partials/logo_svg.html" with cls="sv-anim" uid="dl" size=52 %}<span class="word" style="font-size:26px">{{ platform.site_name|default:"Servora" }}</span></a>
+    <h1>Your restaurant, in your pocket.</h1>
+    <p>Bill tables, send KOTs, run the kitchen display, manage deliveries and ride with rider mode — on any Android phone or tablet. Keeps billing even when the internet drops.</p>
+    <div class="row wrap" style="margin-top:24px;gap:14px">
+      <a class="play-btn" href="{% url 'web:download_android' %}" id="dl-btn">
+        <svg viewBox="0 0 24 24" fill="#3DDC84"><path d="M17.6 9.48l1.84-3.18a.38.38 0 0 0-.66-.38l-1.86 3.22a11.4 11.4 0 0 0-9.84 0L5.22 5.92a.38.38 0 0 0-.66.38L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
+        <span><small>{% if is_play_store %}GET IT ON{% else %}DOWNLOAD FOR{% endif %}</small><b>{% if is_play_store %}Google Play{% else %}Android (APK){% endif %}</b></span>
+      </a>
+      <a class="btn btn-lg" style="background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.2)" href="{% url 'web:login' %}">Use it on the web</a>
+    </div>
+    <p class="small" style="margin-top:16px;font-size:13px">Android 5.0+ · Free with every {{ platform.site_name|default:"Servora" }} plan · Updated automatically on this page</p>
+  </div>
+  <div class="qr-box reveal-right">
+    <div class="phone"><div class="scr">{% include "partials/logo_svg.html" with cls="sv-loop" uid="ph" %}<b>{{ platform.site_name|default:"Servora" }}</b><span>Run your restaurant smarter</span></div></div>
+    <b>On a computer?</b><div class="small muted">Scan with your phone camera to download</div>
+    <div id="qr"></div>
+  </div>
+</div></section>
+
+<section class="steps">
+  <div class="card reveal"><h3>Download</h3><p class="muted">Tap the download button on your Android phone. The app file is about 34 MB.</p></div>
+  <div class="card reveal"><h3>Install</h3><p class="muted">Open the downloaded file. If asked, allow <b>“Install unknown apps”</b> for your browser — this is needed for apps outside the Play Store.</p></div>
+  <div class="card reveal"><h3>Sign in</h3><p class="muted">Use your mobile number or email and password — the same login as the web dashboard. Staff see only what their role allows.</p></div>
+</section>
+
+<section class="feats">
+  <div class="card reveal"><i data-lucide="monitor-smartphone"></i><div><b>POS & tables</b><div class="small muted">Floor plan, KOT, split bills, UPI/card/cash</div></div></div>
+  <div class="card reveal"><i data-lucide="chef-hat"></i><div><b>Kitchen display</b><div class="small muted">Live tickets with timers & alerts</div></div></div>
+  <div class="card reveal"><i data-lucide="bike"></i><div><b>Rider mode</b><div class="small muted">GPS, navigation, OTP & cash collection</div></div></div>
+  <div class="card reveal"><i data-lucide="wifi-off"></i><div><b>Works offline</b><div class="small muted">Bills sync automatically when back online</div></div></div>
+  <div class="card reveal"><i data-lucide="printer"></i><div><b>Print anywhere</b><div class="small muted">Wi-Fi & Bluetooth thermal printers</div></div></div>
+  <div class="card reveal"><i data-lucide="scan-barcode"></i><div><b>Scan & bill</b><div class="small muted">Barcode scanning with the camera</div></div></div>
+  <div class="card reveal"><i data-lucide="chart-column"></i><div><b>Reports</b><div class="small muted">Today's sales & top items anywhere</div></div></div>
+  <div class="card reveal"><i data-lucide="shield-check"></i><div><b>Role based</b><div class="small muted">Owner, manager, captain, cashier, kitchen, rider</div></div></div>
+</section>
+<p class="center small muted" style="padding:0 16px 40px">Designed &amp; Developed by <b>Tinos Software &amp; Security Solutions LLP</b> · <a href="/">Home</a></p>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  if (window.QRCode) new QRCode(document.getElementById("qr"), { text: "{{ apk_url|escapejs }}", width: 170, height: 170, colorDark: "#14123A", correctLevel: QRCode.CorrectLevel.M });
+  // iPhone visitors: the app is Android-only for now — point them at the web app.
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    const b = document.getElementById("dl-btn");
+    b.insertAdjacentHTML("afterend", '<p class="small" style="width:100%;color:#FFD2B3">On iPhone? Use the web app — it works in Safari and can be added to your Home Screen.</p>');
+  }
+</script>
+{% endblock %}

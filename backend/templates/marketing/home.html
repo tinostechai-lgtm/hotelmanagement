@@ -63,7 +63,7 @@
 <div class="page-loader" id="loader">{% include "partials/logo_svg.html" with cls="sv-loop" uid="ld" %}</div>
 <nav class="mk-nav"><div class="wrap">
   <a href="/" class="sv-logo" style="color:var(--text)">{% include "partials/logo_svg.html" with cls="sv-anim" uid="nv" %}<span class="word" style="font-size:22px">Servora</span></a>
-  <div class="links"><a href="#features">Features</a><a href="#delivery">Delivery</a><a href="#hardware">Hardware</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></div>
+  <div class="links"><a href="#features">Features</a><a href="#delivery">Delivery</a><a href="#hardware">Hardware</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="{% url 'web:download' %}"><i data-lucide="smartphone" style="width:15px;vertical-align:-2px"></i> Get the app</a></div>
   <a href="{% url 'web:login' %}" class="btn btn-ghost cta-login">Log in</a>
   <a href="{% url 'web:signup' %}" class="btn btn-primary">Start free trial</a>
 </div></nav>
@@ -166,6 +166,23 @@
   </div>
 </div></section>
 
+<section class="blk dark" id="app" style="padding:64px 0"><div class="wrap grid g2" style="align-items:center;gap:40px">
+  <div class="reveal-left">
+    <div class="eyebrow">Android app</div>
+    <h2 class="h2">Your whole restaurant, in your pocket.</h2>
+    <p>POS & tables, kitchen display, delivery management and rider mode in one app for phones and tablets — with offline billing and Bluetooth printing.</p>
+    <div class="row wrap" style="gap:12px;margin-top:20px">
+      <a href="{% url 'web:download_android' %}" class="btn btn-primary btn-lg"><i data-lucide="download"></i>Download for Android</a>
+      <a href="{% url 'web:download' %}" class="btn btn-lg" style="background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.2)">How to install</a>
+    </div>
+    <p class="small" style="margin-top:12px">Free with every plan · Android 5.0+</p>
+  </div>
+  <div class="reveal-right center"><div style="display:inline-block;width:230px;border-radius:34px;background:#0B0A1F;padding:11px;box-shadow:0 30px 60px rgba(0,0,0,.45)">
+    <div style="border-radius:24px;background:radial-gradient(260px 200px at 50% 30%,rgba(255,122,61,.35),transparent),#14123A;aspect-ratio:9/18;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+      {% include "partials/logo_svg.html" with cls="sv-loop" uid="app" size=88 %}<b style="color:#fff;font-size:22px">Servora</b><span style="color:#CFCDEB;font-size:12px">Run your restaurant smarter</span>
+    </div></div></div>
+</div></section>
+
 <section class="blk" id="pricing"><div class="wrap center">
   <div class="eyebrow reveal">Simple pricing</div><h2 class="h2 reveal" style="margin:0 auto 18px">Plans that grow with your business.</h2>
   <div class="price-toggle"><button class="chip active" data-cycle="m">Monthly</button><button class="chip" data-cycle="y">Yearly — 2 months free</button></div>
@@ -205,7 +222,7 @@
 
 <footer><div class="wrap row between wrap">
   <div class="row">{% include "partials/logo_svg.html" with cls="sv-static" uid="fo" size=32 %}<b style="color:#fff">Servora</b><span>© {% now "Y" %} Servora. Made in India.</span></div>
-  <div class="row"><a href="#pricing" style="color:#A3A2C2">Pricing</a><a href="{% url 'web:login' %}" style="color:#A3A2C2">Log in</a><a href="/terms/" style="color:#A3A2C2">Terms</a><a href="/privacy/" style="color:#A3A2C2">Privacy</a><a href="mailto:support@servora.app" style="color:#A3A2C2">Support</a></div>
+  <div class="row"><a href="#pricing" style="color:#A3A2C2">Pricing</a><a href="{% url 'web:login' %}" style="color:#A3A2C2">Log in</a><a href="{% url 'web:download' %}" style="color:#A3A2C2">Android app</a><a href="/terms/" style="color:#A3A2C2">Terms</a><a href="/privacy/" style="color:#A3A2C2">Privacy</a><a href="mailto:support@servora.app" style="color:#A3A2C2">Support</a></div>
 </div><div class="wrap" style="border-top:1px solid rgba(255,255,255,.08);margin-top:22px;padding-top:18px;text-align:center;font-size:13px;color:#8987B5">Designed &amp; Developed by <b style="color:#CFCDEB">Tinos Software &amp; Security Solutions LLP</b></div></footer>
 {% endblock %}
 {% block scripts %}

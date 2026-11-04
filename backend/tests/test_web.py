@@ -68,3 +68,30 @@ class QRTests(TestCase):
         t = Table.objects.first()
         self.assertIn(f"/q/{t.qr_token}/", html)
         self.assertIn("not for tables", html)
+
+
+class DownloadAppTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from apps.accounts.models import User
+
+        User.objects.create_superuser("7000000000", "a@example.com", "Adm1n-Passw0rd")
+
+    def test_download_page_and_redirect(self):
+        res = self.client.get("/download/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Android (APK)")
+        self.assertContains(res, "/download/android")
+        res = self.client.get("/download/android")
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(res["Location"].endswith("/releases/latest/download/servora.apk"))
+        self.assertContains(self.client.get("/"), "Download for Android")
+
+    def test_super_admin_can_override_link(self):
+        from apps.superadmin.models import get_settings
+
+        ps = get_settings(fresh=True)
+        ps.android_app_url = "https://play.google.com/store/apps/details?id=com.servora.servora"
+        ps.save()
+        self.assertEqual(self.client.get("/download/android")["Location"], ps.android_app_url)
+        self.assertContains(self.client.get("/download/"), "Google Play")

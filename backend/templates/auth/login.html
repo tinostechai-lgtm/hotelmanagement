@@ -11,7 +11,7 @@
   <div class="field"><label for="phone">Mobile number or email</label><input type="text" id="phone" name="login" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="98765 43210 or you@example.com" autofocus></div>
   <div class="field"><label for="password">Password</label><input type="password" id="password" name="password" required autocomplete="current-password"></div>
   <button class="btn btn-primary btn-lg btn-block" type="submit">Log in</button>
-  <p class="center small" style="margin-top:10px"><a href="{% url 'password_reset' %}">Forgot password?</a></p>
+  <p class="center small" style="margin-top:10px"><a href="{% url 'password_reset' %}">Forgot password?</a> · <a href="{% url 'web:download' %}">📱 Get the Android app</a></p>
 </form>
 {% if show_demo_login and not admin_login %}<div class="card" style="margin-top:20px;background:var(--surface-2);box-shadow:none">
   <b class="small">Try the demo restaurant</b>
