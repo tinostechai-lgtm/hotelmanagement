@@ -367,8 +367,16 @@ def download_android(request):
     return redirect(android_app_url())
 
 
+def get_app(request):
+    """Landing page for the QR / phone buttons: shows install steps and starts the download in the background."""
+    url = android_app_url()
+    if "play.google.com" in url:
+        return redirect(url)
+    return render(request, "marketing/get_app.html", {"apk_url": url, "meta_url": "/downloads/android.json"})
+
+
 def download_page(request):
     return render(request, "marketing/download.html", {
-        "apk_url": request.build_absolute_uri("/download/android"),
+        "apk_url": request.build_absolute_uri("/get/"),
         "is_play_store": "play.google.com" in android_app_url(),
     })

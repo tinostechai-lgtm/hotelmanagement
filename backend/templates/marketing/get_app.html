@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Downloading {{ platform.site_name|default:"Servora" }} for Android{% endblock %}
+{% block robots %}<meta name="robots" content="noindex">{% endblock %}
+{% block head %}<style>
+  body { background: radial-gradient(600px 320px at 50% -10%, rgba(255,122,61,.35), transparent), #14123A; color: #fff; min-height: 100vh; }
+  .ga { max-width: 460px; margin: 0 auto; padding: 36px 20px 40px; text-align: center; }
+  .ga .sv-mark { width: 96px; height: 96px; filter: drop-shadow(0 14px 30px rgba(240,80,42,.4)); }
+  .ga h1 { font-size: 26px; margin: 18px 0 6px; }
+  .ga p { color: #D9D7F2; }
+  .bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; margin: 22px 0 8px; }
+  .bar i { display: block; height: 100%; width: 35%; background: var(--grad); border-radius: 99px; animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+  .done .bar i { animation: none; width: 100%; transform: none; }
+  .steps { text-align: left; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 16px 18px; margin: 22px 0; }
+  .steps li { margin: 8px 0; color: #ECEBFA; }
+  .steps b { color: #FFD2B3; }
+  .ga .btn { width: 100%; }
+  .ga a.link { color: #FFD2B3; }
+</style>{% endblock %}
+{% block body %}
+<main class="ga" id="ga">
+  {% include "partials/logo_svg.html" with cls="sv-anim" uid="ga" %}
+  <h1 id="title">Downloading {{ platform.site_name|default:"Servora" }}…</h1>
+  <p id="sub">Your download starts automatically. It's about <span id="size">34 MB</span>.</p>
+  <div class="bar"><i></i></div>
+  <p class="small" id="ver" style="opacity:.75"></p>
+  <ol class="steps">
+    <li>When the download finishes, tap <b>Servora.apk</b> in the notification or your <b>Downloads</b> folder.</li>
+    <li>If Android asks, allow <b>“Install unknown apps”</b> for this browser, then tap <b>Install</b>.</li>
+    <li>Open <b>Servora</b> and sign in with your mobile number or email.</li>
+  </ol>
+  <a class="btn btn-primary btn-lg" id="again" href="{{ apk_url }}" download="Servora.apk"><i data-lucide="download"></i>Download again</a>
+  <p class="small" style="margin-top:18px"><a class="link" href="/">Visit the website</a> · <a class="link" href="{% url 'web:login' %}">Use it on the web</a></p>
+  <iframe id="dl" title="download" style="display:none" aria-hidden="true"></iframe>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const apk = "{{ apk_url|escapejs }}";
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  if (isIOS) {
+    document.getElementById("title").textContent = "Servora for iPhone";
+    document.getElementById("sub").textContent = "The app is Android-only for now — on iPhone, use the web app in Safari (you can add it to your Home Screen).";
+    document.querySelector(".bar").style.display = "none"; document.querySelector(".steps").style.display = "none";
+    const b = document.getElementById("again"); b.textContent = "Open the web app"; b.href = "{% url 'web:login' %}"; b.removeAttribute("download");
+    return;
+  }
+  // Start the download without leaving this page, so the phone keeps showing these instructions.
+  setTimeout(() => { document.getElementById("dl").src = apk; }, 700);
+  setTimeout(() => { document.getElementById("ga").classList.add("done"); document.getElementById("title").textContent = "Download started ✓"; }, 4000);
+  fetch("{{ meta_url|escapejs }}", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((m) => {
+    if (!m) return;
+    if (m.size_bytes) document.getElementById("size").textContent = (m.size_bytes / 1048576).toFixed(1) + " MB";
+    if (m.version) document.getElementById("ver").textContent = "Version " + m.version;
+  }).catch(() => {});
+})();
+</script>
+{% endblock %}

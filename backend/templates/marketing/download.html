@@ -38,7 +38,7 @@
     <h1>Your restaurant, in your pocket.</h1>
     <p>Bill tables, send KOTs, run the kitchen display, manage deliveries and ride with rider mode — on any Android phone or tablet. Keeps billing even when the internet drops.</p>
     <div class="row wrap dl-cta" style="margin-top:24px;gap:14px">
-      <a class="play-btn" href="{% url 'web:download_android' %}" id="dl-btn" {% if not is_play_store %}download="Servora.apk"{% endif %}>
+      <a class="play-btn" href="{% url 'web:get_app' %}" id="dl-btn">
         <svg viewBox="0 0 24 24" fill="#3DDC84"><path d="M17.6 9.48l1.84-3.18a.38.38 0 0 0-.66-.38l-1.86 3.22a11.4 11.4 0 0 0-9.84 0L5.22 5.92a.38.38 0 0 0-.66.38L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
         <span><small>{% if is_play_store %}GET IT ON{% else %}DOWNLOAD FOR{% endif %}</small><b>{% if is_play_store %}Google Play{% else %}Android (APK){% endif %}</b></span>
       </a>
