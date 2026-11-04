@@ -113,12 +113,12 @@ class ServoraMarkPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant ServoraMarkPainter old) =>
-      old.background != background ||
-      old.tray != tray ||
-      old.dome != dome ||
-      old.steam != steam ||
-      old.shine != shine;
+  bool shouldRepaint(covariant ServoraMarkPainter oldDelegate) =>
+      oldDelegate.background != background ||
+      oldDelegate.tray != tray ||
+      oldDelegate.dome != dome ||
+      oldDelegate.steam != steam ||
+      oldDelegate.shine != shine;
 }
 
 /// Static logo mark, optionally with the wordmark beside it.

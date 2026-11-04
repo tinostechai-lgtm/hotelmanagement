@@ -140,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       GradientButton(label: 'Sign in', icon: Icons.arrow_forward, busy: _busy, onPressed: _login),
                       if (AppConfig.showDemoLogins) ...[
                         const SizedBox(height: 22),
-                        Row(children: const [
+                        const Row(children: [
                           Expanded(child: Divider()),
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 10),
