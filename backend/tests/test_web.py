@@ -39,3 +39,32 @@ class WebPagesTests(TestCase):
         res = self.client.post("/signup/", {"name": "A B", "phone": "9000011111", "password": "Passw0rd!", "restaurant_name": "Cafe X", "business_type": "cafe"})
         self.assertRedirects(res, "/app/")
         self.assertEqual(self.client.get("/app/").status_code, 200)
+
+
+class QRTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed", demo=True, stdout=open("/dev/null", "w"))
+
+    def test_short_qr_link_opens_table_mode(self):
+        from apps.operations.models import Room
+
+        t = Table.objects.first()
+        res = self.client.get(f"/q/{t.qr_token}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, f'"table": "{t.qr_token}"')
+        room = Room.objects.first()
+        self.assertContains(self.client.get(f"/q/{room.qr_token}/"), f'"room": "{room.qr_token}"')
+        self.assertEqual(self.client.get("/q/not-a-real-token/").status_code, 404)
+
+    def test_invalid_table_token_is_reported_not_delivery(self):
+        data = self.client.get("/api/public/spice-garden/store?table=deleted-token").json()
+        self.assertEqual(data.get("invalid_qr"), "table")
+        self.assertNotIn("table", data)
+
+    def test_qr_sheet_uses_short_links(self):
+        self.client.post("/login/", {"login": "9999999999", "password": "Demo@1234"})
+        html = self.client.get("/app/qr-codes/").content.decode()
+        t = Table.objects.first()
+        self.assertIn(f"/q/{t.qr_token}/", html)
+        self.assertIn("not for tables", html)

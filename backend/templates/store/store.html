@@ -11,135 +11,356 @@
 {% endblock %}
 {% block analytics %}{% include "partials/analytics.html" %}<script type="application/ld+json">{{ jsonld|safe }}</script>{% endblock %}
 {% block head %}<style>
-  :root { --brand: {{ r.brand_color|default:"#F4632F" }}; }
-  body { background: var(--bg); padding-bottom: 96px; }
-  .st-wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
-  .st-hero { background: linear-gradient(160deg, #14123A, #2A2760); color: #fff; padding: 28px 0 70px; }
-  .st-hero h1 { font-size: 28px; margin: 0; }
-  .st-card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); margin-top: -50px; padding: 14px; position: relative; }
-  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
-  .modes button { border: 2px solid var(--line); border-radius: 12px; padding: 10px; background: var(--surface); font: 700 14px var(--font); cursor: pointer; color: var(--text); }
-  .modes button.active { border-color: var(--brand); background: var(--primary-soft); color: var(--brand); }
-  .cat-bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; }
-  .m-item { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); }
-  .m-item .img { width: 104px; height: 104px; border-radius: 14px; background: var(--surface-2) center/cover; flex: none; position: relative; }
-  .m-item .add { position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); }
-  .add { background: var(--surface); border: 1px solid var(--line); color: var(--brand); font: 800 14px var(--font); border-radius: 10px; padding: 7px 18px; cursor: pointer; box-shadow: var(--shadow); }
-  .qtyb { display: inline-flex; align-items: center; background: var(--brand); color: #fff; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
-  .qtyb button { background: none; border: 0; color: #fff; font: 800 16px var(--font); width: 32px; height: 32px; cursor: pointer; }
+  :root { --brand: {{ r.brand_color|default:"#F4632F" }}; --brand-soft: color-mix(in srgb, var(--brand) 12%, transparent); }
+  body { background: var(--bg); }
+  .sw { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+  /* Top bar */
+  .s-top { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  .s-top .sw { display: flex; align-items: center; gap: 12px; height: 62px; }
+  .s-logo { width: 38px; height: 38px; border-radius: 11px; object-fit: cover; background: var(--ink); flex: none; }
+  .s-name { font-weight: 800; font-size: 17px; line-height: 1.15; min-width: 0; }
+  .s-name small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .s-search { margin-left: auto; position: relative; flex: 0 1 360px; }
+  .s-search input { padding-left: 38px; border-radius: 99px; min-height: 40px; background: var(--surface-2); border-color: transparent; }
+  .s-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; color: var(--muted); }
+  /* Hero */
+  .s-hero { position: relative; color: #fff; padding: 26px 0 22px; overflow: hidden; isolation: isolate;
+    background: radial-gradient(600px 300px at 85% -10%, color-mix(in srgb, var(--brand) 55%, transparent), transparent), linear-gradient(160deg, #14123A, #262361); }
+  .s-hero.has-cover { background: linear-gradient(180deg, rgba(20,18,58,.55), rgba(20,18,58,.92)), var(--cover) center/cover; }
+  .s-hero h1 { font-size: clamp(26px, 4.5vw, 40px); margin: 0 0 6px; letter-spacing: -.02em; }
+  .s-hero .tag { color: #D9D7F2; margin: 0 0 14px; }
+  .s-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .s-stat { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+  .s-stat.ok { background: rgba(16,185,129,.2); border-color: rgba(16,185,129,.45); }
+  .s-stat.closed { background: rgba(239,68,68,.22); border-color: rgba(239,68,68,.5); }
+  .s-links a { color: #FFD2B3; font-size: 13px; font-weight: 600; margin-right: 14px; }
+  .s-offer { background: var(--grad); color: #fff; text-align: center; font-weight: 700; padding: 9px 14px; font-size: 14px; }
+  /* Mode + filters */
+  .s-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 18px 0 6px; }
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px; gap: 4px; }
+  .seg button { border: 0; background: none; padding: 9px 16px; border-radius: 10px; font: 700 14px var(--font); color: var(--muted); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .seg button.active { background: var(--brand); color: #fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 35%, transparent); }
+  .vegt { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; cursor: pointer; user-select: none; }
+  .vegt i { width: 40px; height: 22px; border-radius: 99px; background: var(--line); position: relative; transition: background .2s; }
+  .vegt i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .vegt input { display: none; } .vegt input:checked + i { background: var(--veg); } .vegt input:checked + i::after { transform: translateX(18px); }
+  /* Category bar */
+  .s-cats { position: sticky; top: 62px; z-index: 20; background: var(--bg); padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .s-cats .chips { padding-bottom: 0; }
+  .s-cats .chip span { opacity: .6; font-weight: 600; margin-left: 4px; }
+  /* Layout */
+  .s-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; padding-top: 6px; }
+  @media (max-width: 980px) { .s-layout { grid-template-columns: 1fr; } .s-cartpanel { display: none; } .s-search { display: none; } }
+  /* Sections */
+  .s-sec { scroll-margin-top: 130px; padding-top: 18px; }
+  .s-sec h2 { font-size: 20px; margin: 0 0 12px; display: flex; align-items: baseline; gap: 8px; }
+  .s-sec h2 small { color: var(--muted); font-size: 13px; font-weight: 600; }
+  .s-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 680px) { .s-grid { grid-template-columns: 1fr; gap: 0; } }
+  /* Dish card */
+  .dish { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px; transition: box-shadow .2s, transform .2s, border-color .2s; }
+  .dish:hover { box-shadow: 0 10px 28px rgba(20,18,58,.08); border-color: color-mix(in srgb, var(--brand) 30%, var(--line)); }
+  @media (max-width: 680px) { .dish { border-radius: 0; border-width: 0 0 1px; padding: 16px 2px; background: transparent; } .dish:hover { box-shadow: none; } }
+  .dish .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .dish .nm { font-weight: 700; font-size: 16px; line-height: 1.3; display: flex; gap: 6px; align-items: flex-start; }
+  .dish .nm .diet { margin-top: 3px; }
+  .dish .pr { font-weight: 800; font-size: 15px; }
+  .dish .pr s { color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .dish .ds { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dish .best { align-self: flex-start; font-size: 11px; font-weight: 800; color: #B45309; background: var(--warning-soft); padding: 2px 8px; border-radius: 99px; }
+  .dish .pic { width: 112px; flex: none; display: flex; flex-direction: column; align-items: center; }
+  .dish .pic img { width: 112px; height: 100px; border-radius: 14px; object-fit: cover; background: var(--surface-2); }
+  .dish .pic .ctl { margin-top: -18px; }
+  .dish .side { display: flex; align-items: center; flex: none; }
+  .dish.off { opacity: .5; }
+  /* Portion pills */
+  .portions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .portion { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 6px 10px; font: 600 13px var(--font); cursor: pointer; color: var(--text); transition: border-color .15s, background .15s; }
+  .portion b { color: var(--text); }
+  .portion:hover { border-color: var(--brand); }
+  .portion.in { border-color: var(--brand); background: var(--brand-soft); }
+  .portion .q { background: var(--brand); color: #fff; border-radius: 99px; min-width: 20px; height: 20px; display: inline-grid; place-items: center; font-size: 11px; padding: 0 5px; }
+  /* Add / qty */
+  .add { background: var(--surface); border: 1.5px solid var(--brand); color: var(--brand); font: 800 14px var(--font); border-radius: 10px; padding: 7px 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(20,18,58,.08); transition: transform .12s, background .15s; }
+  .add:hover { background: var(--brand-soft); } .add:active { transform: scale(.95); }
+  .qtyb { display: inline-flex; align-items: center; background: var(--brand); color: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 35%, transparent); }
+  .qtyb button { background: none; border: 0; color: #fff; font: 800 17px var(--font); width: 34px; height: 34px; cursor: pointer; }
   .qtyb span { min-width: 22px; text-align: center; font-weight: 800; }
-  .cartbar { position: fixed; left: 12px; right: 12px; bottom: 12px; max-width: 836px; margin: 0 auto; background: var(--brand); color: #fff; border-radius: 16px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; box-shadow: var(--shadow-lg); cursor: pointer; z-index: 20; }
-  .closed { background: var(--danger-soft); color: var(--danger); padding: 10px 14px; border-radius: 12px; margin-top: 12px; font-weight: 600; }
+  .soldout { font-size: 12px; font-weight: 700; color: var(--muted); background: var(--surface-2); padding: 6px 10px; border-radius: 8px; }
+  /* Bestsellers carousel */
+  .s-best { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 230px); gap: 12px; overflow-x: auto; padding: 4px 2px 10px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .s-best::-webkit-scrollbar { display: none; }
+  .bcard { scroll-snap-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+  .bcard img, .bcard .ph { height: 120px; width: 100%; object-fit: cover; background: linear-gradient(135deg, var(--brand-soft), var(--surface-2)); display: grid; place-items: center; font-size: 38px; }
+  .bcard .b { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .bcard .b .row { margin-top: auto; justify-content: space-between; }
+  /* Cart panel (desktop) */
+  .s-cartpanel { position: sticky; top: 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+  .s-cartpanel .h { padding: 16px 18px; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 17px; display: flex; justify-content: space-between; }
+  .s-cartpanel .lines { max-height: 46vh; overflow-y: auto; padding: 4px 18px; }
+  .cline { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+  .cline .n { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
+  .cline .n small { display: block; color: var(--muted); font-weight: 500; }
+  .cline .qtyb button { width: 28px; height: 28px; font-size: 15px; } .cline .qtyb span { min-width: 18px; font-size: 13px; }
+  .s-cartpanel .f { padding: 14px 18px 18px; }
+  .s-empty { text-align: center; padding: 30px 18px; color: var(--muted); }
+  .s-empty div { font-size: 40px; margin-bottom: 6px; }
+  /* Mobile cart bar */
+  .cartbar { position: fixed; left: 12px; right: 12px; bottom: 12px; max-width: 560px; margin: 0 auto; background: var(--brand); color: #fff; border-radius: 16px; padding: 12px 16px;
+    display: none; justify-content: space-between; align-items: center; font-weight: 800; box-shadow: 0 16px 40px color-mix(in srgb, var(--brand) 45%, transparent); cursor: pointer; z-index: 40; animation: pop .3s; }
+  .cartbar small { display: block; font-weight: 600; opacity: .85; font-size: 12px; }
+  @media (max-width: 980px) { .cartbar.show { display: flex; } body.has-cart { padding-bottom: 90px; } }
+  .closed-note { background: var(--danger-soft); color: var(--danger); padding: 12px 14px; border-radius: 12px; font-weight: 600; margin-top: 14px; }
   .sum .row { justify-content: space-between; padding: 3px 0; }
+  .s-foot { text-align: center; color: var(--muted); font-size: 12px; padding: 40px 16px 30px; }
+  mark { background: color-mix(in srgb, var(--brand) 25%, transparent); color: inherit; border-radius: 3px; }
 </style>{% endblock %}
 {% block body %}
-{% if r.offer_banner %}<div style="background:var(--grad);color:#fff;text-align:center;font-weight:700;padding:9px 14px;font-size:14px">🎉 {{ r.offer_banner }}</div>{% endif %}
-<header class="st-hero" {% if r.cover_image_url %}style="background:linear-gradient(160deg,rgba(20,18,58,.92),rgba(42,39,96,.75)),url('{{ r.cover_image_url }}') center/cover"{% endif %}><div class="st-wrap">
-  <div class="row between"><div class="row">{% if r.logo_url %}<img src="{{ r.logo_url }}" alt="" style="width:52px;height:52px;border-radius:14px;object-fit:cover">{% endif %}
-    <div><h1>{{ r.name }}</h1><div class="small" style="color:#CFCDEB">{% if r.tagline %}{{ r.tagline }} · {% endif %}{% if r.cuisine %}{{ r.cuisine }} · {% endif %}{{ r.city }}{% if r.phone %} · {{ r.phone }}{% endif %}</div>
-      <div class="row" style="gap:8px;margin-top:6px">{% if r.instagram_url %}<a href="{{ r.instagram_url }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">Instagram</a>{% endif %}{% if r.facebook_url %}<a href="{{ r.facebook_url }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">Facebook</a>{% endif %}{% if r.whatsapp_number %}<a href="https://wa.me/{{ r.whatsapp_number|cut:"+"|cut:" " }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">WhatsApp</a>{% endif %}{% if r.google_review_url %}<a href="{{ r.google_review_url }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">★ Google reviews</a>{% endif %}</div></div></div>
-    <span class="badge {% if r.is_open %}b-success{% else %}b-danger{% endif %}">{% if r.is_open %}Open now{% else %}Closed{% endif %}</span></div>
+{{ qr|json_script:"qr-ctx" }}
+{% if r.offer_banner %}<div class="s-offer">🎉 {{ r.offer_banner }}</div>{% endif %}
+<header class="s-top"><div class="sw">
+  {% if r.logo_url %}<img class="s-logo" src="{{ r.logo_url }}" alt="">{% else %}<span class="s-logo" style="display:grid;place-items:center">{% include "partials/logo_svg.html" with cls="sv-static" uid="st" size=30 %}</span>{% endif %}
+  <div class="s-name">{{ r.name }}<small>{% if r.cuisine %}{{ r.cuisine }}{% else %}{{ r.city }}{% endif %}</small></div>
+  <label class="s-search"><i data-lucide="search"></i><input type="search" id="q" placeholder="Search the menu…" autocomplete="off"></label>
 </div></header>
-<main class="st-wrap">
-  <div class="st-card">
-    <div id="ctx" class="small" style="margin-bottom:10px"></div>
-    <div class="modes" id="modes"></div>
-    <div class="row" style="margin-top:12px"><input type="search" id="q" placeholder="Search dishes…"><label class="check nowrap"><input type="checkbox" id="veg"> Veg only</label></div>
-    <div id="closed"></div>
+
+<section class="s-hero {% if r.cover_image_url %}has-cover{% endif %}" {% if r.cover_image_url %}style="--cover:url('{{ r.cover_image_url }}')"{% endif %}><div class="sw">
+  <h1>{{ r.name }}</h1>
+  <p class="tag">{% if r.tagline %}{{ r.tagline }}{% else %}Order online — fresh from our kitchen{% endif %}{% if r.address %} · {{ r.address }}{% endif %}{% if r.city %}, {{ r.city }}{% endif %}</p>
+  <div class="s-stats" id="stats">
+    <span class="s-stat {% if r.is_open %}ok{% else %}closed{% endif %}">● {% if r.is_open %}Open now{% else %}Closed{% endif %}</span>
   </div>
-  <div class="cat-bar"><div class="chips" id="cats"></div></div>
-  <div id="menu"><div class="skeleton" style="height:300px;margin-top:12px"></div></div>
-  <p class="center tiny muted" style="margin:30px 0">Powered by <b>Servora</b> · Designed &amp; Developed by <b>Tinos Software &amp; Security Solutions LLP</b></p>
+  <div class="s-links" style="margin-top:12px">{% if r.phone %}<a href="tel:{{ r.phone }}">📞 Call</a>{% endif %}{% if r.whatsapp_number %}<a href="https://wa.me/{{ r.whatsapp_number|cut:"+"|cut:" " }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}{% if r.instagram_url %}<a href="{{ r.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}{% if r.facebook_url %}<a href="{{ r.facebook_url }}" target="_blank" rel="noopener">Facebook</a>{% endif %}{% if r.google_review_url %}<a href="{{ r.google_review_url }}" target="_blank" rel="noopener">★ Reviews</a>{% endif %}</div>
+</div></section>
+
+<main class="sw">
+  <div class="s-controls">
+    <div class="seg" id="modes"></div>
+    <div class="row" style="gap:14px"><span id="ctx" class="small"></span><label class="vegt"><input type="checkbox" id="veg"><i></i>Veg only</label></div>
+  </div>
+  <div id="closed"></div>
+  <label class="s-search" style="display:none;margin:10px 0 0;max-width:none" id="mq-wrap"><i data-lucide="search"></i><input type="search" id="mq" placeholder="Search the menu…" autocomplete="off"></label>
 </main>
-<div class="cartbar hidden" id="cartbar"><span id="cb-count"></span><span>View cart · <span id="cb-total"></span> →</span></div>
+<nav class="s-cats"><div class="sw"><div class="chips" id="cats"></div></div></nav>
+<div class="sw s-layout">
+  <div id="menu"><div class="skeleton" style="height:320px;margin-top:16px"></div></div>
+  <aside class="s-cartpanel" id="cartpanel"></aside>
+</div>
+<p class="s-foot">Powered by <b>Servora</b> · Designed &amp; Developed by <b>Tinos Software &amp; Security Solutions LLP</b></p>
+<div class="cartbar" id="cartbar"><span><span id="cb-count"></span><small>Taxes calculated at checkout</small></span><span>View cart · <span id="cb-total"></span> →</span></div>
 {% endblock %}
 {% block scripts %}
 <script>
 (function () {
   const slug = "{{ r.slug|escapejs }}";
   const qs = new URLSearchParams(location.search);
-  const tableToken = qs.get("table"), roomToken = qs.get("room");
-  let data, items = {}, cart = [], mode = null, cat = null;
+  const QR = JSON.parse(document.getElementById("qr-ctx").textContent || "{}");
+  const tableToken = QR.table || qs.get("table"), roomToken = QR.room || qs.get("room");
+  let data, items = {}, cart = [], mode = null, activeCat = null;
   const key = `sv_cart_${slug}_${tableToken || roomToken || "web"}`;
   const ls = { get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } } };
-  const api = (p, body) => fetch(`/api/public/${slug}/${p}`, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.detail || Object.values(d).flat().join(" ") || "Something went wrong"); return d; });
+  const api = (p, body) => fetch(`/api/public/${slug}/${p}`, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {})
+    .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.detail || Object.values(d).flat().join(" ") || "Something went wrong"); return d; });
+  const isDesktop = () => matchMedia("(min-width: 981px)").matches;
 
+  /* ---------- Portion grouping: "Al faham Q / half / full" → one card ---------- */
+  const SIZE = { q: "Quarter", qtr: "Quarter", quarter: "Quarter", half: "Half", full: "Full", small: "Small", regular: "Regular", medium: "Medium", large: "Large", single: "Single", double: "Double", plate: "Plate", mini: "Mini", jumbo: "Jumbo" };
+  const ORDER = ["Mini", "Quarter", "Small", "Single", "Half", "Regular", "Medium", "Plate", "Full", "Large", "Double", "Jumbo"];
+  const clean = (n) => {
+    const s = n.replace(/[.]+/g, " ").replace(/\s+/g, " ").trim();
+    return s === s.toLowerCase() ? s.replace(/(^|\s|\()([a-z])/g, (m, a, b) => a + b.toUpperCase()) : s.charAt(0).toUpperCase() + s.slice(1);
+  };
+  function splitName(name) {
+    const words = clean(name).split(" ");
+    const sizeWords = [];
+    while (words.length > 1 && SIZE[words[words.length - 1].toLowerCase()]) sizeWords.unshift(SIZE[words.pop().toLowerCase()]);
+    if (!sizeWords.length) return { base: clean(name), size: null };
+    return { base: words.join(" "), size: sizeWords.join(" ") };
+  }
+  function groupItems(list) {
+    const fams = new Map(), out = [];
+    list.forEach((i) => {
+      const { base, size } = splitName(i.name);
+      const k = base.toLowerCase();
+      if (size) { if (!fams.has(k)) { const g = { family: true, base, diet: i.diet, items: [] }; fams.set(k, g); out.push(g); } fams.get(k).items.push({ ...i, size }); }
+      else out.push(i);
+    });
+    // a "family" with a single portion is just a normal item
+    return out.map((g) => {
+      if (!g.family) return g;
+      if (g.items.length === 1) return g.items[0];
+      g.items.sort((a, b) => (ORDER.indexOf(a.size) + 99 * (ORDER.indexOf(a.size) < 0)) - (ORDER.indexOf(b.size) + 99 * (ORDER.indexOf(b.size) < 0)));
+      g.image_url = (g.items.find((x) => x.image_url) || {}).image_url || "";
+      g.description = (g.items.find((x) => x.description) || {}).description || "";
+      g.bestseller = g.items.some((x) => x.bestseller);
+      g.available = g.items.some((x) => x.available);
+      g.diet = g.items.some((x) => x.diet === "non_veg") ? "non_veg" : g.items[0].diet;
+      return g;
+    });
+  }
+
+  /* ---------- Boot ---------- */
   async function boot() {
     data = await api(`store${tableToken ? "?table=" + tableToken : roomToken ? "?room=" + roomToken : ""}`);
+    if (data.invalid_qr) {
+      S.$("#menu").innerHTML = `<div class="s-empty" style="padding:60px 18px"><div>📷</div><h2 style="color:var(--text)">This ${data.invalid_qr === "room" ? "room" : "table"} QR code is no longer valid</h2>
+        <p>Please ask a staff member for help — they can take your order or give you the current QR code.</p></div>`;
+      S.$("#modes").innerHTML = ""; S.$(".s-cats").style.display = "none"; S.$("#cartpanel").style.display = "none";
+      return;
+    }
     data.menu.forEach((c) => c.items.forEach((i) => (items[i.id] = i)));
     cart = (ls.get(key) || []).filter((l) => items[l.item_id]);
     const s = data.store, modes = [];
-    if (data.table) { modes.push(["dine_in", `🍽 Table ${data.table.name}`]); S.$("#ctx").innerHTML = `Ordering for <b>Table ${S.esc(data.table.name)}</b> · <a href="#" id="call">🔔 Call waiter</a>`; }
-    else if (data.room) { modes.push(["room_service", `🛎 Room ${data.room.number}`]); S.$("#ctx").innerHTML = `In-room dining for <b>Room ${S.esc(data.room.number)}</b>`; }
+    if (data.table) { modes.push(["dine_in", "🍽 Table " + data.table.name]); S.$("#ctx").innerHTML = `<a href="#" id="call">🔔 Call waiter</a>`; }
+    else if (data.room) modes.push(["room_service", "🛎 Room " + data.room.number]);
     else {
       if (s.delivery) modes.push(["delivery", "🛵 Delivery"]);
       if (s.pickup && s.online_ordering) modes.push(["takeaway", "🛍 Takeaway"]);
-      S.$("#ctx").innerHTML = s.delivery ? `Free delivery above ${S.money(s.free_delivery_above)} · ~${s.prep_minutes + 15} min` : "";
-      if (!s.is_open || !s.online_ordering) S.$("#closed").innerHTML = `<div class="closed">${s.online_ordering ? "We're closed right now — you can browse the menu." : "Online ordering isn't available — browse our menu."}</div>`;
+      if (!s.is_open || !s.online_ordering) S.$("#closed").innerHTML = `<div class="closed-note">${s.online_ordering ? "We're closed right now — you can still browse the menu." : "Online ordering isn't available — browse our menu."}</div>`;
     }
+    const stats = S.$("#stats");
+    if (s.delivery && !data.table && !data.room) stats.insertAdjacentHTML("beforeend", `<span class="s-stat">⏱ ${s.prep_minutes + 15}–${s.prep_minutes + 30} min</span>${Number(s.free_delivery_above) ? `<span class="s-stat">🛵 Free delivery above ${S.money(s.free_delivery_above)}</span>` : ""}${Number(s.min_order) ? `<span class="s-stat">Min order ${S.money(s.min_order)}</span>` : ""}`);
+    stats.insertAdjacentHTML("beforeend", `<span class="s-stat">🍽 ${Object.keys(items).length} dishes</span>`);
     mode = modes[0] ? modes[0][0] : null;
-    S.$("#modes").innerHTML = modes.map(([m, l]) => `<button data-mode="${m}" class="${m === mode ? "active" : ""}">${l}</button>`).join("");
-    S.$("#modes").onclick = (e) => { const b = e.target.closest("[data-mode]"); if (b) { mode = b.dataset.mode; S.$$("#modes button").forEach((x) => x.classList.toggle("active", x === b)); } };
+    S.$("#modes").innerHTML = modes.map(([m, l]) => `<button data-mode="${m}" class="${m === mode ? "active" : ""}">${l}</button>`).join("") || '<button class="active">📖 Menu</button>';
+    S.$("#modes").onclick = (e) => { const b = e.target.closest("[data-mode]"); if (b) { mode = b.dataset.mode; S.$$("#modes button").forEach((x) => x.classList.toggle("active", x === b)); renderCart(); } };
     S.$("#call") && (S.$("#call").onclick = async (e) => { e.preventDefault(); await api("call-waiter", { table_token: tableToken, request: "waiter" }); S.toast("A staff member is on the way 🙂", "ok"); });
-    renderCats(); renderMenu(); renderBar();
+    if (!isDesktop()) S.$("#mq-wrap").style.display = "block";
+    render();
+    renderCart();
+    setupScrollSpy();
   }
   const canOrder = () => mode && (data.table || data.room || (data.store.is_open && data.store.online_ordering));
-  function renderCats() { S.$("#cats").innerHTML = [`<button class="chip ${!cat ? "active" : ""}" data-c="">All</button>`].concat(data.menu.map((c) => `<button class="chip ${cat == c.id ? "active" : ""}" data-c="${c.id}">${S.esc(c.name)}</button>`)).join(""); }
-  S.$("#cats").onclick = (e) => { const b = e.target.closest("[data-c]"); if (!b) return; cat = b.dataset.c || null; renderCats(); renderMenu(); };
+
+  /* ---------- Menu ---------- */
+  const query = () => (S.$("#q").value || S.$("#mq").value || "").trim().toLowerCase();
+  const hl = (t) => { const q = query(); const e = S.esc(t); if (!q) return e; const i = t.toLowerCase().indexOf(q); return i < 0 ? e : S.esc(t.slice(0, i)) + "<mark>" + S.esc(t.slice(i, i + q.length)) + "</mark>" + S.esc(t.slice(i + q.length)); };
   const qtyOf = (id) => cart.filter((l) => l.item_id === id).reduce((s, l) => s + l.quantity, 0);
-  function renderMenu() {
-    const q = S.$("#q").value.toLowerCase(), veg = S.$("#veg").checked;
-    S.$("#menu").innerHTML = data.menu.filter((c) => !cat || c.id == cat).map((c) => {
-      const list = c.items.filter((i) => (!q || i.name.toLowerCase().includes(q)) && (!veg || ["veg", "vegan"].includes(i.diet)));
-      if (!list.length) return "";
-      return `<h3 style="margin-top:22px">${S.esc(c.name)}</h3>` + list.map((i) => {
-        const n = qtyOf(i.id);
-        const ctl = !i.available ? '<span class="badge">Sold out</span>' : !canOrder() ? "" : n && !i.variants.length && !i.addon_groups.length ? `<span class="qtyb"><button data-dec="${i.id}">−</button><span>${n}</span><button data-inc="${i.id}">+</button></span>` : `<button class="add" data-add="${i.id}">ADD${n ? " · " + n : ""}</button>`;
-        return `<div class="m-item" style="${i.available ? "" : "opacity:.55"}"><div class="grow"><div class="row" style="gap:6px"><span class="diet ${i.diet}"></span>${i.bestseller ? '<span class="badge b-primary">★ Bestseller</span>' : ""}</div>
-          <div style="font-weight:700;margin-top:4px">${S.esc(i.name)}</div><div style="font-weight:700">${S.money(i.price)}</div><div class="small muted" style="margin-top:4px">${S.esc(i.description)}</div></div>
-          <div class="img" style="${i.image_url ? `background-image:url('${encodeURI(i.image_url)}')` : ""}">${!i.image_url ? '<div style="display:grid;place-items:center;height:100%;font-size:34px">🍽</div>' : ""}<div class="add-wrap" style="position:absolute;bottom:-14px;left:50%;transform:translateX(-50%)">${ctl}</div></div></div>`;
-      }).join("");
-    }).join("") || '<div class="empty">No dishes found.</div>';
+  const needsOptions = (i) => i.variants.length || i.addon_groups.length;
+  function control(i) {
+    if (!i.available) return '<span class="soldout">Sold out</span>';
+    if (!canOrder()) return "";
+    const n = qtyOf(i.id);
+    if (n && !needsOptions(i)) return `<span class="qtyb"><button data-dec="${i.id}" aria-label="Remove one">−</button><span>${n}</span><button data-inc="${i.id}" aria-label="Add one">+</button></span>`;
+    return `<button class="add" data-add="${i.id}">ADD${n ? " · " + n : ""}</button>`;
   }
-  S.$("#q").oninput = renderMenu; S.$("#veg").onchange = renderMenu;
-  const save = () => { ls.set(key, cart); renderMenu(); renderBar(); };
+  function priceLabel(i) { return S.money(i.price) + (i.variants.length ? '<span class="muted small" style="font-weight:600"> onwards</span>' : ""); }
+  function dishCard(g) {
+    if (g.family) {
+      const portions = g.items.map((i) => { const n = qtyOf(i.id); return `<button class="portion ${n ? "in" : ""}" ${i.available && canOrder() ? `data-add="${i.id}"` : "disabled"} title="Add ${S.esc(i.size)}">${S.esc(i.size)} <b>${S.money(i.price)}</b>${n ? `<span class="q">${n}</span>` : ""}</button>`; }).join("");
+      return `<article class="dish ${g.available ? "" : "off"}"><div class="info">${g.bestseller ? '<span class="best">★ Bestseller</span>' : ""}
+        <div class="nm"><span class="diet ${g.diet}"></span><span>${hl(g.base)}</span></div>
+        <div class="pr">${S.money(Math.min(...g.items.map((x) => Number(x.price))))} <span class="muted small" style="font-weight:600">onwards</span></div>
+        ${g.description ? `<div class="ds">${S.esc(g.description)}</div>` : ""}<div class="portions">${portions}</div></div>
+        ${g.image_url ? `<div class="pic"><img loading="lazy" src="${encodeURI(g.image_url)}" alt=""></div>` : ""}</article>`;
+    }
+    const i = g;
+    return `<article class="dish ${i.available ? "" : "off"}"><div class="info">${i.bestseller ? '<span class="best">★ Bestseller</span>' : ""}
+      <div class="nm"><span class="diet ${i.diet}"></span><span>${hl(clean(i.name))}</span></div><div class="pr">${priceLabel(i)}</div>
+      ${i.description ? `<div class="ds">${S.esc(i.description)}</div>` : ""}</div>
+      ${i.image_url ? `<div class="pic"><img loading="lazy" src="${encodeURI(i.image_url)}" alt=""><div class="ctl">${control(i)}</div></div>` : `<div class="side">${control(i)}</div>`}</article>`;
+  }
+  function render() {
+    const q = query(), veg = S.$("#veg").checked;
+    const match = (i) => (!q || i.name.toLowerCase().includes(q) || (i.description || "").toLowerCase().includes(q)) && (!veg || ["veg", "vegan"].includes(i.diet));
+    const sections = data.menu.map((c) => ({ c, groups: groupItems(c.items.filter(match)) })).filter((s) => s.groups.length);
+    S.$("#cats").innerHTML = sections.map((s) => `<button class="chip" data-c="${s.c.id}">${S.esc(s.c.name)}<span>${s.groups.length}</span></button>`).join("");
+    const best = !q ? groupItems(Object.values(items).filter((i) => i.bestseller && match(i))).slice(0, 10) : [];
+    const bestHtml = best.length ? `<section class="s-sec" id="sec-best"><h2>★ Bestsellers</h2><div class="s-best">${best.map((g) => {
+        const first = g.family ? g.items[0] : g; const img = g.image_url;
+        return `<div class="bcard">${img ? `<img loading="lazy" src="${encodeURI(img)}" alt="">` : '<div class="ph">🍽</div>'}<div class="b"><div class="nm" style="font-weight:700;display:flex;gap:6px"><span class="diet ${g.diet}" style="margin-top:3px"></span>${S.esc(g.family ? g.base : clean(g.name))}</div>
+          <div class="row"><b>${S.money(g.family ? Math.min(...g.items.map((x) => Number(x.price))) : g.price)}</b>${g.family ? `<button class="add" data-jump="${first.id}">Options</button>` : control(g)}</div></div></div>`; }).join("")}</div></section>` : "";
+    S.$("#menu").innerHTML = (bestHtml + sections.map((s) => `<section class="s-sec" id="sec-${s.c.id}" data-cat="${s.c.id}"><h2>${S.esc(s.c.name)} <small>${s.groups.length} dishes</small></h2><div class="s-grid">${s.groups.map(dishCard).join("")}</div></section>`).join(""))
+      || `<div class="s-empty"><div>🔍</div>No dishes match “${S.esc(q)}”${veg ? " in veg" : ""}.</div>`;
+    markActive();
+  }
+  ["#q", "#mq"].forEach((s) => S.$(s).addEventListener("input", (e) => { S.$(s === "#q" ? "#mq" : "#q").value = e.target.value; render(); }));
+  S.$("#veg").onchange = render;
+  S.$("#cats").onclick = (e) => { const b = e.target.closest("[data-c]"); if (!b) return; const sec = S.$("#sec-" + b.dataset.c); sec && sec.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  function markActive() { S.$$("#cats .chip").forEach((c) => c.classList.toggle("active", c.dataset.c === String(activeCat))); const a = S.$("#cats .chip.active"); a && a.scrollIntoView({ block: "nearest", inline: "center" }); }
+  function setupScrollSpy() {
+    let ticking = false;
+    addEventListener("scroll", () => { if (ticking) return; ticking = true; requestAnimationFrame(() => {
+      ticking = false; let cur = null;
+      S.$$(".s-sec[data-cat]").forEach((s) => { if (s.getBoundingClientRect().top < 160) cur = s.dataset.cat; });
+      if (cur !== activeCat) { activeCat = cur; markActive(); }
+    }); }, { passive: true });
+  }
+
+  /* ---------- Cart ---------- */
+  const save = () => { ls.set(key, cart); render(); renderCart(); };
   const linePrice = (l) => { const i = items[l.item_id]; const v = i.variants.find((x) => x.id === l.variant_id); const add = i.addon_groups.flatMap((g) => g.addons).filter((a) => (l.addon_ids || []).includes(a.id)).reduce((s, a) => s + Number(a.price), 0); return (Number(v ? v.price : i.price) + add) * l.quantity; };
   const subtotal = () => cart.reduce((s, l) => s + linePrice(l), 0);
-  function renderBar() { const n = cart.reduce((s, l) => s + l.quantity, 0); S.$("#cartbar").classList.toggle("hidden", !n); S.$("#cb-count").textContent = `${n} item${n > 1 ? "s" : ""}`; S.$("#cb-total").textContent = S.money(subtotal()); }
-  S.$("#menu").onclick = (e) => {
-    const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]"), add = e.target.closest("[data-add]");
-    if (inc) { cart.find((l) => l.item_id == inc.dataset.inc).quantity++; save(); }
-    if (dec) { const l = cart.find((x) => x.item_id == dec.dataset.dec); l.quantity--; if (!l.quantity) cart.splice(cart.indexOf(l), 1); save(); }
-    if (add) { const i = items[add.dataset.add]; if (i.variants.length || i.addon_groups.length) customize(i); else { cart.push({ item_id: i.id, quantity: 1 }); save(); } }
-  };
+  const count = () => cart.reduce((s, l) => s + l.quantity, 0);
+  function lineName(l) { const i = items[l.item_id]; const v = i.variants.find((x) => x.id === l.variant_id); const { base, size } = splitName(i.name); return `${S.esc(base)}${size ? ` <span class="muted">(${S.esc(size)})</span>` : ""}${v ? ` <span class="muted">(${S.esc(v.name)})</span>` : ""}`; }
+  function renderCart() {
+    const n = count();
+    document.body.classList.toggle("has-cart", n > 0);
+    S.$("#cartbar").classList.toggle("show", n > 0 && canOrder());
+    S.$("#cb-count").textContent = `${n} item${n === 1 ? "" : "s"} · ${S.money(subtotal())}`;
+    S.$("#cb-total").textContent = S.money(subtotal());
+    const s = data.store, sub = subtotal();
+    const freeLeft = Number(s.free_delivery_above) - sub;
+    S.$("#cartpanel").innerHTML = `<div class="h"><span>Your order</span><span class="muted small">${n} item${n === 1 ? "" : "s"}</span></div>` + (n ? `<div class="lines">${cart.map((l, k) => `<div class="cline"><span class="diet ${items[l.item_id].diet}"></span><div class="n">${lineName(l)}${l.notes ? `<small>${S.esc(l.notes)}</small>` : ""}</div>
+        <span class="qtyb"><button data-ld="${k}">−</button><span>${l.quantity}</span><button data-li="${k}">+</button></span><b style="min-width:60px;text-align:right">${S.money(linePrice(l))}</b></div>`).join("")}</div>
+      <div class="f">${mode === "delivery" && Number(s.free_delivery_above) && freeLeft > 0 ? `<div class="small" style="margin-bottom:10px;color:var(--brand);font-weight:700">Add ${S.money(freeLeft)} more for free delivery</div>` : ""}
+        <div class="row between" style="font-weight:800;font-size:18px;margin-bottom:12px"><span>Subtotal</span><span>${S.money(sub)}</span></div>
+        <button class="btn btn-primary btn-lg btn-block" id="go" ${canOrder() ? "" : "disabled"}>${canOrder() ? "Checkout →" : "Ordering unavailable"}</button></div>`
+      : `<div class="s-empty"><div>🛒</div>Your cart is empty.<br><span class="small">Add dishes to get started.</span></div>`);
+    S.icons();
+  }
+  function onCartClick(e) {
+    const i = e.target.closest("[data-li]"), d = e.target.closest("[data-ld]");
+    if (i) { cart[i.dataset.li].quantity++; save(); }
+    if (d) { const l = cart[d.dataset.ld]; l.quantity--; if (!l.quantity) cart.splice(d.dataset.ld, 1); save(); }
+    if (e.target.closest("#go")) checkout();
+  }
+  S.$("#cartpanel").addEventListener("click", onCartClick);
+  S.$("#menu").addEventListener("click", (e) => {
+    const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]"), add = e.target.closest("[data-add]"), jump = e.target.closest("[data-jump]");
+    if (inc) { cart.find((l) => l.item_id == inc.dataset.inc && !l.variant_id && !(l.addon_ids || []).length).quantity++; save(); }
+    if (dec) { const l = cart.find((x) => x.item_id == dec.dataset.dec && !x.variant_id && !(x.addon_ids || []).length); l.quantity--; if (!l.quantity) cart.splice(cart.indexOf(l), 1); save(); }
+    if (add) { const it = items[add.dataset.add]; if (needsOptions(it)) customize(it); else { const ex = cart.find((l) => l.item_id === it.id && !l.variant_id && !(l.addon_ids || []).length && !l.notes); ex ? ex.quantity++ : cart.push({ item_id: it.id, quantity: 1 }); save(); S.toast(`${splitName(it.name).base}${splitName(it.name).size ? " (" + splitName(it.name).size + ")" : ""} added`, "ok"); } }
+    if (jump) {
+      const target = S.$$(".s-sec:not(#sec-best) [data-add]").find((x) => x.dataset.add === jump.dataset.jump);
+      const card = target && target.closest(".dish");
+      if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.animate([{ boxShadow: "0 0 0 3px var(--brand)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1600 }); }
+    }
+  });
   function customize(i) {
-    const m = S.modal({ title: i.name, body: `${i.variants.length ? `<label>Choose size</label>${i.variants.map((v, k) => `<label class="check" style="margin-bottom:8px"><input type="radio" name="v" value="${v.id}" ${k === i.variants.length - 1 ? "checked" : ""}> ${S.esc(v.name)} — ${S.money(v.price)}</label>`).join("")}` : ""}
+    const m = S.modal({ title: clean(i.name), body: `${i.variants.length ? `<label>Choose size</label>${i.variants.map((v, k) => `<label class="check" style="margin-bottom:8px"><input type="radio" name="v" value="${v.id}" ${k === 0 ? "checked" : ""}> ${S.esc(v.name)} — ${S.money(v.price)}</label>`).join("")}` : ""}
       ${i.addon_groups.map((g) => `<label style="margin-top:12px">${S.esc(g.name)}</label>${g.addons.map((a) => `<label class="check" style="margin-bottom:8px"><input type="checkbox" value="${a.id}"> ${S.esc(a.name)} ${Number(a.price) ? "+" + S.money(a.price) : ""}</label>`).join("")}`).join("")}
       <div class="field" style="margin-top:12px"><label>Special instructions</label><input type="text" id="note" placeholder="e.g. less spicy"></div>`,
-      footer: '<button class="btn btn-primary btn-block" data-ok>Add to cart</button>' });
+      footer: '<button class="btn btn-primary btn-block btn-lg" data-ok>Add to cart</button>' });
     m.$("[data-ok]").onclick = () => { const v = m.$('input[name="v"]:checked'); cart.push({ item_id: i.id, quantity: 1, variant_id: v ? Number(v.value) : null, addon_ids: m.$$('input[type="checkbox"]:checked').map((x) => Number(x.value)), notes: m.$("#note").value }); m.close(); save(); };
   }
   S.$("#cartbar").onclick = checkout;
+
+  /* ---------- Checkout ---------- */
   function checkout() {
-    const s = data.store, saved = ls.get("sv_customer") || {};
-    const isDel = mode === "delivery";
-    const m = S.modal({ title: "Your order", body: `
-      <div id="lines">${cart.map((l, k) => { const i = items[l.item_id]; const v = i.variants.find((x) => x.id === l.variant_id); return `<div class="row between" style="padding:8px 0;border-bottom:1px dashed var(--line)"><div><span class="diet ${i.diet}"></span> <b>${S.esc(i.name)}</b>${v ? ` <span class="muted small">(${S.esc(v.name)})</span>` : ""}<div class="tiny muted">${S.esc(l.notes || "")}</div></div><div class="row"><span class="qtyb"><button data-ld="${k}">−</button><span>${l.quantity}</span><button data-li="${k}">+</button></span><b style="min-width:64px;text-align:right">${S.money(linePrice(l))}</b></div></div>`; }).join("")}</div>
-      <div class="grid g2" style="gap:0 12px;margin-top:16px"><div class="field"><label>Name</label><input id="c-name" value="${S.esc(saved.name || "")}" required></div><div class="field"><label>Mobile</label><input id="c-phone" type="tel" value="${S.esc(saved.phone || "")}" required></div></div>
-      ${isDel ? `<div class="field"><label>Delivery address</label><textarea id="c-addr" placeholder="House / flat, street, landmark">${S.esc(saved.address || "")}</textarea><button type="button" class="btn btn-sm" id="loc" style="margin-top:6px">📍 Use my current location</button> <span class="small muted" id="loc-msg"></span></div>` : ""}
-      <div class="field"><label>Note for the restaurant</label><input id="c-note" placeholder="Optional"></div>
-      <div class="row"><input id="coupon" placeholder="Coupon code" style="text-transform:uppercase"></div>
-      <div class="sum card" style="margin-top:14px;background:var(--surface-2);box-shadow:none" id="sum"></div>
-      <label style="margin-top:14px">Payment</label><div class="modes" id="pay">
-        <button class="active" data-p="online">💳 Pay online (UPI / card)</button>
-        ${isDel && s.accept_cod ? '<button data-p="cod">💵 Cash on delivery</button>' : ""}${!isDel && mode !== "takeaway" ? '<button data-p="later">🧾 Pay at the end</button>' : ""}</div>`,
+    if (!canOrder()) return;
+    const s = data.store, saved = ls.get("sv_customer") || {}, isDel = mode === "delivery";
+    const m = S.modal({ title: "Checkout", body: `
+      <div id="lines">${cart.map((l, k) => `<div class="cline"><span class="diet ${items[l.item_id].diet}"></span><div class="n">${lineName(l)}${l.notes ? `<small>${S.esc(l.notes)}</small>` : ""}</div>
+        <span class="qtyb"><button data-ld="${k}">−</button><span>${l.quantity}</span><button data-li="${k}">+</button></span><b style="min-width:60px;text-align:right">${S.money(linePrice(l))}</b></div>`).join("")}</div>
+      <div class="grid g2" style="gap:0 12px;margin-top:16px"><div class="field"><label>Your name</label><input id="c-name" value="${S.esc(saved.name || "")}" autocomplete="name"></div>
+        <div class="field"><label>Mobile number</label><input id="c-phone" type="tel" value="${S.esc(saved.phone || "")}" autocomplete="tel"></div></div>
+      ${isDel ? `<div class="field"><label>Delivery address</label><textarea id="c-addr" placeholder="House / flat, street, landmark" autocomplete="street-address">${S.esc(saved.address || "")}</textarea>
+        <button type="button" class="btn btn-sm" id="loc" style="margin-top:6px">📍 Use my current location</button> <span class="small muted" id="loc-msg"></span></div>` : ""}
+      <div class="grid g2" style="gap:0 12px"><div class="field"><label>Note for the kitchen</label><input id="c-note" placeholder="Optional"></div>
+        <div class="field"><label>Coupon</label><input id="coupon" placeholder="e.g. WELCOME20" style="text-transform:uppercase"></div></div>
+      <div class="sum card" style="background:var(--surface-2);box-shadow:none" id="sum"></div>
+      <label style="margin-top:14px">Payment</label><div class="seg" id="pay" style="display:flex;flex-wrap:wrap">
+        <button class="active" data-p="online">💳 Pay online</button>${isDel && s.accept_cod ? '<button data-p="cod">💵 Cash on delivery</button>' : ""}${!isDel && mode !== "takeaway" ? '<button data-p="later">🧾 Pay at the end</button>' : ""}</div>`,
       footer: '<button class="btn btn-primary btn-lg btn-block" id="place">Place order</button>' });
     let pay = "online", lat = saved.lat || null, lng = saved.lng || null, fee = isDel ? Number(s.delivery_fee) : 0;
-    const sum = () => { const sub = subtotal(); const free = Number(s.free_delivery_above) && sub >= Number(s.free_delivery_above); const f = isDel ? (free ? 0 : fee) : 0; const pk = mode === "delivery" || mode === "takeaway" ? Number(s.packaging_charge) : 0;
-      m.$("#sum").innerHTML = `<div class="row"><span>Item total</span><span>${S.money(sub)}</span></div>${isDel ? `<div class="row"><span>Delivery fee</span><span>${f ? S.money(f) : "FREE"}</span></div>` : ""}${pk ? `<div class="row"><span>Packaging</span><span>${S.money(pk)}</span></div>` : ""}<div class="row"><span>Taxes</span><span>calculated at checkout</span></div>
-        <div class="row" style="font-weight:800;font-size:18px"><span>To pay (approx.)</span><span>${S.money(sub + f + pk)}</span></div>${isDel && Number(s.min_order) > sub ? `<div class="small" style="color:var(--danger)">Minimum order for delivery is ${S.money(s.min_order)}</div>` : ""}`; };
+    const sum = () => { const sub = subtotal(); const free = Number(s.free_delivery_above) && sub >= Number(s.free_delivery_above); const f = isDel ? (free ? 0 : fee) : 0;
+      const pk = mode === "delivery" || mode === "takeaway" ? Number(s.packaging_charge) : 0;
+      m.$("#sum").innerHTML = `<div class="row"><span>Item total</span><span>${S.money(sub)}</span></div>${isDel ? `<div class="row"><span>Delivery fee</span><span>${f ? S.money(f) : '<b style="color:var(--success)">FREE</b>'}</span></div>` : ""}${pk ? `<div class="row"><span>Packaging</span><span>${S.money(pk)}</span></div>` : ""}
+        <div class="row muted small"><span>Taxes</span><span>added at checkout</span></div><div class="row" style="font-weight:800;font-size:18px;border-top:1px dashed var(--line);margin-top:6px;padding-top:8px"><span>To pay (approx.)</span><span>${S.money(sub + f + pk)}</span></div>
+        ${isDel && Number(s.min_order) > sub ? `<div class="small" style="color:var(--danger)">Minimum order for delivery is ${S.money(s.min_order)}</div>` : ""}`; };
     sum();
-    m.$("#lines").onclick = (e) => { const i = e.target.closest("[data-li]"), d = e.target.closest("[data-ld]"); if (i) cart[i.dataset.li].quantity++; if (d) { cart[d.dataset.ld].quantity--; if (!cart[d.dataset.ld].quantity) cart.splice(d.dataset.ld, 1); } save(); m.close(); if (cart.length) checkout(); };
+    m.$("#lines").onclick = (e) => { onCartClick(e); m.close(); if (cart.length) checkout(); };
     m.$("#pay").onclick = (e) => { const b = e.target.closest("[data-p]"); if (!b) return; pay = b.dataset.p; m.$$("#pay button").forEach((x) => x.classList.toggle("active", x === b)); };
     m.$("#loc") && (m.$("#loc").onclick = () => navigator.geolocation.getCurrentPosition(async (p) => {
       lat = p.coords.latitude.toFixed(6); lng = p.coords.longitude.toFixed(6);
@@ -149,19 +370,18 @@
       const body = { mode, table_token: tableToken || "", room_token: roomToken || "", name: m.$("#c-name").value.trim(), phone: m.$("#c-phone").value.trim(), address: isDel ? m.$("#c-addr").value.trim() : "",
         lat, lng, notes: m.$("#c-note").value, coupon: m.$("#coupon").value.trim(), payment: pay, items: cart.map(({ item_id, quantity, variant_id, addon_ids, notes }) => ({ item_id, quantity, variant_id, addon_ids, notes })) };
       if (!body.name || !body.phone) return S.toast("Please enter your name and mobile number", "err");
+      if (isDel && !body.address) return S.toast("Please enter your delivery address", "err");
       ls.set("sv_customer", { name: body.name, phone: body.phone, address: body.address, lat, lng });
       m.$("#place").disabled = true; m.$("#place").innerHTML = '<span class="spin"></span>';
       try {
         const res = await api("order", body);
-        const done = () => { cart = []; save(); location.href = `/t/${res.order.token}/`; };
-        if (res.razorpay) {
-          S.razorpay({ ...res.razorpay, description: `Order #${res.order.number}` }, async (resp) => { await api("verify-payment", resp); done(); });
-          m.close();
-        } else done();
+        const done = () => { cart = []; ls.set(key, cart); location.href = `/t/${res.order.token}/`; };
+        if (res.razorpay) { S.razorpay({ ...res.razorpay, description: `Order #${res.order.number}` }, async (resp) => { await api("verify-payment", resp); done(); }); m.close(); }
+        else done();
       } catch (err) { S.toast(err.message, "err"); m.$("#place").disabled = false; m.$("#place").textContent = "Place order"; }
     };
   }
-  boot().catch((e) => (S.$("#menu").innerHTML = `<div class="empty">${S.esc(e.message)}</div>`));
+  boot().catch((e) => (S.$("#menu").innerHTML = `<div class="s-empty"><div>😕</div>${S.esc(e.message)}</div>`));
 })();
 </script>
 {% endblock %}

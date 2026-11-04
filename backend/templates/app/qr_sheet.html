@@ -10,12 +10,13 @@
   @media print { .bar { display: none; } .sheet { padding: 0; } }
 </style>{% endblock %}
 {% block body %}
-<div class="bar"><b>{{ restaurant.name }} — table & room QR codes</b><button class="btn btn-primary" onclick="window.print()">Print</button></div>
+<div class="bar"><div><b>{{ restaurant.name }} — table & room QR codes</b><div class="small muted">Each table has its own QR. If you delete or re-create a table, print its QR again.</div></div><button class="btn btn-primary" onclick="window.print()">Print</button></div>
 <div class="sheet">
-  <div class="qr-card"><div class="small">Order online</div><h2>{{ restaurant.name }}</h2><div class="qr" data-url="{{ store_url }}"></div><div class="small">Scan for home delivery & takeaway</div></div>
   {% for t, url in tables %}<div class="qr-card"><div class="small">{{ restaurant.name }}</div><h2>Table {{ t.name }}</h2><div class="qr" data-url="{{ url }}"></div><div class="small">Scan to view menu, order & pay</div><div class="tiny" style="margin-top:6px;opacity:.6">Powered by Servora</div></div>{% endfor %}
   {% for r, url in rooms %}<div class="qr-card"><div class="small">{{ restaurant.name }} · In-room dining</div><h2>Room {{ r.number }}</h2><div class="qr" data-url="{{ url }}"></div><div class="small">Scan to order room service</div></div>{% endfor %}
 </div>
+<h3 style="padding:0 24px;margin:8px 0 0" class="no-print-break">Home delivery &amp; takeaway QR <span class="small muted">(for flyers, posters &amp; social media — not for tables)</span></h3>
+<div class="sheet"><div class="qr-card" style="border-style:dashed"><div class="small">Order online · Home delivery &amp; takeaway</div><h2>{{ restaurant.name }}</h2><div class="qr" data-url="{{ store_url }}"></div><div class="small">Scan to order for delivery or pickup</div></div></div>
 {% endblock %}
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>

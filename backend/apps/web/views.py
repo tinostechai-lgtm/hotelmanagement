@@ -259,15 +259,31 @@ def qr_sheet(request):
         raise Http404
     from apps.operations.models import Room, Table
 
-    base = request.build_absolute_uri(f"/s/{r.slug}/")
+    import re
+
+    root = request.build_absolute_uri("/").rstrip("/")
+    natural = lambda t: [int(x) if x.isdigit() else x.lower() for x in re.split(r"(\d+)", t.name)]
     return render(request, "app/qr_sheet.html", {
-        "tables": [(t, f"{base}?table={t.qr_token}") for t in Table.objects.filter(restaurant=r)],
-        "rooms": [(rm, f"{base}?room={rm.qr_token}") for rm in Room.objects.filter(restaurant=r)],
-        "store_url": base,
+        "tables": [(t, f"{root}/q/{t.qr_token}/") for t in sorted(Table.objects.filter(restaurant=r), key=natural)],
+        "rooms": [(rm, f"{root}/q/{rm.qr_token}/") for rm in Room.objects.filter(restaurant=r)],
+        "store_url": f"{root}/s/{r.slug}/",
     })
 
 
-def store(request, slug):
+def qr_entry(request, token):
+    """Short QR link printed on tables & room cards: /q/<token>/."""
+    from apps.operations.models import Room, Table
+
+    t = Table.objects.filter(qr_token=token).select_related("restaurant").first()
+    if t:
+        return store(request, t.restaurant.slug, qr={"table": token})
+    rm = Room.objects.filter(qr_token=token).select_related("restaurant").first()
+    if rm:
+        return store(request, rm.restaurant.slug, qr={"room": token})
+    return render(request, "store/qr_invalid.html", status=404)
+
+
+def store(request, slug, qr=None):
     r = get_object_or_404(Restaurant, slug=slug, is_active=True)
     base = request.build_absolute_uri("/").rstrip("/")
     data = {"@context": "https://schema.org", "@type": "Restaurant", "name": r.name, "url": f"{base}/s/{r.slug}/",
@@ -282,7 +298,7 @@ def store(request, slug):
     same = [u for u in [r.instagram_url, r.facebook_url] if u]
     if same:
         data["sameAs"] = same
-    return render(request, "store/store.html", {"r": r, "jsonld": _json_script_safe(data)})
+    return render(request, "store/store.html", {"r": r, "jsonld": _json_script_safe(data), "qr": qr or {}})
 
 
 def robots_txt(request):

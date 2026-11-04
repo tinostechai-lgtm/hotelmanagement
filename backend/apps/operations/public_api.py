@@ -52,13 +52,11 @@ def store(request, slug):
     t = request.query_params.get("table")
     if t:
         table = Table.objects.filter(restaurant=r, qr_token=t).first()
-        if table:
-            ctx = {"table": {"name": table.name, "token": table.qr_token}}
+        ctx = {"table": {"name": table.name, "token": table.qr_token}} if table else {"invalid_qr": "table"}
     rm = request.query_params.get("room")
     if rm:
         room = Room.objects.filter(restaurant=r, qr_token=rm).first()
-        if room:
-            ctx = {"room": {"number": room.number, "token": room.qr_token}}
+        ctx = {"room": {"number": room.number, "token": room.qr_token}} if room else {"invalid_qr": "room"}
     return Response({"store": store_info(r), "menu": menu_payload(r, online=not ctx), **ctx})
 
 

@@ -19,7 +19,7 @@
     toolbar: '<button class="btn" id="bulk-tables"><i data-lucide="copy-plus"></i>Add many</button>',
     columns: [{ key: "name", label: "Table", render: (t) => `<b>${S.esc(t.name)}</b>` }, { key: "area_name", label: "Area" }, { key: "seats", label: "Seats" },
       { key: "status", label: "Status", render: (t) => `<span class="badge st-${t.status}" style="background:var(--st-bg);color:var(--st)">${S.esc(t.status)}</span>` },
-      { key: "qr", label: "QR order link", render: (t) => `<a href="/s/${SV.slug}/?table=${t.qr_token}" target="_blank" class="small">Open ↗</a>` }],
+      { key: "qr", label: "QR order link", render: (t) => `<a href="/q/${t.qr_token}/" target="_blank" class="small">Open ↗</a>` }],
     fields: () => [{ name: "name", label: "Table name / number", required: true, half: true }, { name: "seats", label: "Seats", type: "number", half: true, default: 4 },
       { name: "area", label: "Area", type: "select", half: true, options: areas.map((a) => [a.id, a.name]) }, { name: "shape", label: "Shape", type: "select", half: true, options: [["square", "Square"], ["round", "Round"], ["long", "Long"]] },
       { name: "status", label: "Status", type: "select", required: true, options: statusOpts, default: "free" }] });
@@ -37,7 +37,7 @@
       columns: [{ key: "number", label: "Room", render: (r) => `<b>${S.esc(r.number)}</b> <span class="muted small">${S.esc(r.room_type)}</span>` },
         { key: "guest_name", label: "Guest", render: (r) => (r.is_occupied ? `${S.esc(r.guest_name || "Guest")} <span class="badge b-success">In-house</span>` : '<span class="badge">Vacant</span>') },
         { key: "open_charges", label: "F&B posted to room", render: (r) => S.money(r.open_charges) },
-        { key: "qr", label: "Room-service QR", render: (r) => `<a href="/s/${SV.slug}/?room=${r.qr_token}" target="_blank" class="small">Open ↗</a>` }],
+        { key: "qr", label: "Room-service QR", render: (r) => `<a href="/q/${r.qr_token}/" target="_blank" class="small">Open ↗</a>` }],
       fields: [{ name: "number", label: "Room number", required: true, half: true }, { name: "room_type", label: "Room type", half: true }, { name: "floor", label: "Floor", half: true }, { name: "pms_reference", label: "PMS / folio ref", half: true }],
       actions: [
         { label: "Check in", icon: "log-in", run: async (r, reload) => { const v = await S.prompt(`Check in to room ${r.number}`, [{ name: "guest_name", label: "Guest name", required: true }, { name: "guest_phone", label: "Mobile", type: "tel" }, { name: "pms_reference", label: "PMS reservation / folio no." }], "Check in"); if (v) { await S.api(`rooms/${r.id}/checkin`, { body: v }); reload(); } } },

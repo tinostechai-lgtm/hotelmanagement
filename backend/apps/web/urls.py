@@ -34,5 +34,6 @@ urlpatterns = [
     path("terms/", views.legal, {"page": "terms"}, name="terms"),
     path("privacy/", views.legal, {"page": "privacy"}, name="privacy"),
     path("s/<slug:slug>/", views.store, name="store"),
+    path("q/<str:token>/", views.qr_entry, name="qr"),
     path("t/<str:token>/", views.track, name="track"),
 ]
