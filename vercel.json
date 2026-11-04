@@ -4,9 +4,19 @@
     "web": {
       "root": "backend/",
       "framework": "django"
+    },
+    "files": {
+      "root": "public/",
+      "framework": null
     }
   },
   "rewrites": [
+    {
+      "source": "/downloads/(.*)",
+      "destination": {
+        "service": "files"
+      }
+    },
     {
       "source": "/(.*)",
       "destination": {
