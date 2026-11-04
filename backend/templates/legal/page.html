@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}{{ title }} · Servora{% endblock %}
+{% block body %}<main style="max-width:760px;margin:0 auto;padding:40px 20px 80px">
+<a href="/" class="sv-logo" style="color:var(--text)">{% include "partials/logo_svg.html" with cls="sv-static" uid="lg" size=36 %}<b class="word" style="font-size:20px">Servora</b></a>
+<h1 style="margin-top:28px">{{ title }}</h1><p class="muted small">Last updated {% now "d F Y" %}. This is a starting template — have it reviewed by your legal advisor before launch.</p>
+{% if page == "terms" %}
+<h3>1. The service</h3><p>Servora provides cloud software for restaurants and hotels ("Merchants") to take orders, bill, accept payments and manage deliveries. Merchants are responsible for their menus, prices, taxes, food safety and the orders they accept.</p>
+<h3>2. Accounts & subscriptions</h3><p>You must provide accurate details and keep your login secure. Paid plans renew for the chosen billing cycle; fees are payable in advance and are exclusive of GST. If a plan lapses, access to paid features may be suspended after a grace period. You may cancel at any time; fees already paid are non-refundable except where required by law.</p>
+<h3>3. Payments</h3><p>Online payments are processed by Razorpay under its own terms. Servora does not store card details. Refunds for customer orders are the Merchant's responsibility.</p>
+<h3>4. Acceptable use</h3><p>Do not misuse the service, attempt unauthorised access, or use it for unlawful purposes.</p>
+<h3>5. Data</h3><p>Merchants own their business and customer data and may export it at any time. See our <a href="/privacy/">Privacy Policy</a>.</p>
+<h3>6. Liability</h3><p>The service is provided "as is". To the maximum extent permitted by law, our liability is limited to the fees paid in the 3 months before the claim.</p>
+<h3>7. Governing law</h3><p>These terms are governed by the laws of India.</p>
+{% else %}
+<h3>What we collect</h3><p>Account details (name, mobile, email), restaurant details, and the operational data you enter (menu, orders, customers). For diners ordering online we store name, mobile, address and location needed to fulfil the order.</p>
+<h3>How we use it</h3><p>Only to provide the service: billing, order fulfilment, delivery tracking, support and security. We do not sell personal data.</p>
+<h3>Sharing</h3><p>With the Merchant you ordered from, Razorpay for payments, and infrastructure providers (hosting, database) under contract.</p>
+<h3>Retention & your rights</h3><p>Data is kept while the account is active and deleted on request, subject to tax-record obligations. Contact <a href="mailto:privacy@servora.app">privacy@servora.app</a> to access, correct or delete your data (Digital Personal Data Protection Act, 2023).</p>
+<h3>Security</h3><p>Data is encrypted in transit (HTTPS), each restaurant's data is isolated, and access is role-based.</p>
+{% endif %}
+</main>{% endblock %}

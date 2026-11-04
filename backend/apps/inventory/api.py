@@ -59,11 +59,27 @@ class POSerializer(TenantSerializer):
         exclude = ["restaurant"]
         read_only_fields = ["status"]
 
+    def validate_lines(self, lines):
+        if not lines:
+            raise serializers.ValidationError("Add at least one line")
+        return lines
+
     def create(self, data):
         lines = data.pop("lines")
         po = PurchaseOrder.objects.create(**data)
         for line in lines:
             PurchaseLine.objects.create(po=po, **line)
+        return po
+
+    def update(self, po, data):
+        if po.status == "received":
+            raise serializers.ValidationError("A received purchase order can't be edited")
+        lines = data.pop("lines", None)
+        po = super().update(po, data)
+        if lines is not None:
+            po.lines.all().delete()
+            for line in lines:
+                PurchaseLine.objects.create(po=po, **line)
         return po
 
 

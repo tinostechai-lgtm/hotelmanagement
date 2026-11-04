@@ -4,15 +4,24 @@ from django.contrib.auth import authenticate
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.tenants.api_base import TenantViewSet
 from apps.tenants.middleware import resolve_restaurant
 
 from .models import PERMISSIONS, Membership, Role, User
+
+
+class LoginThrottle(AnonRateThrottle):
+    scope = "login"
+
+
+class PinThrottle(UserRateThrottle):
+    scope = "login"
 
 
 def user_payload(user, request=None):
@@ -35,6 +44,7 @@ def tokens(user):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([LoginThrottle])
 def login(request):
     phone = str(request.data.get("phone") or request.data.get("username") or "").strip()
     user = authenticate(request, username=phone, password=request.data.get("password", ""))
@@ -45,6 +55,7 @@ def login(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([PinThrottle])
 def pin_switch(request):
     """Fast staff switching on a shared POS terminal using a 4–6 digit PIN."""
     r = resolve_restaurant(request, request.user)
@@ -95,6 +106,7 @@ def create_account(data):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([LoginThrottle])
 def signup(request):
     s = SignupSerializer(data=request.data)
     s.is_valid(raise_exception=True)

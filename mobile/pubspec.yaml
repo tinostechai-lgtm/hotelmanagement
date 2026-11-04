@@ -23,6 +23,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+# Generate launcher icons: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/brand/app-icon-1024.png
+  adaptive_icon_background: "#14123A"
+  adaptive_icon_foreground: assets/brand/app-icon-foreground-1024.png
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true

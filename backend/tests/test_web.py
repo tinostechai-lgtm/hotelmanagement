@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -8,6 +9,9 @@ class WebPagesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("seed", demo=True, stdout=open("/dev/null", "w"))
+
+    def setUp(self):
+        cache.clear()
 
     def test_public_pages(self):
         for url in ["/", "/login/", "/signup/", "/s/spice-garden/"]:

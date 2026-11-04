@@ -26,6 +26,8 @@ urlpatterns = [
     path("app/settings/", views.settings_page, name="settings"),
     path("app/billing/", views.billing, name="billing"),
     path("app/qr-codes/", views.qr_sheet, name="qr_sheet"),
+    path("terms/", views.legal, {"page": "terms"}, name="terms"),
+    path("privacy/", views.legal, {"page": "privacy"}, name="privacy"),
     path("s/<slug:slug>/", views.store, name="store"),
     path("t/<str:token>/", views.track, name="track"),
 ]

@@ -127,6 +127,29 @@ Without `DATABASE_URL`, the deployment boots a throw-away SQLite demo in `/tmp` 
 
 Vercel functions can't hold websockets, so the dashboard, KDS and rider tracking poll lightweight endpoints every 5–10 s (`/api/orders/live`, `/api/kots`, `/api/delivery/live-map`).
 
+## Go-live checklist
+
+1. **Vercel env vars:** `DJANGO_SECRET_KEY` (long and random; the app refuses to start against a real database without it), `DJANGO_DEBUG=false`, `DATABASE_URL`, and `DJANGO_ALLOWED_HOSTS` / `DJANGO_CSRF_TRUSTED_ORIGINS` including your custom domain.
+2. **Database:** run `python manage.py migrate && python manage.py seed` once against the production `DATABASE_URL`. Use `seed` without `--demo` so the demo restaurant isn't created.
+3. **Platform admin:** `python manage.py createsuperuser`, then sign in at `/admin/` to manage tenants, plans and subscriptions.
+4. **Razorpay:**
+   - Switch to live keys.
+   - Add the webhook `https://<domain>/api/razorpay/webhook` for `payment.captured` and `order.paid`, and set `RAZORPAY_WEBHOOK_SECRET`.
+   - Edit plan prices in `/admin/` if needed.
+5. **Legal:** have a lawyer review `/terms/` and `/privacy/` (`backend/templates/legal/page.html`). They are starting templates.
+6. **Mobile:**
+   - `flutter create .`, then `dart run flutter_launcher_icons`, then `flutter analyze`.
+   - Set your domain as the default server in `lib/core/config.dart`, then build and sign the release APK / IPA.
+7. **Hardware agent:** set `DEFAULT_SERVER` in `hardware-agent/servora_agent.py` to your domain before you hand it out.
+
+Security already in place:
+- HTTPS redirect and HSTS when `DEBUG` is off; secure cookies
+- login, signup and PIN brute-force throttling (10/min) plus general API rate limits
+- tenant isolation checks on every foreign key and many-to-many field
+- Razorpay HMAC signature verification; HMAC-signed aggregator webhooks
+- open-redirect protection on login
+- unpaid online orders auto-cancel after 20 minutes (`UNPAID_ONLINE_ORDER_TTL_MINUTES`)
+
 ## Mobile app
 
 See `mobile/README.md`:

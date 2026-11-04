@@ -20,7 +20,7 @@
   <div class="field"><label>Password</label><input type="password" name="password" required minlength="8" autocomplete="new-password"><div class="help">At least 8 characters.</div></div>
   <input type="hidden" name="plan" value="{{ data.plan|default:'growth' }}">
   <button class="btn btn-primary btn-lg btn-block" type="submit">Start free trial</button>
-  <p class="tiny muted center" style="margin-top:10px">By continuing you agree to the Terms of Service and Privacy Policy.</p>
+  <p class="tiny muted center" style="margin-top:10px">By continuing you agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</p>
 </form>
 <p class="center">Already have an account? <a href="{% url 'web:login' %}"><b>Log in</b></a></p>
 {% endblock %}

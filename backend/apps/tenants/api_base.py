@@ -64,7 +64,15 @@ class TenantSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context.get("request")
         r = getattr(request, "restaurant", None)
+        if not r:
+            return attrs
+
+        def foreign(obj):
+            return hasattr(obj, "restaurant_id") and obj.restaurant_id != r.id
+
         for k, v in attrs.items():
-            if hasattr(v, "restaurant_id") and r and v.restaurant_id != r.id:
-                raise serializers.ValidationError({k: "Not found"})
+            values = v if isinstance(v, (list, tuple)) else [v]
+            for obj in values:
+                if foreign(obj) or (isinstance(obj, dict) and any(foreign(x) for x in obj.values())):
+                    raise serializers.ValidationError({k: "Not found"})
         return attrs

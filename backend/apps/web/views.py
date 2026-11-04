@@ -44,10 +44,20 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect("web:dashboard")
     if request.method == "POST":
+        from django.core.cache import cache
+
+        ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")).split(",")[0].strip()
+        key = f"login-fail:{ip}"
+        if cache.get(key, 0) >= 10:
+            messages.error(request, "Too many attempts. Please wait a few minutes and try again.")
+            return render(request, "auth/login.html", status=429)
         user = authenticate(request, username=request.POST.get("phone", "").strip(), password=request.POST.get("password", ""))
         if user:
             login(request, user)
-            return redirect(request.GET.get("next") or "web:dashboard")
+            cache.delete(key)
+            nxt = request.GET.get("next", "")
+            return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else "web:dashboard")
+        cache.set(key, cache.get(key, 0) + 1, 300)
         messages.error(request, "Incorrect mobile number or password.")
     return render(request, "auth/login.html")
 
@@ -204,3 +214,7 @@ def store(request, slug):
 
 def track(request, token):
     return render(request, "store/track.html", {"token": token})
+
+
+def legal(request, page):
+    return render(request, "legal/page.html", {"page": page, "title": "Terms of Service" if page == "terms" else "Privacy Policy"})

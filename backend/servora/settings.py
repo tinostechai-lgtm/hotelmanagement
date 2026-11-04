@@ -23,6 +23,10 @@ def env_bool(name, default=False):
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-change-me-servora-local-only-key-0123456789")
 DEBUG = env_bool("DJANGO_DEBUG", not os.environ.get("VERCEL"))
+if os.environ.get("DATABASE_URL") and not DEBUG and "DJANGO_SECRET_KEY" not in os.environ:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY before running Servora with a real database.")
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", ".vercel.app,localhost,127.0.0.1,testserver").split(",")
 CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "https://*.vercel.app").split(",") if o]
 
@@ -130,6 +134,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle", "rest_framework.throttling.UserRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {"anon": "120/min", "user": "1200/min", "login": "10/min"},
 }
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
@@ -151,8 +157,15 @@ AGGREGATOR_WEBHOOK_SECRET = os.environ.get("AGGREGATOR_WEBHOOK_SECRET", "")
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
+# Online order tabs left unpaid at Razorpay are auto-cancelled after this many minutes.
+UNPAID_ONLINE_ORDER_TTL_MINUTES = int(os.environ.get("UNPAID_ONLINE_ORDER_TTL_MINUTES", "20"))
 
 LOGGING = {
     "version": 1,

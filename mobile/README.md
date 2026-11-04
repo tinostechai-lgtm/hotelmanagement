@@ -15,6 +15,8 @@ flutter create . --platforms=android,ios --org com.servora --project-name servor
 # flutter create keeps existing files, so lib/ and AndroidManifest.xml are not overwritten.
 # If it did replace android/app/src/main/AndroidManifest.xml, restore it with: git checkout android/app/src/main/AndroidManifest.xml
 flutter pub get
+dart run flutter_launcher_icons   # Servora app icons for Android & iOS
+flutter analyze                   # should report no errors before you build
 flutter run
 ```
 

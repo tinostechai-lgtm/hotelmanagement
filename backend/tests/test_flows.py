@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
@@ -16,6 +17,7 @@ class Base(TestCase):
         call_command("seed", demo=True, stdout=open("/dev/null", "w"))
 
     def setUp(self):
+        cache.clear()
         self.c = APIClient()
         res = self.c.post("/api/auth/login", {"phone": "9999999999", "password": "Demo@1234"}, format="json")
         self.assertEqual(res.status_code, 200, res.content)
@@ -174,6 +176,7 @@ class DeliveryTests(Base):
 
 class SaasTests(TestCase):
     def setUp(self):
+        cache.clear()
         call_command("seed", stdout=open("/dev/null", "w"))
 
     def test_signup_trial_and_upgrade(self):
@@ -224,3 +227,39 @@ class HardwareTests(Base):
         d = Device.objects.get(restaurant=self.r, name="Bar printer")
         res = self.c.post(f"/api/devices/{d.id}/test", format="json")
         self.assertIn("Printer test successful", res.json()["preview"])
+
+
+class HardeningTests(Base):
+    def test_login_is_rate_limited(self):
+        cache.clear()
+        c = APIClient()
+        codes = [c.post("/api/auth/login", {"phone": "9999999999", "password": "wrong"}, format="json").status_code for _ in range(12)]
+        self.assertIn(429, codes)
+
+    def test_cannot_attach_other_restaurants_station(self):
+        from apps.accounts.api import create_account
+        from apps.menu.models import KitchenStation
+
+        _, other = create_account({"name": "X Y", "phone": "9111111111", "password": "Passw0rd!", "restaurant_name": "Other"})
+        foreign = KitchenStation.objects.get(restaurant=other)
+        res = self.c.post("/api/devices", {"name": "P", "kind": "kot_printer", "connection": "network", "stations": [foreign.id]}, format="json")
+        self.assertEqual(res.status_code, 400)
+
+    def test_unpaid_online_order_hidden_then_expired(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        pub = APIClient()
+        res = pub.post("/api/public/spice-garden/order", {"mode": "takeaway", "name": "A", "phone": "9876500099", "payment": "online",
+                                                          "items": [{"item_id": self.item("Masala Chai").id, "quantity": 1}]}, format="json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(self.c.get("/api/orders/live").json()["pending_online"], 0)
+        Order.objects.filter(pk=Order.objects.latest("id").pk).update(created_at=timezone.now() - timedelta(hours=1))
+        self.c.get("/api/orders/live")
+        self.assertEqual(Order.objects.latest("id").status, "cancelled")
+
+    def test_open_redirect_blocked(self):
+        cache.clear()
+        res = self.client.post("/login/?next=https://evil.example", {"phone": "9999999999", "password": "Demo@1234"})
+        self.assertEqual(res["Location"], "/app/")

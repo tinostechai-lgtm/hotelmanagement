@@ -197,7 +197,7 @@
 
 <footer><div class="wrap row between wrap">
   <div class="row">{% include "partials/logo_svg.html" with cls="sv-static" uid="fo" size=32 %}<b style="color:#fff">Servora</b><span>© {% now "Y" %} Servora. Made in India.</span></div>
-  <div class="row"><a href="#pricing" style="color:#A3A2C2">Pricing</a><a href="{% url 'web:login' %}" style="color:#A3A2C2">Log in</a><a href="mailto:support@servora.app" style="color:#A3A2C2">Support</a></div>
+  <div class="row"><a href="#pricing" style="color:#A3A2C2">Pricing</a><a href="{% url 'web:login' %}" style="color:#A3A2C2">Log in</a><a href="/terms/" style="color:#A3A2C2">Terms</a><a href="/privacy/" style="color:#A3A2C2">Privacy</a><a href="mailto:support@servora.app" style="color:#A3A2C2">Support</a></div>
 </div></footer>
 {% endblock %}
 {% block scripts %}

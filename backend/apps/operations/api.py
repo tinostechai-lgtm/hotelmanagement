@@ -102,6 +102,8 @@ class OrderViewSet(TenantViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         p = self.request.query_params
+        if p.get("status") in ("open", "pending") and not p.get("include_unpaid"):
+            qs = qs.exclude(pk__in=services.awaiting_payment(qs).values("pk"))
         if p.get("status") == "open":
             qs = qs.filter(status__in=Order.OPEN_STATUSES)
         elif p.get("status"):
@@ -159,7 +161,9 @@ class OrderViewSet(TenantViewSet):
     def live(self, request):
         """Lightweight poll endpoint for dashboards / apps (no websockets needed on Vercel)."""
         r = request.restaurant
+        services.expire_unpaid_online_orders(r)
         qs = Order.objects.filter(restaurant=r, status__in=Order.OPEN_STATUSES)
+        qs = qs.exclude(pk__in=services.awaiting_payment(qs).values("pk"))
         return Response({
             "server_time": timezone.now(),
             "orders": OrderListSerializer(qs[:200], many=True).data,

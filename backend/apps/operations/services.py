@@ -67,7 +67,7 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
         add_items(order, items)
     else:
         order.recalc()
-    if source not in ("pos", "captain"):
+    if source not in ("pos", "captain") and payment_mode != "online":
         Notification.objects.create(restaurant=restaurant, kind="new_order",
                                     title=f"New {order.get_source_display()} order #{order.number}",
                                     body=f"{order.label} · ₹{order.total}", link=f"/app/orders/{order.pk}/")
@@ -345,9 +345,28 @@ def confirm_payment(payment, reference=""):
     _after_payment(payment.order, payment.bill)
     order = payment.order
     if order.status == "pending" and order.source in ("online", "app", "qr"):
-        Notification.objects.create(restaurant=order.restaurant, kind="payment", title=f"Payment received for #{order.number}",
-                                    body=f"₹{payment.amount} via Razorpay", link=f"/app/orders/{order.pk}/")
+        Notification.objects.create(restaurant=order.restaurant, kind="new_order", title=f"New prepaid {order.get_source_display()} order #{order.number}",
+                                    body=f"{order.label} · ₹{payment.amount} paid via Razorpay", link=f"/app/orders/{order.pk}/")
     return payment
+
+
+def awaiting_payment(qs):
+    """Online orders whose customer hasn't finished Razorpay checkout yet."""
+    return qs.filter(status="pending", payment_mode="online", is_paid=False)
+
+
+def expire_unpaid_online_orders(restaurant):
+    """Cancel online orders left unpaid at checkout (called lazily from polling)."""
+    from datetime import timedelta
+
+    from django.conf import settings
+
+    cutoff = timezone.now() - timedelta(minutes=settings.UNPAID_ONLINE_ORDER_TTL_MINUTES)
+    stale = awaiting_payment(Order.objects.filter(restaurant=restaurant, created_at__lt=cutoff))
+    for order in stale:
+        order.payments.filter(status="pending").update(status="failed")
+        cancel_order(order, "Payment not completed")
+    return len(stale)
 
 
 @transaction.atomic
