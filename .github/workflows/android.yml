@@ -39,6 +39,28 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk build/servora-1.0.${{ github.run_number }}.apk
           cp build/app/outputs/flutter-apk/app-release.apk build/servora.apk
+      - name: Publish APK to the website (direct download)
+        working-directory: .
+        env:
+          BRANCH: ${{ github.ref_name }}
+          VERSION: 1.0.${{ github.run_number }}
+        run: |
+          cp mobile/build/servora.apk "$RUNNER_TEMP/servora.apk"
+          git config user.name "servora-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4; do
+            git fetch --depth=1 origin "$BRANCH"
+            git checkout -B publish FETCH_HEAD
+            mkdir -p backend/public/downloads
+            cp "$RUNNER_TEMP/servora.apk" backend/public/downloads/servora.apk
+            SIZE=$(stat -c %s backend/public/downloads/servora.apk)
+            printf '{"version": "%s", "size_bytes": %s, "published_at": "%s", "url": "/downloads/servora.apk"}\n' "$VERSION" "$SIZE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > backend/public/downloads/android.json
+            git add backend/public/downloads
+            git commit -m "Publish Android app $VERSION [skip ci]" || exit 0
+            if git push origin "HEAD:$BRANCH"; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: servora-android-apk

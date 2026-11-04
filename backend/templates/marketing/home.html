@@ -8,7 +8,11 @@
   .mk-nav { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
   .mk-nav .wrap { display: flex; align-items: center; gap: 24px; height: 68px; }
   .mk-nav .links { display: flex; gap: 22px; margin-left: auto; }
-  .mk-nav .links a { color: var(--text); font-weight: 600; font-size: 14px; }
+  .mk-nav .links a { color: var(--text); font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+  .mk-nav .links a svg { width: 16px; height: 16px; }
+  /* ".row.wrap" is a flex utility; don't let it inherit the ".wrap" page-container padding */
+  div.row.wrap { max-width: none; margin-left: 0; margin-right: 0; padding: 0; }
+
   .mk-nav .sv-mark { width: 38px; height: 38px; }
   @media (max-width: 860px) { .mk-nav .links { display: none; } .mk-nav .cta-login { display: none; } }
   .hero { background: radial-gradient(1200px 500px at 80% -10%, rgba(255, 138, 61, .25), transparent), linear-gradient(180deg, #14123A, #1E1B4B); color: #fff; overflow: hidden; }
@@ -63,7 +67,7 @@
 <div class="page-loader" id="loader">{% include "partials/logo_svg.html" with cls="sv-loop" uid="ld" %}</div>
 <nav class="mk-nav"><div class="wrap">
   <a href="/" class="sv-logo" style="color:var(--text)">{% include "partials/logo_svg.html" with cls="sv-anim" uid="nv" %}<span class="word" style="font-size:22px">Servora</span></a>
-  <div class="links"><a href="#features">Features</a><a href="#delivery">Delivery</a><a href="#hardware">Hardware</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="{% url 'web:download' %}"><i data-lucide="smartphone" style="width:15px;vertical-align:-2px"></i> Get the app</a></div>
+  <div class="links"><a href="#features">Features</a><a href="#delivery">Delivery</a><a href="#hardware">Hardware</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="{% url 'web:download' %}"><i data-lucide="smartphone"></i>Get the app</a></div>
   <a href="{% url 'web:login' %}" class="btn btn-ghost cta-login">Log in</a>
   <a href="{% url 'web:signup' %}" class="btn btn-primary">Start free trial</a>
 </div></nav>
@@ -172,7 +176,7 @@
     <h2 class="h2">Your whole restaurant, in your pocket.</h2>
     <p>POS & tables, kitchen display, delivery management and rider mode in one app for phones and tablets — with offline billing and Bluetooth printing.</p>
     <div class="row wrap" style="gap:12px;margin-top:20px">
-      <a href="{% url 'web:download_android' %}" class="btn btn-primary btn-lg"><i data-lucide="download"></i>Download for Android</a>
+      <a href="{% url 'web:download_android' %}" class="btn btn-primary btn-lg" download="Servora.apk"><i data-lucide="download"></i>Download for Android</a>
       <a href="{% url 'web:download' %}" class="btn btn-lg" style="background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.2)">How to install</a>
     </div>
     <p class="small" style="margin-top:12px">Free with every plan · Android 5.0+</p>

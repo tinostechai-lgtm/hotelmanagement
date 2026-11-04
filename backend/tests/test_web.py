@@ -84,7 +84,7 @@ class DownloadAppTests(TestCase):
         self.assertContains(res, "/download/android")
         res = self.client.get("/download/android")
         self.assertEqual(res.status_code, 302)
-        self.assertTrue(res["Location"].endswith("/releases/latest/download/servora.apk"))
+        self.assertEqual(res["Location"], "/downloads/servora.apk")
         self.assertContains(self.client.get("/"), "Download for Android")
 
     def test_super_admin_can_override_link(self):
