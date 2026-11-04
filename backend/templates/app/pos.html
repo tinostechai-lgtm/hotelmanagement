@@ -131,7 +131,8 @@
   async function loadFloor() {
     if (!$("#order").classList.contains("hidden")) return;
     const [tables, live] = await Promise.all([S.list("tables"), S.api("orders/live", { quiet: true })]);
-    const shown = tables.filter((t) => st.area === "all" || String(t.area) === String(st.area));
+    const shown = tables.filter((t) => st.area === "all" || String(t.area) === String(st.area))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
     $("#tables").innerHTML = shown.map((t) => {
       const o = t.active_order;
       const status = o ? (o.billed ? "billed" : "occupied") : t.status;
