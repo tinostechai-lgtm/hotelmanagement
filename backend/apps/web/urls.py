@@ -5,6 +5,8 @@ from . import views
 app_name = "web"
 urlpatterns = [
     path("", views.home, name="home"),
+    path("robots.txt", views.robots_txt),
+    path("sitemap.xml", views.sitemap_xml),
     path("login/", views.login_view, name="login"),
     path("signup/", views.signup_view, name="signup"),
     path("logout/", views.logout_view, name="logout"),
@@ -21,6 +23,8 @@ urlpatterns = [
     path("app/customers/", views.customers, name="customers"),
     path("app/inventory/", views.inventory, name="inventory"),
     path("app/reports/", views.reports, name="reports"),
+    path("app/marketing/", views.marketing, name="marketing"),
+    path("unsubscribe/<str:token>/", views.unsubscribe, name="unsubscribe"),
     path("app/staff/", views.staff, name="staff"),
     path("app/hardware/", views.hardware, name="hardware"),
     path("app/settings/", views.settings_page, name="settings"),

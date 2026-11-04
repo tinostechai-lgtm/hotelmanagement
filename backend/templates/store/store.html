@@ -1,6 +1,15 @@
 {% extends "base.html" %}
-{% block title %}{{ r.name }} — Order online{% endblock %}
-{% block description %}Order from {{ r.name }} online — home delivery, takeaway and table ordering.{% endblock %}
+{% block title %}{{ r.seo_title|default:r.name }}{% if not r.seo_title %} — Order online{% if r.city %} in {{ r.city }}{% endif %}{% endif %}{% endblock %}
+{% block description %}{{ r.seo_description|default:"" }}{% if not r.seo_description %}Order from {{ r.name }} online{% if r.cuisine %} — {{ r.cuisine }}{% endif %}. Home delivery, takeaway and table ordering{% if r.city %} in {{ r.city }}{% endif %}.{% endif %}{% endblock %}
+{% block social %}
+  <meta property="og:type" content="restaurant.restaurant">
+  <meta property="og:title" content="{{ r.seo_title|default:r.name }}">
+  <meta property="og:description" content="{{ r.seo_description|default:r.tagline }}">
+  <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  {% if r.cover_image_url or r.logo_url %}<meta property="og:image" content="{{ r.cover_image_url|default:r.logo_url }}">{% endif %}
+  <meta name="twitter:card" content="summary_large_image">
+{% endblock %}
+{% block analytics %}{% include "partials/analytics.html" %}<script type="application/ld+json">{{ jsonld|safe }}</script>{% endblock %}
 {% block head %}<style>
   :root { --brand: {{ r.brand_color|default:"#F4632F" }}; }
   body { background: var(--bg); padding-bottom: 96px; }
@@ -24,9 +33,11 @@
   .sum .row { justify-content: space-between; padding: 3px 0; }
 </style>{% endblock %}
 {% block body %}
-<header class="st-hero"><div class="st-wrap">
+{% if r.offer_banner %}<div style="background:var(--grad);color:#fff;text-align:center;font-weight:700;padding:9px 14px;font-size:14px">🎉 {{ r.offer_banner }}</div>{% endif %}
+<header class="st-hero" {% if r.cover_image_url %}style="background:linear-gradient(160deg,rgba(20,18,58,.92),rgba(42,39,96,.75)),url('{{ r.cover_image_url }}') center/cover"{% endif %}><div class="st-wrap">
   <div class="row between"><div class="row">{% if r.logo_url %}<img src="{{ r.logo_url }}" alt="" style="width:52px;height:52px;border-radius:14px;object-fit:cover">{% endif %}
-    <div><h1>{{ r.name }}</h1><div class="small" style="color:#CFCDEB">{{ r.city }}{% if r.phone %} · {{ r.phone }}{% endif %}</div></div></div>
+    <div><h1>{{ r.name }}</h1><div class="small" style="color:#CFCDEB">{% if r.tagline %}{{ r.tagline }} · {% endif %}{% if r.cuisine %}{{ r.cuisine }} · {% endif %}{{ r.city }}{% if r.phone %} · {{ r.phone }}{% endif %}</div>
+      <div class="row" style="gap:8px;margin-top:6px">{% if r.instagram_url %}<a href="{{ r.instagram_url }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">Instagram</a>{% endif %}{% if r.facebook_url %}<a href="{{ r.facebook_url }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">Facebook</a>{% endif %}{% if r.whatsapp_number %}<a href="https://wa.me/{{ r.whatsapp_number|cut:"+"|cut:" " }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">WhatsApp</a>{% endif %}{% if r.google_review_url %}<a href="{{ r.google_review_url }}" target="_blank" rel="noopener" style="color:#FFD2B3" class="small">★ Google reviews</a>{% endif %}</div></div></div>
     <span class="badge {% if r.is_open %}b-success{% else %}b-danger{% endif %}">{% if r.is_open %}Open now{% else %}Closed{% endif %}</span></div>
 </div></header>
 <main class="st-wrap">

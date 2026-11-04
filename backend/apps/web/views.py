@@ -25,6 +25,7 @@ NAV = [
         ("customers", "Customers & Loyalty", "users", "customers", None),
         ("inventory", "Inventory", "package", "inventory", "inventory"),
         ("reports", "Reports & Insights", "chart-column", "reports", None),
+        ("marketing", "Marketing & SEO", "megaphone", "marketing", "crm"),
     ]),
     ("Setup", [
         ("staff", "Staff & Roles", "shield-check", "staff", None),
@@ -43,7 +44,30 @@ def home(request):
     plans = Plan.objects.filter(is_public=True)
     showcase = (Restaurant.objects.filter(slug="spice-garden", is_active=True).first()
                 or Restaurant.objects.filter(is_active=True, online_ordering_enabled=True).order_by("created_at").first())
-    return render(request, "marketing/home.html", {"plans": plans, "features": FEATURES, "showcase": showcase})
+    return render(request, "marketing/home.html", {"plans": plans, "features": FEATURES, "showcase": showcase,
+                                                    "jsonld": _jsonld_software(request, plans)})
+
+
+def _json_script_safe(data):
+    import json
+
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
+def _jsonld_software(request, plans):
+    from apps.superadmin.models import get_settings
+
+    ps = get_settings()
+    base = request.build_absolute_uri("/").rstrip("/")
+    return _json_script_safe({
+        "@context": "https://schema.org", "@type": "SoftwareApplication", "name": ps.site_name,
+        "applicationCategory": "BusinessApplication", "operatingSystem": "Web, Android, iOS",
+        "description": ps.seo_description or "Restaurant & hotel POS with QR ordering, home delivery and inventory.",
+        "url": base, "image": ps.og_image_url or f"{base}/static/brand/icon-512.png",
+        "offers": [{"@type": "Offer", "name": p.name, "price": str(p.price_monthly), "priceCurrency": "INR"} for p in plans if p.price_monthly],
+        "publisher": {"@type": "Organization", "name": ps.company_name or ps.site_name, "url": base,
+                      **({"email": ps.support_email} if ps.support_email else {}), **({"telephone": ps.support_phone} if ps.support_phone else {})},
+    })
 
 
 def login_view(request):
@@ -197,6 +221,16 @@ def staff(request):
     return {"permission_catalog": PERMISSIONS}
 
 
+@app_page("marketing", "crm")
+def marketing(request):
+    from apps.crm.models import Campaign
+    from apps.superadmin.models import get_settings
+
+    ps = get_settings()
+    return {"segments": Campaign.SEGMENTS, "channels_ready": {"whatsapp": bool(ps.whatsapp_enabled and ps.whatsapp_token),
+                                                              "sms": ps.sms_provider != "none", "email": bool(ps.email_enabled and ps.email_host)}}
+
+
 @app_page("settings")
 def hardware(request):
     pass
@@ -230,7 +264,48 @@ def qr_sheet(request):
 
 def store(request, slug):
     r = get_object_or_404(Restaurant, slug=slug, is_active=True)
-    return render(request, "store/store.html", {"r": r})
+    base = request.build_absolute_uri("/").rstrip("/")
+    data = {"@context": "https://schema.org", "@type": "Restaurant", "name": r.name, "url": f"{base}/s/{r.slug}/",
+            "hasMenu": f"{base}/s/{r.slug}/", "acceptsReservations": "False",
+            "address": {"@type": "PostalAddress", "streetAddress": r.address, "addressLocality": r.city, "addressRegion": r.state,
+                        "postalCode": r.pincode, "addressCountry": "IN"}}
+    for k, v in {"telephone": r.phone, "servesCuisine": r.cuisine, "image": r.cover_image_url or r.logo_url, "description": r.seo_description or r.tagline}.items():
+        if v:
+            data[k] = v
+    if r.latitude and r.longitude:
+        data["geo"] = {"@type": "GeoCoordinates", "latitude": float(r.latitude), "longitude": float(r.longitude)}
+    same = [u for u in [r.instagram_url, r.facebook_url] if u]
+    if same:
+        data["sameAs"] = same
+    return render(request, "store/store.html", {"r": r, "jsonld": _json_script_safe(data)})
+
+
+def robots_txt(request):
+    from django.http import HttpResponse
+
+    from apps.superadmin.models import get_settings
+
+    base = request.build_absolute_uri("/").rstrip("/")
+    if not get_settings().allow_indexing:
+        body = "User-agent: *\nDisallow: /\n"
+    else:
+        body = ("User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /superadmin/\nDisallow: /admin/\nDisallow: /api/\n"
+                "Disallow: /t/\nDisallow: /setup/\nDisallow: /password-reset/\nDisallow: /unsubscribe/\n"
+                f"\nSitemap: {base}/sitemap.xml\n")
+    return HttpResponse(body, content_type="text/plain")
+
+
+def sitemap_xml(request):
+    from django.http import HttpResponse
+    from django.utils.html import escape
+
+    base = request.build_absolute_uri("/").rstrip("/")
+    urls = [(f"{base}/", "1.0"), (f"{base}/signup/", "0.8"), (f"{base}/login/", "0.5"), (f"{base}/terms/", "0.2"), (f"{base}/privacy/", "0.2")]
+    for slug, updated in Restaurant.objects.filter(is_active=True, online_ordering_enabled=True).values_list("slug", "created_at"):
+        urls.append((f"{base}/s/{slug}/", "0.7"))
+    body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "".join(
+        f"  <url><loc>{escape(u)}</loc><priority>{p}</priority></url>\n" for u, p in urls) + "</urlset>\n"
+    return HttpResponse(body, content_type="application/xml")
 
 
 def track(request, token):
@@ -239,3 +314,20 @@ def track(request, token):
 
 def legal(request, page):
     return render(request, "legal/page.html", {"page": page, "title": "Terms of Service" if page == "terms" else "Privacy Policy"})
+
+
+def unsubscribe(request, token):
+    from django.core import signing
+
+    from apps.crm.models import Customer
+
+    try:
+        cid = signing.loads(token, salt="servora-unsub", max_age=60 * 60 * 24 * 365)["c"]
+    except signing.BadSignature:
+        raise Http404
+    c = get_object_or_404(Customer, pk=cid)
+    if request.method == "POST":
+        c.marketing_opt_in = False
+        c.save(update_fields=["marketing_opt_in"])
+        return render(request, "store/unsubscribed.html", {"r": c.restaurant, "done": True})
+    return render(request, "store/unsubscribed.html", {"r": c.restaurant, "done": False})

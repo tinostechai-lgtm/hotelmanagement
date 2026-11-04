@@ -173,7 +173,7 @@ def _track(o):
     d = getattr(o, "delivery", None)
     steps = ["pending", "accepted", "preparing", "ready"] + (["out_for_delivery", "delivered"] if o.order_type == "delivery" else ["served"])
     return {
-        "number": o.number, "token": o.tracking_token, "status": o.status, "status_display": o.get_status_display(),
+        "number": o.number, "token": o.tracking_token, "status": o.status, "review_url": o.restaurant.google_review_url, "status_display": o.get_status_display(),
         "steps": steps, "type": o.order_type, "restaurant": o.restaurant.name, "created_at": o.created_at,
         "items": [{"name": li.display_name, "qty": f"{li.quantity.normalize():f}", "amount": str(li.line_total)} for li in o.live_items()],
         "subtotal": str(o.subtotal), "discount": str(o.discount), "tax": str(o.tax), "delivery_fee": str(o.delivery_fee),

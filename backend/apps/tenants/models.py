@@ -51,6 +51,18 @@ class Restaurant(models.Model):
     accept_cod = models.BooleanField(default=True)
     is_open = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True, help_text="Suspended restaurants can't log in or take online orders")
+
+    # Online store SEO & marketing
+    tagline = models.CharField(max_length=120, blank=True)
+    cuisine = models.CharField(max_length=120, blank=True, help_text="e.g. North Indian, Chinese, Kerala")
+    seo_title = models.CharField(max_length=70, blank=True)
+    seo_description = models.CharField(max_length=170, blank=True)
+    cover_image_url = models.URLField(blank=True)
+    offer_banner = models.CharField(max_length=140, blank=True, help_text="Shown at the top of your online store")
+    google_review_url = models.URLField(blank=True)
+    instagram_url = models.URLField(blank=True)
+    facebook_url = models.URLField(blank=True)
+    whatsapp_number = models.CharField(max_length=20, blank=True)
     suspended_reason = models.CharField(max_length=200, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -3,8 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>{% block title %}Servora{% endblock %}</title>
-  <meta name="description" content="{% block description %}Servora — the restaurant & hotel F&B operating system: POS billing, KOT, QR ordering, home delivery, inventory and analytics.{% endblock %}">
+  <title>{% block title %}{{ platform.site_name|default:"Servora" }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ platform.seo_description|default:"Servora — the restaurant & hotel F&B operating system: POS billing, KOT, QR ordering, home delivery, inventory and analytics." }}{% endblock %}">
+  {% if platform.seo_keywords %}<meta name="keywords" content="{{ platform.seo_keywords }}">{% endif %}
+  {% block robots %}{% if not platform.allow_indexing %}<meta name="robots" content="noindex,nofollow">{% endif %}{% endblock %}
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  {% block social %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ platform.site_name|default:"Servora" }}">
+  <meta property="og:title" content="{{ platform.seo_title|default:platform.site_name|default:"Servora" }}">
+  <meta property="og:description" content="{{ platform.seo_description }}">
+  <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  <meta property="og:image" content="{% if platform.og_image_url %}{{ platform.og_image_url }}{% else %}{{ request.scheme }}://{{ request.get_host }}/static/brand/icon-512.png{% endif %}">
+  <meta name="twitter:card" content="summary_large_image">{% if platform.twitter_handle %}<meta name="twitter:site" content="@{{ platform.twitter_handle|cut:"@" }}">{% endif %}
+  {% endblock %}
+  {% if platform.google_site_verification %}<meta name="google-site-verification" content="{{ platform.google_site_verification }}">{% endif %}
+  {% if platform.bing_site_verification %}<meta name="msvalidate.01" content="{{ platform.bing_site_verification }}">{% endif %}
+  {% block analytics %}{% endblock %}
   <meta name="theme-color" content="#14123A">
   <link rel="icon" href="{% static 'brand/servora-mark.svg' %}" type="image/svg+xml">
   <link rel="icon" href="{% static 'brand/favicon-32.png' %}" type="image/png" sizes="32x32">

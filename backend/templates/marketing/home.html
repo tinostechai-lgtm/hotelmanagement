@@ -1,5 +1,7 @@
 {% extends "base.html" %}{% load static humanize %}
-{% block title %}Servora — Restaurant & Hotel POS, QR Ordering and Home Delivery{% endblock %}
+{% block title %}{{ platform.seo_title|default:"Servora — Restaurant & Hotel POS, QR Ordering and Home Delivery" }}{% endblock %}
+{% block analytics %}{% include "partials/analytics.html" %}
+<script type="application/ld+json">{{ jsonld|safe }}</script>{% endblock %}
 {% block head %}<style>
   body { background: var(--surface); }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px; }

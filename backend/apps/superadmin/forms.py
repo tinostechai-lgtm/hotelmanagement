@@ -14,6 +14,9 @@ SECTIONS = {
                                "email_username", "email_password", "email_from", "email_from_name"]),
     "sms": ("SMS & WhatsApp", ["sms_provider", "sms_api_key", "sms_account_sid", "sms_sender_id", "sms_template_id",
                                "whatsapp_enabled", "whatsapp_token", "whatsapp_phone_number_id"]),
+    "seo": ("SEO & analytics", ["seo_title", "seo_description", "seo_keywords", "og_image_url", "twitter_handle", "allow_indexing",
+                                "google_site_verification", "bing_site_verification", "google_analytics_id", "google_tag_manager_id",
+                                "meta_pixel_id"]),
     "integrations": ("Maps & integrations", ["google_maps_api_key", "aggregator_webhook_secret"]),
 }
 
@@ -25,7 +28,7 @@ def settings_form(section):
         class Meta:
             model = PlatformSettings
             fields = SECTIONS[section][1]
-            widgets = {"company_address": forms.Textarea(attrs={"rows": 3})}
+            widgets = {"company_address": forms.Textarea(attrs={"rows": 3}), "seo_description": forms.Textarea(attrs={"rows": 3, "maxlength": 170})}
 
         def __init__(self, *a, **kw):
             super().__init__(*a, **kw)
@@ -48,7 +51,14 @@ def settings_form(section):
             self.order_fields(order)
 
         def clean(self):
+            import re
+
             data = super().clean()
+            for f, pat in {"google_analytics_id": r"^(G|UA|AW)-[A-Z0-9-]+$", "google_tag_manager_id": r"^GTM-[A-Z0-9]+$",
+                           "meta_pixel_id": r"^\d{6,20}$", "google_site_verification": r"^[\w-]+$", "bing_site_verification": r"^[\w-]+$",
+                           "twitter_handle": r"^@?\w{1,30}$"}.items():
+                if data.get(f) and not re.match(pat, data[f].strip()):
+                    self.add_error(f, "This doesn't look like a valid ID")
             for name in self.secret_fields:
                 if data.get(name + "__clear"):
                     data[name] = ""

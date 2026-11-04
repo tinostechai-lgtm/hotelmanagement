@@ -1,0 +1,105 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Marketing{% endblock %}
+{% block heading %}Marketing & SEO{% endblock %}
+{% block content %}
+<div class="tabs" id="tabs"><button class="tab active" data-t="c">Campaigns</button><button class="tab" data-t="seo">Online store & Google</button><button class="tab" data-t="kit">Share kit</button></div>
+
+<section data-p="c">
+  <div class="grid g3" style="margin-bottom:16px">
+    {% for key, ready in channels_ready.items %}
+    <div class="card row" style="gap:12px"><i data-lucide="{% if key == 'whatsapp' %}message-circle{% elif key == 'sms' %}smartphone{% else %}mail{% endif %}" style="color:var(--primary)"></i>
+      <div><b>{% if key == 'whatsapp' %}WhatsApp{% elif key == 'sms' %}SMS{% else %}Email{% endif %}</b><div class="small {% if ready %}" style="color:var(--success){% else %} muted{% endif %}">{% if ready %}Ready to send{% else %}Not enabled on the platform yet{% endif %}</div></div></div>
+    {% endfor %}
+  </div>
+  <div id="campaigns"></div>
+  <p class="small muted" style="margin-top:12px">Messages go only to customers who agreed to receive offers. Emails include an unsubscribe link. Sending happens in batches of 200 — press “Continue” for larger lists.</p>
+</section>
+
+<section data-p="seo" class="hidden">
+  <div class="grid" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);align-items:start" id="seo-grid">
+    <form class="card" id="seo-form"><h3>How your store appears on Google & social media</h3><div id="seo-fields" class="grid g2" style="gap:0 16px"></div>
+      <button class="btn btn-primary"><i data-lucide="save"></i>Save</button></form>
+    <div class="stack">
+      <div class="card"><h3>Google preview</h3><div id="g-preview" style="font-family:arial,sans-serif"></div></div>
+      <div class="card"><h3>Rank higher on Google</h3><ol class="small" style="padding-left:18px;margin:0">
+        <li>Create / claim your <b>Google Business Profile</b> and add your store link as the “Order online” link.</li>
+        <li>Add the review link here — we show “Rate us on Google” after every order.</li>
+        <li>Use your cuisine & area in the title, e.g. “Spice Garden — Kerala & North Indian food in Kochi”.</li>
+        <li>Add photos to your menu items — dishes with photos sell more.</li></ol>
+        <p class="tiny muted" style="margin-top:8px">Your store page automatically includes restaurant structured data (address, cuisine, menu link) and is listed in the sitemap.</p></div>
+    </div>
+  </div>
+</section>
+
+<section data-p="kit" class="hidden">
+  <div class="grid g2" style="align-items:start">
+    <div class="card"><h3>Your online store</h3><div class="row"><input id="store-url" readonly class="mono"><button class="btn" id="copy-url"><i data-lucide="copy"></i>Copy</button></div>
+      <div class="row wrap" style="margin-top:12px"><a class="btn" id="wa-share" target="_blank"><i data-lucide="message-circle"></i>Share on WhatsApp</a><a class="btn" id="open-store" target="_blank"><i data-lucide="external-link"></i>Open store</a><a class="btn" href="{% url 'web:qr_sheet' %}" target="_blank"><i data-lucide="qr-code"></i>Table QR codes</a></div>
+      <div id="qr" style="margin-top:16px;display:inline-block;padding:10px;background:#fff;border-radius:12px"></div><div><button class="btn btn-sm" id="dl-qr" style="margin-top:8px"><i data-lucide="download"></i>Download QR (PNG)</button></div>
+    </div>
+    <div class="card"><h3>“Order online” button for your website</h3><p class="small muted">Paste this HTML on your website or blog.</p>
+      <textarea id="embed" readonly class="mono" style="min-height:120px;font-size:12px"></textarea><button class="btn btn-sm" id="copy-embed"><i data-lucide="copy"></i>Copy code</button>
+      <h3 style="margin-top:18px">Instagram & Facebook</h3><p class="small muted">Put your store link in your Instagram bio and as the Facebook page “Order food” button. Post your QR code on stories with an offer from <b>Customers → Coupons</b>.</p></div>
+  </div>
+</section>
+<style>@media(max-width:980px){#seo-grid{grid-template-columns:1fr!important}}</style>
+{{ segments|json_script:"segments" }}
+{% endblock %}
+{% block page_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(async function () {
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("section[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
+  const segments = JSON.parse(S.$("#segments").textContent);
+  const coupons = SV.perms.includes("customers") ? await S.list("coupons").catch(() => []) : [];
+  const store = await S.api("marketing/store");
+
+  /* ---------- Campaigns ---------- */
+  const statusBadge = { draft: "", sending: "b-warning", sent: "b-success" };
+  const crud = S.crud(S.$("#campaigns"), { endpoint: "campaigns", title: "Campaign",
+    columns: [{ key: "name", label: "Campaign", render: (c) => `<b>${S.esc(c.name)}</b><div class="tiny muted">${S.esc(c.message.slice(0, 80))}${c.message.length > 80 ? "…" : ""}</div>` },
+      { key: "channel_display", label: "Channel" }, { key: "segment_display", label: "Audience", render: (c) => S.esc(c.segment_display) + (c.tag ? ` <span class="badge">${S.esc(c.tag)}</span>` : "") },
+      { key: "status", label: "Status", render: (c) => `<span class="badge ${statusBadge[c.status]}">${S.esc(c.status)}</span> <span class="small muted">${c.sent} sent${c.failed ? ` · ${c.failed} failed` : ""}</span>` }],
+    fields: () => [{ name: "name", label: "Campaign name (internal)", required: true }, { name: "channel", label: "Send via", type: "select", required: true, half: true, options: [["whatsapp", "WhatsApp"], ["sms", "SMS"], ["email", "Email"]], default: "whatsapp" },
+      { name: "segment", label: "Audience", type: "select", required: true, half: true, options: segments, default: "all" }, { name: "tag", label: "Tag (for “Customers with a tag”)", half: true },
+      { name: "coupon", label: "Attach coupon", type: "select", half: true, options: coupons.map((c) => [c.id, `${c.code} — ${c.description}`]) },
+      { name: "subject", label: "Email subject" }, { name: "message", label: "Message", type: "textarea", required: true, default: "Hi {name}! Craving something delicious? Order from {restaurant} today and get a treat with code {coupon} 🎉 {link}",
+        help: "Placeholders: {name} {restaurant} {link} {coupon}" }],
+    actions: [
+      { label: "Preview audience", icon: "users", run: async (c) => { const a = await S.api("campaigns/audience", { body: c }); S.modal({ title: `${c.name} — preview`, body: `<p><b>${a.count}</b> customer${a.count === 1 ? "" : "s"} will receive this.</p><div class="card" style="background:var(--surface-2);box-shadow:none;white-space:pre-wrap">${S.esc(a.sample)}</div>` }); } },
+      { label: "Send / continue", icon: "send", run: async (c, reload) => {
+          const a = await S.api("campaigns/audience", { body: c });
+          if (!a.count && c.status === "draft") return S.toast("No customers match this audience yet", "err");
+          if (!(await S.confirm(`Send “${c.name}” via ${c.channel_display} to ${c.status === "draft" ? a.count : "the remaining"} customers?`, "Send now"))) return;
+          const r = await S.api(`campaigns/${c.id}/send`, { body: {} });
+          S.toast(`Sent ${r.sent}${r.failed ? `, ${r.failed} failed` : ""}${r.remaining ? ` — ${r.remaining} remaining, press Send again to continue` : " — done!"}`, r.failed ? "" : "ok"); reload(); } }],
+    empty: "No campaigns yet. Win back lapsed customers, wish birthdays, or announce a new menu." });
+
+  /* ---------- Store SEO ---------- */
+  const seoFields = [{ name: "seo_title", label: "Google title (≈60 characters)", placeholder: `${store.name} — order food online` },
+    { name: "seo_description", label: "Google description (≈155 characters)", type: "textarea" }, { name: "tagline", label: "Tagline", half: true }, { name: "cuisine", label: "Cuisine", half: true, placeholder: "Kerala, North Indian" },
+    { name: "offer_banner", label: "Offer banner on your store", placeholder: "Flat 20% off on your first order — code WELCOME20" }, { name: "cover_image_url", label: "Cover / share image URL", type: "url", half: true },
+    { name: "logo_url", label: "Logo URL", type: "url", half: true }, { name: "google_review_url", label: "Google review link", type: "url", half: true }, { name: "whatsapp_number", label: "WhatsApp number", type: "tel", half: true },
+    { name: "instagram_url", label: "Instagram", type: "url", half: true }, { name: "facebook_url", label: "Facebook", type: "url", half: true }, { name: "brand_color", label: "Brand colour", half: true, placeholder: "#F4632F" }];
+  S.$("#seo-fields").innerHTML = S.formFields(seoFields, store);
+  S.$$("#seo-fields .field").forEach((x) => { if (!x.classList.contains("half")) x.style.gridColumn = "1 / -1"; });
+  const preview = () => {
+    const v = S.readForm(S.$("#seo-form"), seoFields);
+    S.$("#g-preview").innerHTML = `<div style="font-size:12px;color:#4d5156">${S.esc(store.store_url)}</div><div style="color:#1a0dab;font-size:19px;margin:2px 0">${S.esc(v.seo_title || `${store.name} — Order online`)}</div>
+      <div style="font-size:13px;color:#4d5156">${S.esc(v.seo_description || `Order from ${store.name} online for delivery or takeaway. ${v.cuisine || ""}`)}</div>`;
+  };
+  S.$("#seo-form").oninput = preview; preview();
+  S.$("#seo-form").onsubmit = async (e) => { e.preventDefault(); await S.api("marketing/store", { method: "PATCH", body: S.readForm(S.$("#seo-form"), seoFields) }); S.toast("Store profile saved", "ok"); };
+
+  /* ---------- Share kit ---------- */
+  const url = store.store_url.startsWith("http") ? store.store_url : location.origin + store.store_url;
+  S.$("#store-url").value = url; S.$("#open-store").href = url;
+  S.$("#wa-share").href = "https://wa.me/?text=" + encodeURIComponent(`Order from ${store.name} online: ${url}`);
+  S.$("#copy-url").onclick = () => { navigator.clipboard.writeText(url); S.toast("Link copied"); };
+  if (window.QRCode) new QRCode(S.$("#qr"), { text: url, width: 180, height: 180, colorDark: "#14123A" });
+  S.$("#dl-qr").onclick = () => { const img = S.$("#qr img") || S.$("#qr canvas"); const a = document.createElement("a"); a.href = img.src || img.toDataURL(); a.download = `${store.slug}-qr.png`; a.click(); };
+  S.$("#embed").value = `<a href="${url}" target="_blank" rel="noopener" style="display:inline-block;background:${store.brand_color || "#F4632F"};color:#fff;padding:12px 22px;border-radius:10px;font:600 16px system-ui,sans-serif;text-decoration:none">Order online — ${store.name}</a>`;
+  S.$("#copy-embed").onclick = () => { navigator.clipboard.writeText(S.$("#embed").value); S.toast("Code copied"); };
+})();
+</script>
+{% endblock %}

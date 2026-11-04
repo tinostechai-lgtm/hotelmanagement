@@ -112,3 +112,40 @@ class Feedback(TenantModel):
     food_rating = models.PositiveSmallIntegerField(null=True, blank=True)
     service_rating = models.PositiveSmallIntegerField(null=True, blank=True)
     comment = models.TextField(blank=True)
+
+
+class Campaign(TenantModel):
+    CHANNELS = [("whatsapp", "WhatsApp"), ("sms", "SMS"), ("email", "Email")]
+    SEGMENTS = [("all", "All customers who opted in"), ("new", "New — 1 visit"), ("regulars", "Regulars — 5+ visits"),
+                ("lapsed30", "Haven't visited in 30 days"), ("lapsed60", "Haven't visited in 60 days"),
+                ("birthday", "Birthday this month"), ("top", "Top spenders (Gold & Platinum)"), ("tag", "Customers with a tag")]
+
+    name = models.CharField(max_length=120)
+    channel = models.CharField(max_length=10, choices=CHANNELS, default="whatsapp")
+    segment = models.CharField(max_length=10, choices=SEGMENTS, default="all")
+    tag = models.CharField(max_length=40, blank=True)
+    subject = models.CharField(max_length=150, blank=True, help_text="Email subject")
+    message = models.TextField(help_text="Use {name}, {restaurant}, {link}, {coupon}")
+    coupon = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL)
+    status = models.CharField(max_length=10, default="draft")  # draft / sending / sent
+    sent = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey("accounts.User", null=True, on_delete=models.SET_NULL, related_name="+")
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class CampaignDelivery(models.Model):
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="deliveries")
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="+")
+    ok = models.BooleanField(default=False)
+    error = models.CharField(max_length=200, blank=True)
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("campaign", "customer")

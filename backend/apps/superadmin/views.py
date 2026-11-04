@@ -98,6 +98,8 @@ def overview(request):
         ("Email (SMTP) configured", bool(ps.email_enabled and ps.email_host), "email"),
         ("Support contact", bool(ps.support_email or ps.support_phone), "general"),
         ("Company GSTIN for invoices", bool(ps.company_gstin), "general"),
+        ("SEO title & description", bool(ps.seo_title and ps.seo_description), "seo"),
+        ("Google Search Console verified", bool(ps.google_site_verification), "seo"),
     ]
     return page(request, "overview", "overview",
                 stats={

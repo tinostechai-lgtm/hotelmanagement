@@ -47,7 +47,7 @@
     }
     let rating = 5;
     S.$$("[data-r]").forEach((b) => (b.onclick = () => { rating = Number(b.dataset.r); S.$$("[data-r]").forEach((x) => x.classList.toggle("on", Number(x.dataset.r) <= rating)); }));
-    S.$("#send") && (S.$("#send").onclick = async () => { await fetch(`/api/public/track/${token}/feedback`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rating, comment: S.$("#fb").value }) }); rated = true; S.$("#rate").innerHTML = "<b>Thank you! 🙏</b>"; });
+    S.$("#send") && (S.$("#send").onclick = async () => { await fetch(`/api/public/track/${token}/feedback`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rating, comment: S.$("#fb").value }) }); rated = true; S.$("#rate").innerHTML = rating >= 4 && o.review_url ? `<b>Thank you! 🙏</b><p class="small">Loved it? It would mean a lot if you shared it on Google.</p><a class="btn btn-primary" href="${S.esc(o.review_url)}" target="_blank" rel="noopener">★ Rate us on Google</a>` : "<b>Thank you! 🙏</b>"; });
     return finished || o.status === "cancelled";
   }
   let timer;

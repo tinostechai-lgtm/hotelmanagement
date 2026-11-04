@@ -38,6 +38,7 @@ router.register("shifts", ops.ShiftViewSet)
 router.register("customers", crm.CustomerViewSet)
 router.register("coupons", crm.CouponViewSet)
 router.register("feedback", crm.FeedbackViewSet)
+router.register("campaigns", crm.CampaignViewSet)
 router.register("delivery/zones", delivery.ZoneViewSet)
 router.register("delivery/riders", delivery.RiderViewSet)
 router.register("delivery/tasks", delivery.TaskViewSet)
@@ -60,6 +61,7 @@ urlpatterns = [
     path("auth/pin", accounts.pin_switch),
     path("me", accounts.me),
     path("restaurant", tenants.restaurant),
+    path("marketing/store", crm.store_profile),
     path("bootstrap", tenants.pos_bootstrap),
     path("reports/summary", tenants.reports),
     path("reports/insights", tenants.insights),

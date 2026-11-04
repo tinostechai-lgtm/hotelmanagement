@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block title %}Unsubscribe · {{ r.name }}{% endblock %}
+{% block body %}<div class="empty" style="padding-top:14vh;max-width:460px;margin:0 auto">
+{% if done %}<h2>You're unsubscribed</h2><p>{{ r.name }} won't send you offers any more. Order updates still reach you.</p>
+{% else %}<h2>Stop offers from {{ r.name }}?</h2><p>You'll still get messages about orders you place.</p>
+<form method="post">{% csrf_token %}<button class="btn btn-primary">Unsubscribe</button></form>{% endif %}</div>{% endblock %}

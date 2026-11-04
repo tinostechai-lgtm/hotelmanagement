@@ -88,6 +88,20 @@ class PlatformSettings(models.Model):
     aggregator_webhook_secret = EncryptedTextField("Aggregator webhook secret", blank=True,
                                                    help_text="Shared HMAC secret for Swiggy/Zomato/UrbanPiper middleware")
 
+    # SEO & analytics (marketing website + online stores)
+    seo_title = models.CharField("Home page title", max_length=70, blank=True,
+                                 help_text="≈60 characters. e.g. Servora — Restaurant POS, QR Ordering & Home Delivery")
+    seo_description = models.CharField("Meta description", max_length=170, blank=True, help_text="≈155 characters shown under your link on Google")
+    seo_keywords = models.CharField(max_length=255, blank=True, help_text="Comma separated, e.g. restaurant POS, billing software India")
+    og_image_url = models.URLField("Social share image URL", blank=True, help_text="1200×630 image shown on WhatsApp, Facebook, LinkedIn")
+    twitter_handle = models.CharField(max_length=40, blank=True)
+    allow_indexing = models.BooleanField("Allow search engines to index the site", default=True)
+    google_site_verification = models.CharField(max_length=100, blank=True, help_text="Content of the google-site-verification meta tag")
+    bing_site_verification = models.CharField(max_length=100, blank=True)
+    google_analytics_id = models.CharField("Google Analytics ID", max_length=30, blank=True, help_text="G-XXXXXXXXXX")
+    google_tag_manager_id = models.CharField(max_length=30, blank=True, help_text="GTM-XXXXXXX")
+    meta_pixel_id = models.CharField("Meta (Facebook) Pixel ID", max_length=30, blank=True)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

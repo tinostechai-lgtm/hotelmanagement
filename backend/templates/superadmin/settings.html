@@ -28,6 +28,14 @@
       <form method="post" action="{% url 'superadmin:test' 'sms' %}" class="row" style="margin-bottom:8px">{% csrf_token %}<input type="hidden" name="back" value="{{ request.path }}"><input type="tel" name="to" placeholder="Mobile number"><button class="btn">Test SMS</button></form>
       <form method="post" action="{% url 'superadmin:test' 'whatsapp' %}" class="row">{% csrf_token %}<input type="hidden" name="back" value="{{ request.path }}"><input type="tel" name="to" placeholder="Mobile number"><button class="btn">Test WhatsApp</button></form>
       <p class="small muted" style="margin-top:12px">Customers get order updates (placed, confirmed, out for delivery with OTP, delivered) on WhatsApp when enabled, otherwise by SMS. In India, SMS needs a DLT-registered sender ID and template.</p></div>
+    {% elif section == "seo" %}
+    <div class="card"><h3>SEO checklist</h3><ol class="small" style="padding-left:18px">
+      <li>Write a title (≈60 chars) and description (≈155 chars) with your main keywords — e.g. “restaurant billing software”, “QR ordering”.</li>
+      <li>Add a 1200×630 share image so links look great on WhatsApp & LinkedIn.</li>
+      <li>Verify the site in <b>Google Search Console</b> (HTML tag method → paste the code) and submit <code>{{ request.scheme }}://{{ request.get_host }}/sitemap.xml</code>.</li>
+      <li>Add Google Analytics / Tag Manager / Meta Pixel IDs to measure sign-ups and ads.</li></ol>
+      <p class="small"><a href="/robots.txt" target="_blank">View robots.txt</a> · <a href="/sitemap.xml" target="_blank">View sitemap.xml</a></p>
+      <p class="tiny muted">Every restaurant store page automatically gets its own title, description, social preview and Google “Restaurant” structured data, and is included in the sitemap. Restaurants edit theirs under Marketing & SEO.</p></div>
     {% elif section == "integrations" %}
     <div class="card"><h3>Aggregator orders</h3><p class="small">Point Swiggy / Zomato orders (through UrbanPiper or similar middleware) at:</p><code class="small" style="word-break:break-all">{{ aggregator_url }}</code>
       <p class="small muted">Requests must carry <code>X-Signature</code> = HMAC-SHA256 of the body with the secret saved here.</p></div>
