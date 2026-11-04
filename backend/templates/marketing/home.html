@@ -71,7 +71,7 @@
     <span class="pill"><i data-lucide="sparkles" style="width:14px"></i> POS · QR ordering · Home delivery · Hotels</span>
     <h1>Run your restaurant <em>faster</em>, sell more, stress less.</h1>
     <p class="lead">One elegant system for billing, KOTs, tables, room service, QR & online ordering, your own delivery fleet, inventory and AI insights — on web, Android, iOS and every printer you already own.</p>
-    <div class="row wrap" style="margin-top:26px"><a href="{% url 'web:signup' %}" class="btn btn-primary btn-lg">Start 14-day free trial</a><a href="/s/spice-garden/" class="btn btn-lg"><i data-lucide="play"></i>See a live store</a></div>
+    <div class="row wrap" style="margin-top:26px"><a href="{% url 'web:signup' %}" class="btn btn-primary btn-lg">Start 14-day free trial</a>{% if showcase %}<a href="/s/{{ showcase.slug }}/" class="btn btn-lg"><i data-lucide="play"></i>See a live store</a>{% else %}<a href="#features" class="btn btn-lg"><i data-lucide="play"></i>See features</a>{% endif %}</div>
     <p class="small" style="color:#A3A2C2;margin-top:14px">No card needed · Setup in 10 minutes · Razorpay payments built in</p>
   </div>
   <div class="mock" aria-hidden="true">

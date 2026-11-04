@@ -41,7 +41,9 @@ def home(request):
     if not get_user_model().objects.filter(is_superuser=True).exists():
         return redirect("setup")
     plans = Plan.objects.filter(is_public=True)
-    return render(request, "marketing/home.html", {"plans": plans, "features": FEATURES})
+    showcase = (Restaurant.objects.filter(slug="spice-garden", is_active=True).first()
+                or Restaurant.objects.filter(is_active=True, online_ordering_enabled=True).order_by("created_at").first())
+    return render(request, "marketing/home.html", {"plans": plans, "features": FEATURES, "showcase": showcase})
 
 
 def login_view(request):
