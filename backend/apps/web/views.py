@@ -70,8 +70,12 @@ def _jsonld_software(request, plans):
     })
 
 
-def login_view(request):
+def login_view(request, admin=False):
     if request.user.is_authenticated:
+        from apps.superadmin.models import platform_permissions
+
+        if admin and platform_permissions(request.user):
+            return redirect("superadmin:overview")
         return redirect("web:dashboard")
     if request.method == "POST":
         from django.core.cache import cache
@@ -81,21 +85,22 @@ def login_view(request):
         if cache.get(key, 0) >= 10:
             messages.error(request, "Too many attempts. Please wait a few minutes and try again.")
             return render(request, "auth/login.html", status=429)
-        user = authenticate(request, username=request.POST.get("phone", "").strip(), password=request.POST.get("password", ""))
+        identifier = (request.POST.get("login") or request.POST.get("phone") or "").strip()
+        user = authenticate(request, username=identifier, password=request.POST.get("password", ""))
         if user:
-            login(request, user)
+            login(request, user, backend="apps.accounts.backends.EmailOrPhoneBackend")
             cache.delete(key)
             nxt = request.GET.get("next", "")
             if nxt.startswith("/") and not nxt.startswith("//"):
                 return redirect(nxt)
             from apps.superadmin.models import platform_permissions
 
-            if platform_permissions(user) and not Membership.objects.filter(user=user, is_active=True).exists():
+            if platform_permissions(user) and (admin or not Membership.objects.filter(user=user, is_active=True).exists()):
                 return redirect("superadmin:overview")
             return redirect("web:dashboard")
         cache.set(key, cache.get(key, 0) + 1, 300)
-        messages.error(request, "Incorrect mobile number or password.")
-    return render(request, "auth/login.html")
+        messages.error(request, "Incorrect mobile number / email or password.")
+    return render(request, "auth/login.html", {"admin_login": admin})
 
 
 def signup_view(request):
@@ -110,7 +115,7 @@ def signup_view(request):
         s = SignupSerializer(data=request.POST)
         if s.is_valid():
             user, _ = create_account(s.validated_data)
-            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+            login(request, user, backend="apps.accounts.backends.EmailOrPhoneBackend")
             messages.success(request, "Welcome to Servora! Your 14-day free trial of Pro has started.")
             return redirect("web:dashboard")
         return render(request, "auth/signup.html", {"errors": s.errors, "data": request.POST, "plans": plans})

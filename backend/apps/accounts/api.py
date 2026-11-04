@@ -46,10 +46,11 @@ def tokens(user):
 @permission_classes([AllowAny])
 @throttle_classes([LoginThrottle])
 def login(request):
-    phone = str(request.data.get("phone") or request.data.get("username") or "").strip()
-    user = authenticate(request, username=phone, password=request.data.get("password", ""))
+    # Accepts a mobile number or an email in any of these keys (the app sends "phone").
+    identifier = str(request.data.get("login") or request.data.get("phone") or request.data.get("email") or request.data.get("username") or "").strip()
+    user = authenticate(request, username=identifier, password=request.data.get("password", ""))
     if not user:
-        return Response({"detail": "Invalid mobile number or password"}, status=401)
+        return Response({"detail": "Incorrect mobile number / email or password"}, status=401)
     return Response({**tokens(user), "user": user_payload(user)})
 
 
@@ -76,8 +77,15 @@ class SignupSerializer(serializers.Serializer):
     plan = serializers.CharField(required=False, default="pro")
 
     def validate_phone(self, v):
-        if User.objects.filter(username=v).exists():
+        from .backends import find_users
+
+        if find_users(v).exists():
             raise serializers.ValidationError("This mobile number is already registered. Please log in.")
+        return v
+
+    def validate_email(self, v):
+        if v and User.objects.filter(email__iexact=v).exists():
+            raise serializers.ValidationError("This email is already registered. Please log in.")
         return v
 
 

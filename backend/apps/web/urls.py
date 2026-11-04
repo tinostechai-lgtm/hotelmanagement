@@ -8,6 +8,7 @@ urlpatterns = [
     path("robots.txt", views.robots_txt),
     path("sitemap.xml", views.sitemap_xml),
     path("login/", views.login_view, name="login"),
+    path("superadmin/login/", views.login_view, {"admin": True}, name="admin_login"),
     path("signup/", views.signup_view, name="signup"),
     path("logout/", views.logout_view, name="logout"),
     path("switch/", views.switch_restaurant, name="switch"),

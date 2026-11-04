@@ -35,7 +35,7 @@ def platform_required(perm):
         @wraps(fn)
         def wrapper(request, *a, **kw):
             if not request.user.is_authenticated:
-                return redirect(f"/login/?next={request.path}")
+                return redirect(f"/superadmin/login/?next={request.path}")
             perms = platform_permissions(request.user)
             if not perms:
                 raise Http404
@@ -348,7 +348,7 @@ def setup(request):
             ps.support_email = ps.support_email or d["email"]
             ps.save()
             PlatformRole.ensure_defaults()
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        login(request, user, backend="apps.accounts.backends.EmailOrPhoneBackend")
         messages.success(request, "Welcome! Finish the checklist below to go live.")
         return redirect("superadmin:overview")
     return render(request, "superadmin/setup.html", {"form": form})

@@ -100,12 +100,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 28),
                       TextFormField(
                         controller: _phone,
-                        keyboardType: TextInputType.phone,
+                        keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.telephoneNumber],
+                        autofillHints: const [AutofillHints.username, AutofillHints.email, AutofillHints.telephoneNumber],
                         style: const TextStyle(fontSize: 18),
-                        decoration: const InputDecoration(labelText: 'Mobile number', prefixIcon: Icon(Icons.phone_iphone)),
-                        validator: (v) => (v ?? '').trim().length < 6 ? 'Enter your mobile number' : null,
+                        decoration: const InputDecoration(labelText: 'Mobile number or email', prefixIcon: Icon(Icons.person_outline)),
+                        validator: (v) => (v ?? '').trim().length < 6 ? 'Enter your mobile number or email' : null,
                       ),
                       const SizedBox(height: 14),
                       TextFormField(

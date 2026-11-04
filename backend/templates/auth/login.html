@@ -1,19 +1,22 @@
 {% extends "auth/_layout.html" %}
 {% block title %}Log in · Servora{% endblock %}
 {% block form %}
-<h1 style="font-size:28px">Welcome back</h1>
-<p class="muted">Log in with your mobile number.</p>
+{% if admin_login %}<span class="badge b-primary" style="margin-bottom:10px"><i data-lucide="shield-check" style="width:13px"></i> Super admin</span>
+<h1 style="font-size:28px">Platform admin login</h1>
+<p class="muted">Sign in with your mobile number or email to manage restaurants, plans and settings.</p>
+{% else %}<h1 style="font-size:28px">Welcome back</h1>
+<p class="muted">Log in with your mobile number or email.</p>{% endif %}
 {% for m in messages %}<div class="err">{{ m }}</div>{% endfor %}
 <form method="post">{% csrf_token %}
-  <div class="field"><label for="phone">Mobile number</label><input type="tel" id="phone" name="phone" required autocomplete="username" inputmode="numeric" placeholder="10-digit mobile" autofocus></div>
+  <div class="field"><label for="phone">Mobile number or email</label><input type="text" id="phone" name="login" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="98765 43210 or you@example.com" autofocus></div>
   <div class="field"><label for="password">Password</label><input type="password" id="password" name="password" required autocomplete="current-password"></div>
   <button class="btn btn-primary btn-lg btn-block" type="submit">Log in</button>
   <p class="center small" style="margin-top:10px"><a href="{% url 'password_reset' %}">Forgot password?</a></p>
 </form>
-{% if show_demo_login %}<div class="card" style="margin-top:20px;background:var(--surface-2);box-shadow:none">
+{% if show_demo_login and not admin_login %}<div class="card" style="margin-top:20px;background:var(--surface-2);box-shadow:none">
   <b class="small">Try the demo restaurant</b>
   <div class="small muted">Owner: <span class="mono">9999999999</span> / <span class="mono">Demo@1234</span><br>Captain 8888888801 · Cashier 8888888802 · Kitchen 8888888803 · Rider 8888888804 (same password)</div>
   <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('phone').value='9999999999';document.getElementById('password').value='Demo@1234'">Fill demo login</button>
 </div>{% endif %}
-<p class="center" style="margin-top:20px">New to Servora? <a href="{% url 'web:signup' %}"><b>Start a free trial</b></a></p>
+{% if not admin_login %}<p class="center" style="margin-top:20px">New to Servora? <a href="{% url 'web:signup' %}"><b>Start a free trial</b></a></p>{% endif %}
 {% endblock %}

@@ -97,6 +97,8 @@ DATABASES = {
 }
 
 AUTH_USER_MODEL = "accounts.User"
+# One login field: mobile number or email.
+AUTHENTICATION_BACKENDS = ["apps.accounts.backends.EmailOrPhoneBackend", "django.contrib.auth.backends.ModelBackend"]
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
