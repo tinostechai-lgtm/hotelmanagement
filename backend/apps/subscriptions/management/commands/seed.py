@@ -37,6 +37,15 @@ MENU = {
 }
 
 
+def DEMO_PASSWORD_HASH():
+    """Fixed salt for the public demo accounts only, so every serverless
+    instance that seeds its own demo database produces the same hash and
+    logins (whose session checks use the hash) stay valid across instances."""
+    from django.contrib.auth.hashers import make_password
+
+    return make_password("Demo@1234", salt="servorademo2026")
+
+
 class Command(BaseCommand):
     help = "Create SaaS plans and (optionally) a fully populated demo restaurant."
 
@@ -66,7 +75,7 @@ class Command(BaseCommand):
 
         user, created = User.objects.get_or_create(username="9999999999", defaults={"first_name": "Demo", "last_name": "Owner", "phone": "9999999999", "pin": "1234"})
         if created:
-            user.set_password("Demo@1234")
+            user.password = DEMO_PASSWORD_HASH()
             user.save()
         r, created = Restaurant.objects.get_or_create(slug="spice-garden", defaults=dict(
             name="Spice Garden", owner=user, phone="9999999999", email="hello@spicegarden.example", business_type="hotel",
@@ -84,7 +93,7 @@ class Command(BaseCommand):
                  ("8888888804", "Vishnu", "Delivery Rider")]
         for phone, name, role in staff:
             u, _ = User.objects.get_or_create(username=phone, defaults={"first_name": name, "phone": phone, "pin": phone[-4:]})
-            u.set_password("Demo@1234")
+            u.password = DEMO_PASSWORD_HASH()
             u.save()
             Membership.objects.get_or_create(user=u, restaurant=r, defaults={"role": Role.objects.get(restaurant=r, name=role)})
             if role == "Delivery Rider":
