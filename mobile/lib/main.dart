@@ -18,7 +18,7 @@ final GlobalKey<NavigatorState> rootNavigator = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+  SystemChrome.setSystemUIOverlayStyle(lightStatusBar);
   final prefs = await SharedPreferences.getInstance();
 
   final config = AppConfig(prefs);

@@ -172,7 +172,7 @@ class _KdsScreenState extends State<KdsScreen> {
         backgroundColor: Brand.ink,
         foregroundColor: Colors.white,
         titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-        title: const Text('Kitchen Display'),
+        title: const Text('Kitchen'),
         actions: [
           if (stations.isNotEmpty)
             DropdownButtonHideUnderline(
@@ -241,10 +241,10 @@ class _KdsScreenState extends State<KdsScreen> {
               : GridView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 340,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.78,
+                    maxCrossAxisExtent: 440,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    mainAxisExtent: 260,
                   ),
                   itemCount: visible.length,
                   itemBuilder: (_, i) => _KotCard(

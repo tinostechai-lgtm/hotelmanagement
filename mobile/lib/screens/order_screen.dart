@@ -49,7 +49,7 @@ class _OrderView extends StatelessWidget {
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(c.title, overflow: TextOverflow.ellipsis),
           Text(orderTypeLabels[c.orderType] ?? c.orderType,
-              style: const TextStyle(fontSize: 13, color: Brand.muted, fontWeight: FontWeight.w500)),
+              style: const TextStyle(fontSize: 13, color: Brand.steam, fontWeight: FontWeight.w600)),
         ]),
         actions: [
           IconButton(
@@ -259,7 +259,7 @@ class _MenuPanelState extends State<MenuPanel> {
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 210,
-                  mainAxisExtent: 112,
+                  mainAxisExtent: 138,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
                 ),
@@ -284,58 +284,96 @@ class _ItemTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
+  static const _tints = [
+    Color(0xFFFFEDE3), Color(0xFFEDE9FE), Color(0xFFDCFCE7), Color(0xFFE0F2FE), Color(0xFFFEF3C7), Color(0xFFFCE7F3),
+  ];
+  static const _inks = [
+    Color(0xFFC2410C), Color(0xFF6D28D9), Color(0xFF15803D), Color(0xFF0369A1), Color(0xFFB45309), Color(0xFFBE185D),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final soldOut = !item.available;
-    return Material(
-      color: soldOut ? const Color(0xFFF1F1F4) : Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: qty > 0 ? Brand.orangeDeep : Brand.line, width: qty > 0 ? 2 : 1),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              DietDot(item.diet),
-              if (item.bestseller) ...[
-                const SizedBox(width: 6),
-                const Icon(Icons.star_rounded, size: 16, color: Brand.warning),
-              ],
-              const Spacer(),
-              if (item.shortCode.isNotEmpty)
-                Text(item.shortCode, style: const TextStyle(fontSize: 11, color: Brand.muted, fontWeight: FontWeight.w700)),
-            ]),
-            const SizedBox(height: 6),
-            Expanded(
-              child: Text(
-                item.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: soldOut ? Brand.muted : Brand.ink,
-                  decoration: soldOut ? TextDecoration.lineThrough : null,
+    final selected = qty > 0;
+    final k = item.name.isEmpty ? 0 : item.name.codeUnitAt(0) % _tints.length;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: soldOut ? const Color(0xFFF1F1F4) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: selected ? Brand.orangeDeep : Colors.transparent, width: 2),
+        boxShadow: soldOut ? null : Brand.shadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: _tints[k], borderRadius: BorderRadius.circular(12)),
+                  child: Text(item.name.isEmpty ? '?' : item.name[0].toUpperCase(),
+                      style: TextStyle(color: _inks[k], fontWeight: FontWeight.w900, fontSize: 18)),
+                ),
+                const Spacer(),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (item.bestseller) const Icon(Icons.star_rounded, size: 16, color: Brand.warning),
+                    const SizedBox(width: 4),
+                    DietDot(item.diet),
+                  ]),
+                  if (item.shortCode.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(item.shortCode, style: const TextStyle(fontSize: 11, color: Brand.muted, fontWeight: FontWeight.w700)),
+                  ],
+                ]),
+              ]),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    height: 1.2,
+                    color: soldOut ? Brand.muted : Brand.ink,
+                    decoration: soldOut ? TextDecoration.lineThrough : null,
+                  ),
                 ),
               ),
-            ),
-            Row(children: [
-              Text(Fmt.money(item.variants.isNotEmpty ? item.variants.first.price : item.price),
-                  style: const TextStyle(fontWeight: FontWeight.w800)),
-              if (item.hasOptions) const Text('  +', style: TextStyle(color: Brand.muted)),
-              const Spacer(),
-              if (soldOut)
-                const Pill('SOLD OUT', color: Brand.danger)
-              else if (qty > 0)
-                Pill('×${Fmt.qty(qty)}', color: Brand.orangeDeep, filled: true),
+              Row(children: [
+                Text(Fmt.money(item.variants.isNotEmpty ? item.variants.first.price : item.price),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Brand.ink)),
+                if (item.hasOptions) const Text(' +', style: TextStyle(color: Brand.muted, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                if (soldOut)
+                  const Pill('SOLD OUT', color: Brand.danger)
+                else if (selected)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(99)),
+                    child: Text('×${Fmt.qty(qty)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                  )
+                else
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(color: Brand.orangeDeep.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.add_rounded, size: 18, color: Brand.orangeDeep),
+                  ),
+              ]),
             ]),
-          ]),
+          ),
         ),
       ),
     );

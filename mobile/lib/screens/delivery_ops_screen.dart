@@ -130,7 +130,7 @@ class _DeliveryOpsScreenState extends State<DeliveryOpsScreen> {
         const OfflineBanner(),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          child: Row(children: [
+          child: SizedBox(height: 108, child: Row(children: [
             Expanded(child: StatCard(label: 'Active tasks', value: '${_tasks.length}', icon: Icons.inventory_2_outlined)),
             const SizedBox(width: 10),
             Expanded(
@@ -142,8 +142,8 @@ class _DeliveryOpsScreenState extends State<DeliveryOpsScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Expanded(child: StatCard(label: 'Riders online', value: '$online/${_riders.length}', icon: Icons.two_wheeler)),
-          ]),
+            Expanded(child: StatCard(label: 'Riders online', value: '$online/${_riders.length}', icon: Icons.two_wheeler, color: Brand.teal)),
+          ])),
         ),
         if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: const TextStyle(color: Brand.danger))),
         Expanded(

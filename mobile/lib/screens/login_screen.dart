@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../brand/logo.dart';
@@ -74,124 +75,193 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _fillDemo(String phone) {
+    setState(() {
+      _phone.text = phone;
+      _password.text = AppConfig.demoPassword;
+      _error = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final server = context.watch<AppConfig>().baseUrl;
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(children: [
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Form(
-                  key: _form,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Center(child: AnimatedServoraLogo(size: 96)),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Sign in to your restaurant',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Brand.muted, fontSize: 16),
-                      ),
-                      const SizedBox(height: 28),
-                      TextFormField(
-                        controller: _phone,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.username, AutofillHints.email, AutofillHints.telephoneNumber],
-                        style: const TextStyle(fontSize: 18),
-                        decoration: const InputDecoration(labelText: 'Mobile number or email', prefixIcon: Icon(Icons.person_outline)),
-                        validator: (v) => (v ?? '').trim().length < 6 ? 'Enter your mobile number or email' : null,
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _password,
-                        obscureText: _obscure,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _login(),
-                        autofillHints: const [AutofillHints.password],
-                        style: const TextStyle(fontSize: 18),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => _obscure = !_obscure),
-                          ),
-                        ),
-                        validator: (v) => (v ?? '').isEmpty ? 'Enter your password' : null,
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Brand.danger.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(_error!, style: const TextStyle(color: Brand.danger, fontWeight: FontWeight.w600)),
-                        ),
-                      ],
-                      const SizedBox(height: 22),
-                      GradientButton(label: 'Sign in', icon: Icons.arrow_forward, busy: _busy, onPressed: _login),
-                      if (AppConfig.showDemoLogins) ...[
-                        const SizedBox(height: 22),
-                        const Row(children: [
-                          Expanded(child: Divider()),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: Text('Try a demo account', style: TextStyle(color: Brand.muted, fontSize: 13, fontWeight: FontWeight.w600)),
-                          ),
-                          Expanded(child: Divider()),
-                        ]),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final u in AppConfig.demoUsers)
-                              ActionChip(
-                                avatar: Icon(_demoIcon(u[0]), size: 18, color: Brand.orangeDeep),
-                                label: Text(u[0], style: const TextStyle(fontWeight: FontWeight.w600)),
-                                onPressed: _busy
-                                    ? null
-                                    : () {
-                                        _phone.text = u[1];
-                                        _password.text = AppConfig.demoPassword;
-                                        _login();
-                                      },
-                              ),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 18),
-                      Text(
-                        server.replaceFirst(RegExp(r'^https?://'), ''),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Brand.muted, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
+    final h = MediaQuery.sizeOf(context).height;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: lightStatusBar,
+      child: Scaffold(
+        backgroundColor: Brand.ink,
+        body: Stack(children: [
+          // Ambient glow behind the logo
+          Positioned(
+            top: -h * 0.12,
+            left: -80,
+            right: -80,
+            child: Container(
+              height: h * 0.55,
+              decoration: BoxDecoration(
+                gradient: RadialGradient(colors: [Brand.orange.withOpacity(0.32), Brand.orange.withOpacity(0)]),
               ),
             ),
           ),
-          Positioned(
-            right: 8,
-            top: 8,
-            child: IconButton(
-              tooltip: 'Server settings',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => showServerSettings(context),
+          SafeArea(
+            bottom: false,
+            child: SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: h - MediaQuery.paddingOf(context).top),
+                child: Column(children: [
+                  const SizedBox(height: 28),
+                  GestureDetector(
+                    // Hidden: long-press the logo for server settings (support use only).
+                    onLongPress: () => showServerSettings(context),
+                    child: const AnimatedServoraLogo(size: 92, wordmarkColor: Colors.white),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('Welcome back',
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+                  const SizedBox(height: 4),
+                  const Text('Sign in to run your restaurant', style: TextStyle(color: Color(0xFFCFCDEB), fontSize: 15)),
+                  const SizedBox(height: 26),
+                  Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(minHeight: h * 0.6),
+                    decoration: const BoxDecoration(
+                      color: Brand.background,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                    ),
+                    padding: EdgeInsets.fromLTRB(22, 28, 22, 24 + MediaQuery.paddingOf(context).bottom),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: _form0(),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
             ),
           ),
         ]),
       ),
+    );
+  }
+
+  Widget _form0() {
+    return Form(
+      key: _form,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Sign in', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Brand.ink, letterSpacing: -0.5)),
+          const SizedBox(height: 4),
+          const Text('Use your mobile number or email', style: TextStyle(color: Brand.muted, fontSize: 15)),
+          const SizedBox(height: 22),
+          TextFormField(
+            controller: _phone,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.username, AutofillHints.email, AutofillHints.telephoneNumber],
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Brand.ink),
+            decoration: const InputDecoration(labelText: 'Mobile number or email', prefixIcon: Icon(Icons.person_outline_rounded)),
+            validator: (v) => (v ?? '').trim().length < 6 ? 'Enter your mobile number or email' : null,
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _password,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _login(),
+            autofillHints: const [AutofillHints.password],
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Brand.ink),
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline_rounded),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+            validator: (v) => (v ?? '').isEmpty ? 'Enter your password' : null,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFE4EA),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Brand.danger.withOpacity(0.3)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.error_outline, color: Brand.danger),
+                const SizedBox(width: 10),
+                Expanded(child: Text(_error!, style: const TextStyle(color: Color(0xFF9F1239), fontWeight: FontWeight.w700))),
+              ]),
+            ),
+          ],
+          const SizedBox(height: 22),
+          GradientButton(label: 'Sign in', icon: Icons.arrow_forward_rounded, busy: _busy, onPressed: _login),
+          if (AppConfig.showDemoLogins) ...[const SizedBox(height: 26), _demoCard()],
+          const SizedBox(height: 24),
+          const Text.rich(
+            TextSpan(children: [
+              TextSpan(text: 'Designed & Developed by '),
+              TextSpan(text: 'Tinos Software & Security Solutions LLP', style: TextStyle(fontWeight: FontWeight.w700, color: Brand.ink)),
+            ]),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Brand.muted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Demo credentials as plain text (tap a row to fill the form).
+  Widget _demoCard() {
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: Brand.shadow),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const IconBubble(Icons.key_rounded, size: 34),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Demo accounts', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Brand.ink)),
+              Text('Tap a row to fill the form', style: TextStyle(fontSize: 12.5, color: Brand.muted)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(color: Brand.ink, borderRadius: BorderRadius.circular(12)),
+          child: const Row(children: [
+            Icon(Icons.lock_rounded, size: 18, color: Brand.steam),
+            SizedBox(width: 8),
+            Text('Password', style: TextStyle(color: Color(0xFFCFCDEB), fontWeight: FontWeight.w600)),
+            Spacer(),
+            SelectableText(AppConfig.demoPassword,
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        for (final u in AppConfig.demoUsers)
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: _busy ? null : () => _fillDemo(u[1]),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
+              child: Row(children: [
+                Icon(_demoIcon(u[0]), size: 20, color: Brand.orangeDeep),
+                const SizedBox(width: 10),
+                Expanded(child: Text(u[0], style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Brand.ink))),
+                Text(u[1],
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 15, color: Brand.ink, fontFeatures: [FontFeature.tabularFigures()])),
+              ]),
+            ),
+          ),
+      ]),
     );
   }
 

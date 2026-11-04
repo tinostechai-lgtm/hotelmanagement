@@ -19,7 +19,7 @@ const tableStatusColors = <String, Color>{
   'occupied': Brand.orangeDeep,
   'billed': Brand.info,
   'reserved': Color(0xFF8B5CF6),
-  'cleaning': Color(0xFF94A3B8),
+  'cleaning': Color(0xFF64748B),
 };
 
 const tableStatusLabels = <String, String>{
@@ -208,23 +208,29 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget btn(String label, IconData icon, VoidCallback? onTap) => Expanded(
+    Widget btn(String label, IconData icon, Color color, VoidCallback? onTap) => Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: OutlinedButton.icon(
-              onPressed: onTap,
-              icon: Icon(icon, color: Brand.orangeDeep),
-              label: Text(label, overflow: TextOverflow.ellipsis),
-              style: OutlinedButton.styleFrom(backgroundColor: Colors.white),
+            padding: const EdgeInsets.symmetric(horizontal: 5),
+            child: PremiumCard(
+              onTap: onTap,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              child: Column(children: [
+                IconBubble(icon, color: color, size: 40),
+                const SizedBox(height: 6),
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Brand.ink)),
+              ]),
             ),
           ),
         );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      padding: const EdgeInsets.fromLTRB(11, 14, 11, 4),
       child: Row(children: [
-        btn('Takeaway', Icons.shopping_bag_outlined, onTakeaway),
-        btn('Delivery', Icons.delivery_dining_outlined, onDelivery),
-        if (onRoom != null) btn('Room', Icons.hotel_outlined, onRoom),
+        btn('Takeaway', Icons.shopping_bag_rounded, Brand.orangeDeep, onTakeaway),
+        btn('Delivery', Icons.delivery_dining_rounded, Brand.teal, onDelivery),
+        if (onRoom != null) btn('Room', Icons.hotel_rounded, Brand.violet, onRoom),
       ]),
     );
   }
@@ -245,7 +251,7 @@ class _Legend extends StatelessWidget {
             child: Row(children: [
               CircleAvatar(radius: 6, backgroundColor: tableStatusColors[e.key]),
               const SizedBox(width: 6),
-              Text(e.value, style: const TextStyle(color: Brand.muted, fontWeight: FontWeight.w600)),
+              Text(e.value, style: const TextStyle(color: Brand.ink, fontWeight: FontWeight.w600, fontSize: 13)),
             ]),
           ),
       ]),
@@ -265,12 +271,12 @@ class _TableGrid extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: Provider.of<PosData>(context, listen: false).refreshTables,
       child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 24),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 170,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1,
+          maxCrossAxisExtent: 180,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+          childAspectRatio: 1.05,
         ),
         itemCount: tables.length,
         itemBuilder: (_, i) => _TableTile(table: tables[i], onTap: onTap, onLongPress: onLongPress),
@@ -292,52 +298,77 @@ class _TableTile extends StatelessWidget {
     final color = tableStatusColors[status] ?? Brand.muted;
     final o = table.activeOrder;
     final busy = o != null;
-    return Material(
-      color: busy ? color : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => onTap(table),
-        onLongPress: () => onLongPress(table),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: busy ? null : Border.all(color: color, width: 2.5),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    table.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: busy ? Colors.white : Brand.ink),
-                  ),
-                ),
-                Icon(Icons.chair_outlined, size: 16, color: busy ? Colors.white70 : Brand.muted),
-                Text(' ${o?.guests ?? table.seats}', style: TextStyle(color: busy ? Colors.white70 : Brand.muted)),
-              ]),
-              const Spacer(),
-              if (o != null) ...[
-                Text(Fmt.money(o.total),
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+    final fg = busy ? Colors.white : Brand.ink;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: busy ? Brand.accent(Color.lerp(color, Colors.white, 0.15)!, Color.lerp(color, Colors.black, 0.18)!) : null,
+        color: busy ? null : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: busy ? [BoxShadow(color: color.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 8))] : Brand.shadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => onTap(table),
+          onLongPress: () => onLongPress(table),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(children: [
-                  const Icon(Icons.timer_outlined, size: 14, color: Colors.white70),
-                  const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      '${Fmt.elapsed(o.since ?? table.occupiedSince)} · ${o.items} items',
+                      table.name,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
                     ),
                   ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: busy ? Colors.white.withOpacity(0.22) : Brand.background,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.person_rounded, size: 13, color: fg),
+                      Text(' ${o?.guests ?? table.seats}', style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
                 ]),
-              ] else
-                Text(tableStatusLabels[status] ?? status, style: TextStyle(color: color, fontWeight: FontWeight.w800)),
-            ],
+                const Spacer(),
+                if (o != null) ...[
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(Fmt.money(o.total),
+                        style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(children: [
+                    const Icon(Icons.schedule_rounded, size: 14, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '${Fmt.elapsed(o.since ?? table.occupiedSince)} · ${o.items} items',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ]),
+                ] else
+                  Row(children: [
+                    Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    Text(tableStatusLabels[status] ?? status,
+                        style: TextStyle(color: Color.lerp(color, Colors.black, 0.25), fontWeight: FontWeight.w800, fontSize: 14)),
+                  ]),
+              ],
+            ),
           ),
         ),
       ),

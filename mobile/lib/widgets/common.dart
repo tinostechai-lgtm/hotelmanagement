@@ -9,7 +9,11 @@ void toast(BuildContext context, String message, {bool error = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
-      content: Text(message),
+      content: Row(children: [
+        Icon(error ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+      ]),
       backgroundColor: error ? Brand.danger : Brand.ink,
     ));
 }
@@ -81,72 +85,161 @@ class Pill extends StatelessWidget {
 }
 
 class StatCard extends StatelessWidget {
-  const StatCard({super.key, required this.label, required this.value, this.icon, this.highlight = false});
+  const StatCard({super.key, required this.label, required this.value, this.icon, this.highlight = false, this.color = Brand.orangeDeep});
 
   final String label;
   final String value;
   final IconData? icon;
   final bool highlight;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     final fg = highlight ? Colors.white : Brand.ink;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: highlight ? Brand.gradient : null,
         color: highlight ? null : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: highlight ? null : Border.all(color: Brand.line),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: Brand.shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(children: [
-            if (icon != null) ...[Icon(icon, size: 18, color: fg.withOpacity(0.8)), const SizedBox(width: 6)],
-            Expanded(
-              child: Text(label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: fg.withOpacity(0.8), fontWeight: FontWeight.w600)),
+          if (icon != null)
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: highlight ? Colors.white.withOpacity(0.22) : color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 17, color: highlight ? Colors.white : color),
             ),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: TextStyle(color: fg, fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+            ),
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: highlight ? Colors.white : Brand.muted, fontWeight: FontWeight.w700, fontSize: 12.5)),
           ]),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(value, style: TextStyle(color: fg, fontSize: 26, fontWeight: FontWeight.w800)),
-          ),
         ],
       ),
     );
   }
 }
 
+/// Rounded tinted square holding an icon.
+class IconBubble extends StatelessWidget {
+  const IconBubble(this.icon, {super.key, this.color = Brand.orangeDeep, this.size = 44, this.filled = false});
+
+  final IconData icon;
+  final Color color;
+  final double size;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: filled ? color : color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(size * 0.32),
+      ),
+      child: Icon(icon, size: size * 0.52, color: filled ? Colors.white : color),
+    );
+  }
+}
+
+/// White rounded card with the soft brand shadow.
+class PremiumCard extends StatelessWidget {
+  const PremiumCard({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.onTap, this.margin, this.color});
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? margin;
+  final VoidCallback? onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: margin,
+      decoration: BoxDecoration(color: color ?? Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: Brand.shadow),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+      ),
+    );
+  }
+}
+
+/// Navy curved header that continues the app bar (used at the top of inner screens).
+class HeaderBand extends StatelessWidget {
+  const HeaderBand({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 20)});
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Brand.ink,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(26)),
+      ),
+      padding: padding,
+      child: child,
+    );
+  }
+}
+
 class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.icon, required this.title, this.message, this.action});
+  const EmptyState({super.key, required this.icon, required this.title, this.message, this.action, this.dark = false});
 
   final IconData icon;
   final String title;
   final String? message;
   final Widget? action;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
+    final fg = dark ? Colors.white : Brand.ink;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: Brand.muted.withOpacity(0.5)),
-            const SizedBox(height: 12),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [Brand.orange.withOpacity(dark ? 0.35 : 0.22), Brand.orange.withOpacity(0.04)]),
+              ),
+              child: Icon(icon, size: 44, color: dark ? Brand.steam : Brand.orangeDeep),
+            ),
+            const SizedBox(height: 16),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: fg)),
             if (message != null) ...[
               const SizedBox(height: 6),
-              Text(message!, textAlign: TextAlign.center, style: const TextStyle(color: Brand.muted)),
+              Text(message!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: dark ? const Color(0xFFCFCDEB) : Brand.muted, fontSize: 14.5, height: 1.4)),
             ],
-            if (action != null) ...[const SizedBox(height: 16), action!],
+            if (action != null) ...[const SizedBox(height: 18), action!],
           ],
         ),
       ),
@@ -173,7 +266,11 @@ class GradientButton extends StatelessWidget {
         color: Colors.transparent,
         child: Ink(
           height: height,
-          decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+            gradient: Brand.gradient,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [BoxShadow(color: Color(0x40F0502A), blurRadius: 18, offset: Offset(0, 8))],
+          ),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: enabled ? onPressed : null,
@@ -206,7 +303,7 @@ class SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
       child: Row(children: [
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Brand.ink))),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Brand.ink, letterSpacing: -0.2))),
         if (trailing != null) trailing!,
       ]),
     );
@@ -242,7 +339,7 @@ class SheetFrame extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
               child: Row(children: [
-                Expanded(child: Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+                Expanded(child: Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Brand.ink, letterSpacing: -0.3))),
                 ...?actions,
               ]),
             ),
