@@ -89,6 +89,12 @@ class DownloadAppTests(TestCase):
         res = self.client.get("/download/android")
         self.assertEqual(res.status_code, 302)
         self.assertEqual(res["Location"], "/downloads/servora.apk")
+        apk = self.client.get("/downloads/servora.apk")
+        self.assertEqual(apk.status_code, 200)
+        self.assertEqual(apk["Content-Type"], "application/vnd.android.package-archive")
+        self.assertIn('attachment; filename="Servora.apk"', apk["Content-Disposition"])
+        self.assertEqual(self.client.get("/downloads/android.json").status_code, 200)
+        self.assertEqual(self.client.get("/downloads/secret.txt").status_code, 404)
         self.assertContains(self.client.get("/"), "Download for Android")
 
     def test_super_admin_can_override_link(self):

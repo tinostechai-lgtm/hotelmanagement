@@ -366,6 +366,24 @@ def download_android(request):
     """Permanent link that always points at the newest Android app (direct download from this domain)."""
     return redirect(android_app_url())
 
+DOWNLOADABLE = {"servora.apk": "application/vnd.android.package-archive", "android.json": "application/json"}
+
+
+def download_file(request, name):
+    """Serve the APK (and its version file) directly from this domain, streamed in chunks."""
+    from django.conf import settings
+    from django.http import FileResponse
+
+    if name not in DOWNLOADABLE:
+        raise Http404
+    path = settings.BASE_DIR / "downloads" / name
+    if not path.exists():
+        raise Http404
+    resp = FileResponse(open(path, "rb"), content_type=DOWNLOADABLE[name], as_attachment=name.endswith(".apk"),
+                        filename="Servora.apk" if name.endswith(".apk") else None)
+    resp["Cache-Control"] = "public, max-age=300"
+    return resp
+
 
 def get_app(request):
     """Landing page for the QR / phone buttons: shows install steps and starts the download in the background."""

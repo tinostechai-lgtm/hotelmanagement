@@ -176,8 +176,8 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 # True on Vercel without DATABASE_URL: data lives in per-instance /tmp SQLite.
 DEMO_MODE = bool(os.environ.get("VERCEL")) and not os.environ.get("DATABASE_URL")
-# Latest Android APK: the Android workflow publishes it to public/downloads/, served directly from this
-# domain by the static "files" service in vercel.json (Vercel CDN). Overridable in Super admin → General (e.g. a Play Store link).
+# Latest Android APK: the Android workflow publishes it to backend/downloads/, served directly from this domain
+# by apps.web.views.download_file. Overridable in Super admin → General (e.g. a Play Store link).
 ANDROID_APK_URL = os.environ.get("ANDROID_APK_URL", "/downloads/servora.apk")
 # Online order tabs left unpaid at Razorpay are auto-cancelled after this many minutes.
 UNPAID_ONLINE_ORDER_TTL_MINUTES = int(os.environ.get("UNPAID_ONLINE_ORDER_TTL_MINUTES", "20"))

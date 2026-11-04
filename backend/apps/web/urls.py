@@ -9,6 +9,7 @@ urlpatterns = [
     path("download/", views.download_page, name="download"),
     path("get/", views.get_app, name="get_app"),
     path("download/android", views.download_android, name="download_android"),
+    path("downloads/<str:name>", views.download_file, name="download_file"),
     path("sitemap.xml", views.sitemap_xml),
     path("login/", views.login_view, name="login"),
     path("superadmin/login/", views.login_view, {"admin": True}, name="admin_login"),
