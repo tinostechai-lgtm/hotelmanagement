@@ -28,6 +28,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/servora.css' %}">
+  <link rel="stylesheet" href="{% static 'css/motion.css' %}">
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -36,6 +37,7 @@
   <div id="toasts"></div>
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
   <script src="{% static 'js/servora.js' %}"></script>
+  <script src="{% static 'js/motion.js' %}" defer></script>
   {% block scripts %}{% endblock %}
   <script>window.lucide && lucide.createIcons();</script>
 </body>

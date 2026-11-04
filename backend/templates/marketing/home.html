@@ -59,6 +59,7 @@
   .reveal { opacity: 0; transform: translateY(18px); transition: .6s ease; } .reveal.in { opacity: 1; transform: none; }
 </style>{% endblock %}
 {% block body %}
+<div class="scroll-progress"></div>
 <div class="page-loader" id="loader">{% include "partials/logo_svg.html" with cls="sv-loop" uid="ld" %}</div>
 <nav class="mk-nav"><div class="wrap">
   <a href="/" class="sv-logo" style="color:var(--text)">{% include "partials/logo_svg.html" with cls="sv-anim" uid="nv" %}<span class="word" style="font-size:22px">Servora</span></a>
@@ -67,16 +68,20 @@
   <a href="{% url 'web:signup' %}" class="btn btn-primary">Start free trial</a>
 </div></nav>
 
-<header class="hero"><div class="wrap">
+<header class="hero"><div class="mesh"><span></span><span></span><span></span></div><div class="grid-lines"></div><div class="steam-particles"></div><div class="wrap">
   <div>
     <div class="hero-logo sv-logo">{% include "partials/logo_svg.html" with cls="sv-anim" uid="hr" %}<span class="word">Servora</span></div>
     <span class="pill"><i data-lucide="sparkles" style="width:14px"></i> POS · QR ordering · Home delivery · Hotels</span>
-    <h1>Run your restaurant <em>faster</em>, sell more, stress less.</h1>
-    <p class="lead">One elegant system for billing, KOTs, tables, room service, QR & online ordering, your own delivery fleet, inventory and AI insights — on web, Android, iOS and every printer you already own.</p>
+    <h1 data-split>Run your restaurant <span class="rotator" data-words="faster,smarter,busier,calmer"></span>, sell more, stress less.</h1>
+    <p class="lead reveal" data-delay="600ms">One elegant system for billing, KOTs, tables, room service, QR & online ordering, your own delivery fleet, inventory and AI insights — on web, Android, iOS and every printer you already own.</p>
     <div class="row wrap" style="margin-top:26px"><a href="{% url 'web:signup' %}" class="btn btn-primary btn-lg">Start 14-day free trial</a>{% if showcase %}<a href="/s/{{ showcase.slug }}/" class="btn btn-lg"><i data-lucide="play"></i>See a live store</a>{% else %}<a href="#features" class="btn btn-lg"><i data-lucide="play"></i>See features</a>{% endif %}</div>
     <p class="small" style="color:#A3A2C2;margin-top:14px">No card needed · Setup in 10 minutes · Razorpay payments built in</p>
   </div>
-  <div class="mock" aria-hidden="true">
+  <div class="mock-wrap reveal-right" aria-hidden="true">
+  <div class="float-card fc1"><span class="dot" style="background:#10B981">✓</span><div>Payment received<small>₹1,240 via UPI · Table T2</small></div></div>
+  <div class="float-card fc2"><span class="dot" style="background:#F4632F">🛵</span><div>Rider 2 min away<small>Order #0411-031 · OTP 4821</small></div></div>
+  <div class="float-card fc3"><span class="dot" style="background:#7C5CFF">🍳</span><div>KOT #42 → Main kitchen<small>2 × Butter Chicken</small></div></div>
+  <div class="mock" data-tilt>
     <div class="row between" style="margin-bottom:10px"><b>Main dining · 12 tables</b><span class="badge b-success">● Live</span></div>
     <div class="mt">
       <div class="t" style="border-color:#10B981;background:#E7F8F1">T1<small>Free</small></div><div class="t" style="border-color:#F4632F;background:#FFF1E9">T2<small>₹1,240 · 34m</small></div>
@@ -85,16 +90,17 @@
       <div class="t" style="border-color:#F59E0B;background:#FEF5E3">T7<small>Cleaning</small></div><div class="t" style="border-color:#F4632F;background:#FFF1E9">T8<small>₹2,310 · 51m</small></div>
     </div>
     <div class="card" style="margin-top:12px;padding:12px;box-shadow:none"><div class="row between small"><b>New online order #0411-027</b><span class="badge b-warning">Accept</span></div><div class="small muted">2 × Chicken Biryani · Delivery 2.4 km · Prepaid via UPI</div></div>
-  </div>
+  </div></div>
 </div></header>
 
-<section class="blk" style="padding:44px 0;border-bottom:1px solid var(--line)"><div class="wrap stats">
-  <div><b>&lt;3 s</b><span class="muted">to bill a table</span></div><div><b>99.9%</b><span class="muted">cloud uptime</span></div><div><b>Offline</b><span class="muted">billing in the app</span></div><div><b>All</b><span class="muted">ESC/POS hardware</span></div>
-</div></section>
+<section class="blk" style="padding:44px 0 28px"><div class="wrap stats">
+  <div class="reveal"><b>&lt;3 s</b><span class="muted">to bill a table</span></div><div class="reveal"><b data-count>16</b><span class="muted">modules in one app</span></div><div class="reveal"><b>Offline</b><span class="muted">billing in the app</span></div><div class="reveal"><b>0%</b><span class="muted">commission on your orders</span></div>
+</div>
+<div class="marquee" style="margin-top:34px"><div class="track"><span class="pill2">Restaurants</span><span class="pill2">Cafés</span><span class="pill2">Cloud kitchens</span><span class="pill2">Hotels &amp; resorts</span><span class="pill2">Bars &amp; lounges</span><span class="pill2">Bakeries</span><span class="pill2">Food courts</span><span class="pill2">QSR chains</span><span class="pill2">Room service</span><span class="pill2">Home delivery</span><span class="pill2">QR table ordering</span><span class="pill2">Swiggy &amp; Zomato sync</span><span class="pill2">Razorpay UPI</span><span class="pill2">Thermal printers</span><span class="pill2">Kitchen displays</span><span class="pill2">Weighing scales</span><span class="pill2">Restaurants</span><span class="pill2">Cafés</span><span class="pill2">Cloud kitchens</span><span class="pill2">Hotels &amp; resorts</span><span class="pill2">Bars &amp; lounges</span><span class="pill2">Bakeries</span><span class="pill2">Food courts</span><span class="pill2">QSR chains</span><span class="pill2">Room service</span><span class="pill2">Home delivery</span><span class="pill2">QR table ordering</span><span class="pill2">Swiggy &amp; Zomato sync</span><span class="pill2">Razorpay UPI</span><span class="pill2">Thermal printers</span><span class="pill2">Kitchen displays</span><span class="pill2">Weighing scales</span></div></div></section>
 
 <section class="blk" id="features"><div class="wrap">
-  <div class="eyebrow">Everything in one place</div>
-  <h2 class="h2">Every feature your restaurant, cafe, cloud kitchen or hotel needs.</h2>
+  <div class="eyebrow reveal">Everything in one place</div>
+  <h2 class="h2 reveal">Every feature your restaurant, cafe, cloud kitchen or hotel needs.</h2>
   <div class="feat">
     <div class="card reveal"><div class="ic"><i data-lucide="zap"></i></div><h3>Fast billing & POS</h3><p>Optimised checkout with short codes, barcode scan, keyboard shortcuts and one-tap payments — built for peak hours.</p></div>
     <div class="card reveal"><div class="ic"><i data-lucide="layout-grid"></i></div><h3>Table & order management</h3><p>Live floor plan with occupancy, running totals and timers. Move, merge and reserve tables in a tap.</p></div>
@@ -116,9 +122,9 @@
 </div></section>
 
 <section class="blk dark" id="delivery"><div class="wrap grid g2" style="align-items:center;gap:40px">
-  <div>
-    <div class="eyebrow">Home delivery, done right</div>
-    <h2 class="h2">Your own delivery fleet — without the commission.</h2>
+  <div class="reveal-left">
+    <div class="eyebrow reveal">Home delivery, done right</div>
+    <h2 class="h2 reveal">Your own delivery fleet — without the commission.</h2>
     <p>Customers order on your store, pay with UPI/cards via Razorpay or choose cash on delivery. You dispatch to your riders, track them live, and settle cash in one click.</p>
     <ul class="stack" style="padding-left:0;list-style:none">
       <li>📍 Distance & pincode delivery zones with fees, minimum order & ETA</li>
@@ -128,44 +134,44 @@
       <li>📲 Live order-tracking page for customers with rider location</li>
     </ul>
   </div>
-  <div class="card"><div class="row between"><b>Order #0411-031 · Out for delivery</b><span class="badge b-primary">ETA 14 min</span></div>
+  <div class="card reveal-right route-anim"><div class="row between"><b>Order #0411-031 · Out for delivery</b><span class="badge b-primary">ETA 14 min</span></div>
     <div style="height:180px;border-radius:14px;margin:14px 0;background:linear-gradient(135deg,#1F1E47,#2A2760);position:relative;overflow:hidden">
-      <svg viewBox="0 0 400 180" style="position:absolute;inset:0;width:100%;height:100%"><path d="M40 140 C120 140 120 60 200 70 S300 30 360 40" stroke="#FFD2B3" stroke-width="3" stroke-dasharray="6 8" fill="none"/><circle cx="40" cy="140" r="9" fill="#10B981"/><circle cx="360" cy="40" r="9" fill="#F4632F"/><circle cx="200" cy="70" r="12" fill="#FF8A3D" stroke="#fff" stroke-width="3"/></svg>
+      <svg viewBox="0 0 400 180" style="position:absolute;inset:0;width:100%;height:100%"><path class="route" d="M40 140 C120 140 120 60 200 70 S300 30 360 40" stroke="#FFD2B3" stroke-width="3" fill="none"/><circle cx="40" cy="140" r="9" fill="#10B981"/><circle cx="360" cy="40" r="9" fill="#F4632F"><animate attributeName="r" values="9;13;9" dur="1.6s" repeatCount="indefinite"/></circle><circle class="rider" r="12" fill="#FF8A3D" stroke="#fff" stroke-width="3"/></svg>
     </div>
     <div class="row between small"><span>🛵 Vishnu · KL-07-AB-1234</span><span>OTP <b>4821</b></span></div></div>
 </div></section>
 
 <section class="blk" id="hardware"><div class="wrap">
-  <div class="eyebrow">Plug & play hardware</div>
-  <h2 class="h2">Works with the hardware you already have.</h2>
+  <div class="eyebrow reveal">Plug & play hardware</div>
+  <h2 class="h2 reveal">Works with the hardware you already have.</h2>
   <p class="muted" style="max-width:720px">Connect printers over LAN, USB, serial or Bluetooth — straight from the browser, from the Android app, or through the 2-minute Servora Agent for Windows, Linux & Raspberry Pi.</p>
   <div class="hw">
-    <div class="card"><i data-lucide="printer"></i><div><b>Thermal printers</b><div class="small muted">Epson, TVS, Posiflex, Xprinter, Rugtek…</div></div></div>
-    <div class="card"><i data-lucide="chef-hat"></i><div><b>KOT printers</b><div class="small muted">Per-station routing, 58/80 mm</div></div></div>
-    <div class="card"><i data-lucide="monitor"></i><div><b>Kitchen displays</b><div class="small muted">Any TV, tablet or monitor</div></div></div>
-    <div class="card"><i data-lucide="archive"></i><div><b>Cash drawers</b><div class="small muted">Auto-kick on cash payments</div></div></div>
-    <div class="card"><i data-lucide="scan-barcode"></i><div><b>Barcode scanners</b><div class="small muted">USB/Bluetooth, zero setup</div></div></div>
-    <div class="card"><i data-lucide="scale"></i><div><b>Weighing scales</b><div class="small muted">Essae, Atom & RS232 scales</div></div></div>
-    <div class="card"><i data-lucide="credit-card"></i><div><b>Card / UPI terminals</b><div class="small muted">Razorpay POS, Pine Labs, Paytm</div></div></div>
-    <div class="card"><i data-lucide="tablet-smartphone"></i><div><b>POS tablets & pole displays</b><div class="small muted">Android, iPad, Windows, VFD</div></div></div>
+    <div class="card reveal"><i data-lucide="printer"></i><div><b>Thermal printers</b><div class="small muted">Epson, TVS, Posiflex, Xprinter, Rugtek…</div></div></div>
+    <div class="card reveal"><i data-lucide="chef-hat"></i><div><b>KOT printers</b><div class="small muted">Per-station routing, 58/80 mm</div></div></div>
+    <div class="card reveal"><i data-lucide="monitor"></i><div><b>Kitchen displays</b><div class="small muted">Any TV, tablet or monitor</div></div></div>
+    <div class="card reveal"><i data-lucide="archive"></i><div><b>Cash drawers</b><div class="small muted">Auto-kick on cash payments</div></div></div>
+    <div class="card reveal"><i data-lucide="scan-barcode"></i><div><b>Barcode scanners</b><div class="small muted">USB/Bluetooth, zero setup</div></div></div>
+    <div class="card reveal"><i data-lucide="scale"></i><div><b>Weighing scales</b><div class="small muted">Essae, Atom & RS232 scales</div></div></div>
+    <div class="card reveal"><i data-lucide="credit-card"></i><div><b>Card / UPI terminals</b><div class="small muted">Razorpay POS, Pine Labs, Paytm</div></div></div>
+    <div class="card reveal"><i data-lucide="tablet-smartphone"></i><div><b>POS tablets & pole displays</b><div class="small muted">Android, iPad, Windows, VFD</div></div></div>
   </div>
 </div></section>
 
 <section class="blk" style="background:var(--bg)"><div class="wrap">
-  <div class="eyebrow">Go live today</div><h2 class="h2">Up and running in three steps.</h2>
+  <div class="eyebrow reveal">Go live today</div><h2 class="h2 reveal">Up and running in three steps.</h2>
   <div class="steps">
-    <div class="card"><h3>Create your account</h3><p class="muted">Sign up with your mobile number. We set up tables, a kitchen and GST defaults for you.</p></div>
-    <div class="card"><h3>Add your menu</h3><p class="muted">Type it in or paste a CSV. Add variants, add-ons, HSN codes and photos.</p></div>
-    <div class="card"><h3>Start billing</h3><p class="muted">Open the POS on any browser or the app, connect your printer and print table QRs.</p></div>
+    <div class="card reveal"><h3>Create your account</h3><p class="muted">Sign up with your mobile number. We set up tables, a kitchen and GST defaults for you.</p></div>
+    <div class="card reveal"><h3>Add your menu</h3><p class="muted">Type it in or paste a CSV. Add variants, add-ons, HSN codes and photos.</p></div>
+    <div class="card reveal"><h3>Start billing</h3><p class="muted">Open the POS on any browser or the app, connect your printer and print table QRs.</p></div>
   </div>
 </div></section>
 
 <section class="blk" id="pricing"><div class="wrap center">
-  <div class="eyebrow">Simple pricing</div><h2 class="h2" style="margin:0 auto 18px">Plans that grow with your business.</h2>
+  <div class="eyebrow reveal">Simple pricing</div><h2 class="h2 reveal" style="margin:0 auto 18px">Plans that grow with your business.</h2>
   <div class="price-toggle"><button class="chip active" data-cycle="m">Monthly</button><button class="chip" data-cycle="y">Yearly — 2 months free</button></div>
   <div class="plans" style="text-align:left">
     {% for p in plans %}
-    <div class="card {% if p.is_popular %}pop{% endif %}">
+    <div class="card reveal {% if p.is_popular %}pop{% endif %}">
       {% if p.is_popular %}<span class="badge b-primary" style="position:absolute;top:-12px;left:18px;background:var(--grad);color:#fff">Most popular</span>{% endif %}
       <h3>{{ p.name }}</h3><p class="small muted" style="min-height:40px">{{ p.tagline }}</p>
       {% if p.price_monthly %}<div><span style="font-size:34px;font-weight:800;letter-spacing:-.03em" data-m="{{ p.price_monthly|floatformat:0|intcomma }}" data-y="{{ p.price_yearly|floatformat:0|intcomma }}">₹{{ p.price_monthly|floatformat:0|intcomma }}</span><span class="small muted" data-per>/month</span></div><div class="tiny muted">+ 18% GST · per outlet</div>
@@ -182,7 +188,7 @@
 </div></section>
 
 <section class="blk" id="faq" style="background:var(--bg)"><div class="wrap" style="max-width:820px">
-  <div class="eyebrow">FAQ</div><h2 class="h2">Questions, answered.</h2>
+  <div class="eyebrow reveal">FAQ</div><h2 class="h2 reveal">Questions, answered.</h2>
   <details><summary>Does Servora work without internet?</summary><p class="muted">Yes. The Android/iOS app keeps billing offline and syncs orders automatically when you're back online — duplicate-safe.</p></details>
   <details><summary>Which printers are supported?</summary><p class="muted">Any ESC/POS thermal printer (58 mm or 80 mm) over LAN, USB, serial or Bluetooth, including Epson, TVS, Posiflex, Xprinter, Rugtek, Star and Citizen in ESC/POS mode.</p></details>
   <details><summary>Do I pay commission on online or delivery orders?</summary><p class="muted">Never. Your online store is yours — you pay only the Razorpay gateway fee on prepaid orders.</p></details>
@@ -190,9 +196,9 @@
   <details><summary>Is my data safe?</summary><p class="muted">Data is stored in managed Postgres with daily backups, every request is encrypted over HTTPS, and each restaurant's data is strictly isolated.</p></details>
 </div></section>
 
-<section class="blk dark center"><div class="wrap">
+<section class="blk dark center cta-glow"><div class="wrap" style="position:relative">
   <div class="sv-logo" style="justify-content:center;margin-bottom:18px">{% include "partials/logo_svg.html" with cls="sv-loop" uid="ft" size=72 %}</div>
-  <h2 class="h2" style="margin:0 auto 14px">Serve more guests, with less effort.</h2>
+  <h2 class="h2 reveal" style="margin:0 auto 14px">Serve more guests, with less effort.</h2>
   <p>Join restaurants, cafes, cloud kitchens and hotels running on Servora.</p>
   <a href="{% url 'web:signup' %}" class="btn btn-primary btn-lg">Start your free trial</a>
 </div></section>
@@ -206,8 +212,6 @@
 <script>
   window.addEventListener("load", () => setTimeout(() => S.$("#loader").classList.add("done"), 700));
   setTimeout(() => S.$("#loader")?.classList.add("done"), 2500);
-  const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (e.target.classList.add("in"), io.unobserve(e.target))), { threshold: .15 });
-  S.$$(".reveal").forEach((el, i) => { el.style.transitionDelay = (i % 3) * 80 + "ms"; io.observe(el); });
   S.$$("[data-cycle]").forEach((b) => (b.onclick = () => {
     const y = b.dataset.cycle === "y"; S.$$("[data-cycle]").forEach((x) => x.classList.toggle("active", x === b));
     S.$$("[data-m]").forEach((el) => (el.textContent = "₹" + (y ? el.dataset.y : el.dataset.m))); S.$$("[data-per]").forEach((el) => (el.textContent = y ? "/year" : "/month"));

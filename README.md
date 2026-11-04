@@ -41,7 +41,13 @@ All 14 modules of the reference product, plus advanced features:
 - **Inventory:** ingredients, recipes with automatic deduction, purchase orders, suppliers, wastage, stock ledger, low-stock alerts.
 - **Customer ordering app and storefront:** mobile-first web store that installs as an app (PWA).
 - **CRM & loyalty:** customer profiles, tiers, points, coupons, birthdays, CSV export, feedback.
-- **Staff & roles:** default roles plus custom roles with granular permissions, PIN switching, cash shifts with expected vs counted cash.
+- **Staff & roles:** a permission matrix (roles × 17 permissions) for default and custom roles. The Owner role is locked to full access, and managers can only grant permissions they hold. Also: PIN switching, cash shifts, and an **activity log** of voids, cancellations, discounts, price changes and staff changes.
+- **Marketing & SEO:**
+  - WhatsApp, SMS and email campaigns to customer segments (new, regulars, lapsed, birthdays, top spenders, tags), with coupons, opt-out handling and an unsubscribe link
+  - a Google listing title and description for each store, plus structured data
+  - an offer banner and social links
+  - a "Rate us on Google" prompt
+  - a share kit (QR code, WhatsApp share, website button)
 - **GST:** HSN/SAC codes, CGST/SGST split, GSTIN and FSSAI on bills, service charge, round-off, tax-inclusive pricing.
 - **Offline billing (app):** orders queue on the device and sync later; `client_ref` keeps them duplicate-safe.
 - **Notifications:** new orders, payments, table calls, low stock.
@@ -141,7 +147,15 @@ Vercel functions can't hold websockets, so the dashboard, kitchen display and ri
 - **Plans & pricing:** edit prices, limits and features. Re-seeding never overwrites your edits.
 - **Payments:** all Razorpay subscription payments.
 - **Users:** enable or disable accounts, grant or remove super admin.
-- **Platform settings:** as listed above.
+- **Platform settings:** as listed above, plus **SEO & analytics**:
+  - meta tags and a social share image
+  - Google/Bing verification
+  - GA4, Tag Manager and Meta Pixel
+  - an indexing switch
+  - automatic `robots.txt`, `sitemap.xml` and structured data
+- **Team & roles:** give colleagues limited access. The default roles are Administrator, Support, Finance and Sales, and you can create custom ones. Each covers specific permissions such as restaurants, plans, payments, users, API-key settings and the team. Nobody can grant access they don't have.
+- **Activity log:** every platform change, including who made it, when and from which IP.
+- **Add client:** creates a restaurant and its owner login with a plan and validity, and can send an invite email. **Add user** attaches staff to any restaurant and can reset passwords.
 
 Emails sent automatically: welcome on sign-up, subscription receipt (with your GSTIN), online order confirmation, and password reset by mobile number or email. Customers get order updates on WhatsApp or SMS when those are enabled.
 
