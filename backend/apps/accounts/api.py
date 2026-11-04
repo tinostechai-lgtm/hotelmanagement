@@ -266,6 +266,10 @@ class StaffViewSet(TenantViewSet):
         if not created:
             return Response({"detail": "This person is already in your team"}, status=400)
         AuditLog.record(r, request.user, "staff.add", user.username, role.name)
+        if "rider" in (role.permissions or []):
+            from apps.delivery.models import link_rider_for
+
+            link_rider_for(user, r)
         return Response(staff_row(m), status=201)
 
     def partial_update(self, request, pk=None):

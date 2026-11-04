@@ -145,3 +145,22 @@ class Settlement(TenantModel):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+def link_rider_for(user, restaurant):
+    """Return the rider profile for a staff login, linking/creating it if needed.
+
+    Matches an existing unlinked rider by mobile number (same digits) so riders
+    created on the Delivery page and staff logins become one identity."""
+    import re
+
+    rider = Rider.objects.filter(user=user, restaurant=restaurant).first()
+    if rider:
+        return rider
+    digits = re.sub(r"\D", "", user.username)[-10:]
+    for r in Rider.objects.filter(restaurant=restaurant, user__isnull=True):
+        if re.sub(r"\D", "", r.phone)[-10:] == digits and digits:
+            r.user = user
+            r.save(update_fields=["user"])
+            return r
+    return Rider.objects.create(restaurant=restaurant, user=user, name=str(user) or user.username, phone=user.username)

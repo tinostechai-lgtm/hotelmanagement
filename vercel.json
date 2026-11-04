@@ -4,14 +4,43 @@
     "web": {
       "root": "backend/",
       "framework": "django"
+    },
+    "files": {
+      "root": "public/",
+      "framework": null
     }
   },
   "rewrites": [
+    {
+      "source": "/downloads/(.*)",
+      "destination": {
+        "service": "files"
+      }
+    },
     {
       "source": "/(.*)",
       "destination": {
         "service": "web"
       }
+    }
+  ],
+  "headers": [
+    {
+      "source": "/downloads/(.*)\\.apk",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"Servora.apk\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, must-revalidate"
+        }
+      ]
     }
   ]
 }

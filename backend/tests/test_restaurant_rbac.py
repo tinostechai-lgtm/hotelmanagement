@@ -89,3 +89,32 @@ class RestaurantRBACTests(TestCase):
         c = self.client
         c.post("/login/", {"phone": "8888888809", "password": "Demo@1234"})
         self.assertEqual(c.get("/app/staff/").status_code, 200)
+
+
+class RiderLinkTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed", demo=True, stdout=open("/dev/null", "w"))
+
+    def setUp(self):
+        cache.clear()
+
+    def test_staff_with_rider_role_can_use_rider_app(self):
+        owner = client_for("9999999999")
+        r = Restaurant.objects.get(slug="spice-garden")
+        role = Role.objects.get(restaurant=r, name="Delivery Rider")
+        owner.post("/api/staff", {"name": "New Rider", "phone": "9123400099", "role": role.id, "password": "Demo@1234"}, format="json")
+        rider = client_for("9123400099")
+        res = rider.get("/api/rider")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["rider"]["phone"], "9123400099")
+
+    def test_unlinked_rider_is_linked_by_phone(self):
+        from apps.delivery.models import Rider
+
+        r = Restaurant.objects.get(slug="spice-garden")
+        Rider.objects.filter(restaurant=r).update(user=None)
+        rider = client_for("8888888804")
+        self.assertEqual(rider.get("/api/rider").status_code, 200)
+        self.assertEqual(Rider.objects.get(restaurant=r, phone="8888888804").user.username, "8888888804")
+        self.assertEqual(Rider.objects.filter(restaurant=r, phone="8888888804").count(), 1)
