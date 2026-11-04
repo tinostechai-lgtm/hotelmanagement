@@ -51,13 +51,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--demo", action="store_true", help="Also create the demo restaurant & login")
+        parser.add_argument("--reset-plans", action="store_true", help="Overwrite plan prices/features with the defaults")
 
     @transaction.atomic
     def handle(self, *args, **opts):
         from apps.subscriptions.models import Plan
 
         for p in PLANS:
-            Plan.objects.update_or_create(code=p["code"], defaults=p)
+            if opts.get("reset_plans"):
+                Plan.objects.update_or_create(code=p["code"], defaults=p)
+            else:  # keep prices edited in the super admin
+                Plan.objects.get_or_create(code=p["code"], defaults=p)
         self.stdout.write(self.style.SUCCESS(f"{len(PLANS)} plans ready"))
         if opts["demo"]:
             self.demo()

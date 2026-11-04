@@ -1,0 +1,12 @@
+{% if form.non_field_errors %}<div class="msg error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+<div class="form-grid">
+{% for f in form %}
+  {% if f.widget_type == "checkbox" %}
+  <div class="field full"><label class="check">{{ f }} {{ f.label }}</label>{% if f.help_text %}<div class="help">{{ f.help_text }}</div>{% endif %}{{ f.errors }}</div>
+  {% elif f.widget_type == "checkboxselectmultiple" %}
+  <div class="field full"><label>{{ f.label }}</label><ul class="cbs">{% for c in f %}<li><label>{{ c.tag }} {{ c.choice_label }}</label></li>{% endfor %}</ul>{{ f.errors }}</div>
+  {% else %}
+  <div class="field {% if f.widget_type == 'textarea' or f.name in wide_fields %}full{% endif %}"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% if f.help_text %}<div class="help">{{ f.help_text }}</div>{% endif %}{{ f.errors }}</div>
+  {% endif %}
+{% endfor %}
+</div>

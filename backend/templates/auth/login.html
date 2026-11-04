@@ -8,11 +8,12 @@
   <div class="field"><label for="phone">Mobile number</label><input type="tel" id="phone" name="phone" required autocomplete="username" inputmode="numeric" placeholder="10-digit mobile" autofocus></div>
   <div class="field"><label for="password">Password</label><input type="password" id="password" name="password" required autocomplete="current-password"></div>
   <button class="btn btn-primary btn-lg btn-block" type="submit">Log in</button>
+  <p class="center small" style="margin-top:10px"><a href="{% url 'password_reset' %}">Forgot password?</a></p>
 </form>
-<div class="card" style="margin-top:20px;background:var(--surface-2);box-shadow:none">
+{% if show_demo_login %}<div class="card" style="margin-top:20px;background:var(--surface-2);box-shadow:none">
   <b class="small">Try the demo restaurant</b>
   <div class="small muted">Owner: <span class="mono">9999999999</span> / <span class="mono">Demo@1234</span><br>Captain 8888888801 · Cashier 8888888802 · Kitchen 8888888803 · Rider 8888888804 (same password)</div>
   <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('phone').value='9999999999';document.getElementById('password').value='Demo@1234'">Fill demo login</button>
-</div>
+</div>{% endif %}
 <p class="center" style="margin-top:20px">New to Servora? <a href="{% url 'web:signup' %}"><b>Start a free trial</b></a></p>
 {% endblock %}

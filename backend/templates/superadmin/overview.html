@@ -1,0 +1,47 @@
+{% extends "superadmin/shell.html" %}{% load humanize %}
+{% block page_title %}Overview{% endblock %}{% block heading %}Platform overview{% endblock %}
+{% block content %}
+<div class="grid g4">
+  <div class="card kpi"><span class="l">Restaurants</span><span class="v">{{ stats.restaurants }}</span><span class="small muted">{{ stats.trials }} on trial · {{ stats.expired }} expired</span></div>
+  <div class="card kpi"><span class="l">Paying customers</span><span class="v">{{ stats.active_paid }}</span><span class="small muted">active paid plans</span></div>
+  <div class="card kpi"><span class="l">MRR</span><span class="v">₹{{ stats.mrr|intcomma }}</span><span class="small muted">excl. GST</span></div>
+  <div class="card kpi"><span class="l">Collected this month</span><span class="v">₹{{ stats.revenue_month|floatformat:0|intcomma }}</span><span class="small muted">₹{{ stats.revenue_total|floatformat:0|intcomma }} all time</span></div>
+</div>
+<div class="grid g2" style="margin-top:16px">
+  <div class="card">
+    <div class="card-h"><h3>Go-live checklist</h3></div>
+    {% for label, done, section in checklist %}
+    <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <span>{% if done %}<span style="color:var(--success)">✓</span>{% else %}<span style="color:var(--warning)">●</span>{% endif %} {{ label }}</span>
+      {% if not done %}<a class="btn btn-sm" href="{% url 'superadmin:settings' section %}">Set up</a>{% endif %}
+    </div>
+    {% endfor %}
+    <p class="small muted" style="margin-top:10px">Today across all restaurants: {{ stats.orders_today }} orders · ₹{{ stats.gmv_today|floatformat:0|intcomma }} completed sales.</p>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Trials & plans expiring in 7 days</h3></div>
+    {% for s in expiring %}
+    <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <a href="{% url 'superadmin:restaurant' s.restaurant_id %}">{{ s.restaurant.name }}</a>
+      <span class="small"><span class="badge {% if s.status == 'trial' %}b-warning{% else %}b-info{% endif %}">{{ s.plan.name }} · {{ s.get_status_display }}</span> {{ s.current_period_end|date:"d M" }}</span>
+    </div>
+    {% empty %}<div class="muted small">Nothing expiring this week.</div>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Latest sign-ups</h3><a class="small" href="{% url 'superadmin:restaurants' %}">All restaurants</a></div>
+    {% for r in signups %}
+    <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <a href="{% url 'superadmin:restaurant' r.pk %}"><b>{{ r.name }}</b></a><span class="small muted">{{ r.city|default:"—" }} · {{ r.created_at|naturaltime }}</span>
+    </div>
+    {% empty %}<div class="muted small">No restaurants yet.</div>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Recent subscription payments</h3><a class="small" href="{% url 'superadmin:payments' %}">All payments</a></div>
+    {% for p in recent_payments %}
+    <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <span>{{ p.restaurant.name }} <span class="muted small">· {{ p.plan.name }} {{ p.cycle }}</span></span><b>₹{{ p.amount|floatformat:0|intcomma }}</b>
+    </div>
+    {% empty %}<div class="muted small">No payments yet.</div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

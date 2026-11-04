@@ -22,6 +22,7 @@
         {% endfor %}
       </nav>
     {% endfor %}
+    {% if request.user.is_superuser %}<nav class="nav"><a href="{% url 'superadmin:overview' %}"><i data-lucide="shield"></i>Super admin</a></nav>{% endif %}
     <div class="plan">
       {% if subscription %}
         <div style="color:#fff;font-weight:700">{{ subscription.plan.name }} plan</div>
@@ -45,6 +46,7 @@
       <a class="btn btn-ghost icon-btn" href="{% url 'web:logout' %}" title="Log out"><i data-lucide="log-out"></i></a>
     </header>
     <main class="content">
+      {% if platform.announcement %}<div class="card" style="margin-bottom:16px;border-color:var(--info);background:var(--info-soft)"><i data-lucide="megaphone" style="width:16px"></i> {{ platform.announcement }}</div>{% endif %}
       {% if messages %}{% for m in messages %}<div class="card" style="margin-bottom:16px;border-color:var(--success);background:var(--success-soft)">{{ m }}</div>{% endfor %}{% endif %}
       {% if subscription and not subscription.is_active %}<div class="card" style="margin-bottom:16px;border-color:var(--danger);background:var(--danger-soft)"><b>Your subscription has expired.</b> Billing keeps working for 7 days — <a href="{% url 'web:billing' %}">renew now</a> to avoid interruption.</div>{% endif %}
       {% block content %}{% endblock %}

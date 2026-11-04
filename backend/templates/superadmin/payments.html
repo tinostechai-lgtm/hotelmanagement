@@ -1,0 +1,20 @@
+{% extends "superadmin/shell.html" %}{% load humanize %}
+{% block page_title %}Payments{% endblock %}{% block heading %}Subscription payments{% endblock %}
+{% block content %}
+<div class="chips" style="margin-bottom:14px">
+  <a class="chip {% if not status %}active{% endif %}" href="?">All</a><a class="chip {% if status == 'paid' %}active{% endif %}" href="?status=paid">Paid</a>
+  <a class="chip {% if status == 'created' %}active{% endif %}" href="?status=created">Started, not paid</a><a class="chip {% if status == 'failed' %}active{% endif %}" href="?status=failed">Failed</a>
+</div>
+<div class="table-wrap"><table class="data">
+  <thead><tr><th>Date</th><th>Restaurant</th><th>Plan</th><th class="right">Amount</th><th class="right">GST</th><th>Razorpay</th><th>Status</th></tr></thead>
+  <tbody>{% for p in page_obj %}<tr>
+    <td class="small">{{ p.created_at|date:"d M Y H:i" }}</td>
+    <td><a href="{% url 'superadmin:restaurant' p.restaurant_id %}">{{ p.restaurant.name }}</a></td>
+    <td>{{ p.plan.name }} <span class="muted small">{{ p.cycle }}</span></td>
+    <td class="right">₹{{ p.amount|floatformat:2|intcomma }}</td><td class="right">₹{{ p.gst|floatformat:2|intcomma }}</td>
+    <td class="mono tiny">{{ p.razorpay_payment_id|default:p.razorpay_order_id }}</td>
+    <td><span class="badge {% if p.status == 'paid' %}b-success{% elif p.status == 'failed' %}b-danger{% endif %}">{{ p.status }}</span></td>
+  </tr>{% empty %}<tr><td colspan="7" class="center muted">No payments.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% if page_obj.has_other_pages %}<div class="pager">{% if page_obj.has_previous %}<a class="btn btn-sm" href="?status={{ status }}&page={{ page_obj.previous_page_number }}">← Prev</a>{% endif %}{% if page_obj.has_next %}<a class="btn btn-sm" href="?status={{ status }}&page={{ page_obj.next_page_number }}">Next →</a>{% endif %}</div>{% endif %}
+{% endblock %}

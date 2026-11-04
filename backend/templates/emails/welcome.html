@@ -1,0 +1,5 @@
+{% extends "emails/_base.html" %}{% block content %}<h2 style="margin:0 0 12px">Welcome to {{ site_name }}, {{ name }}!</h2>
+<p><b>{{ restaurant.name }}</b> is ready. Your free trial of the <b>{{ plan }}</b> plan runs until <b>{{ trial_end|date:"d M Y" }}</b>.</p>
+<p>Get started in three steps:</p><ol><li>Add your menu (or import a CSV)</li><li>Connect your printer under Hardware</li><li>Print your table QR codes and share your online store link</li></ol>
+{% if site_url %}<p><a href="{{ site_url }}/app/" style="display:inline-block;background:#F4632F;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Open your dashboard</a></p>
+<p style="font-size:13px;color:#6B6A85">Your online store: <a href="{{ site_url }}/s/{{ restaurant.slug }}/">{{ site_url }}/s/{{ restaurant.slug }}/</a><br>Log in with your mobile number {{ phone }}.</p>{% endif %}{% endblock %}

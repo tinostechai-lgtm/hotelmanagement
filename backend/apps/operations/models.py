@@ -295,6 +295,10 @@ class Order(TenantModel):
                 t.occupied_since = None
                 t.save(update_fields=["status", "occupied_since"])
         OrderEvent.objects.create(order=self, status=new_status, by=user, note=reason)
+        if self.source in (self.Source.ONLINE, self.Source.APP, self.Source.QR) and new_status in ("accepted", "out_for_delivery", "delivered"):
+            from apps.superadmin.messaging import notify_customer
+
+            transaction.on_commit(lambda: notify_customer(self, new_status))
 
 
 class OrderItem(models.Model):

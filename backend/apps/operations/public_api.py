@@ -31,7 +31,7 @@ def public(fn):
 
 
 def _restaurant(slug):
-    return get_object_or_404(Restaurant, slug=slug)
+    return get_object_or_404(Restaurant, slug=slug, is_active=True)
 
 
 def store_info(r):
@@ -40,7 +40,7 @@ def store_info(r):
             "delivery": r.delivery_enabled and r.has_feature("delivery"), "pickup": r.pickup_enabled, "accept_cod": r.accept_cod,
             "delivery_fee": str(r.delivery_fee), "free_delivery_above": str(r.free_delivery_above), "min_order": str(r.delivery_min_order),
             "packaging_charge": str(r.packaging_charge), "prep_minutes": r.avg_prep_minutes, "lat": r.latitude, "lng": r.longitude,
-            "qr_ordering": r.has_feature("qr_ordering"), "razorpay_key": settings.RAZORPAY_KEY_ID or "rzp_test_demo",
+            "qr_ordering": r.has_feature("qr_ordering"), "razorpay_key": razorpay_client.key_id(),
             "razorpay_demo": not razorpay_client.enabled(), "prices_include_tax": r.prices_include_tax}
 
 
@@ -133,10 +133,14 @@ def place_order(request, slug):
     except services.OrderError as e:
         return Response({"detail": str(e)}, status=400)
     resp = {"order": _track(order)}
+    if d["payment"] != "online":
+        from apps.superadmin.messaging import notify_customer
+
+        notify_customer(order, "placed")
     if d["payment"] == "online":
         rz = razorpay_client.create_order(order.total, f"ord-{order.id}", {"restaurant": r.slug, "order": order.number})
         Payment.objects.create(restaurant=r, order=order, method="razorpay", amount=order.total, status="pending", razorpay_order_id=rz["id"])
-        resp["razorpay"] = {"key": settings.RAZORPAY_KEY_ID or "rzp_test_demo", "order_id": rz["id"], "amount": rz["amount"],
+        resp["razorpay"] = {"key": razorpay_client.key_id(), "order_id": rz["id"], "amount": rz["amount"],
                             "currency": "INR", "name": r.name, "demo": bool(rz.get("demo")),
                             "prefill": {"name": d["name"], "contact": d["phone"], "email": d.get("email", "")}}
     return Response(resp, status=201)
@@ -156,6 +160,9 @@ def verify_payment(request, slug):
         return Response({"detail": "Payment verification failed"}, status=400)
     if p.status != "success":
         services.confirm_payment(p, d.get("razorpay_payment_id", ""))
+        from apps.superadmin.messaging import notify_customer
+
+        notify_customer(p.order, "placed")
     if hasattr(p.order, "delivery"):
         p.order.delivery.cod_amount = 0
         p.order.delivery.save(update_fields=["cod_amount"])
@@ -221,7 +228,9 @@ def aggregator_webhook(request, slug, source):
     Requests must carry ``X-Signature: hex(hmac_sha256(AGGREGATOR_WEBHOOK_SECRET, body))``.
     """
     r = _restaurant(slug)
-    secret = settings.AGGREGATOR_WEBHOOK_SECRET
+    from apps.superadmin.models import get_settings
+
+    secret = get_settings().aggregator_webhook_secret or settings.AGGREGATOR_WEBHOOK_SECRET
     sig = hmac.new(secret.encode(), request.body, hashlib.sha256).hexdigest() if secret else None
     if not secret or not hmac.compare_digest(sig, request.headers.get("X-Signature", "")):
         return Response({"detail": "bad signature"}, status=401)

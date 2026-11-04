@@ -1,0 +1,9 @@
+{% extends "emails/_base.html" %}{% block content %}<h2 style="margin:0 0 12px">Payment received — thank you!</h2>
+<p>Your <b>{{ payment.plan.name }}</b> plan for <b>{{ payment.restaurant.name }}</b> is active until <b>{{ valid_till|date:"d M Y" }}</b>.</p>
+<table width="100%" cellpadding="6" style="border-collapse:collapse;font-size:14px;margin:12px 0">
+<tr><td style="border-bottom:1px solid #eee">{{ payment.plan.name }} plan ({{ payment.cycle }})</td><td align="right" style="border-bottom:1px solid #eee">₹{{ payment.amount }}</td></tr>
+<tr><td style="border-bottom:1px solid #eee">GST 18%</td><td align="right" style="border-bottom:1px solid #eee">₹{{ payment.gst }}</td></tr>
+<tr><td><b>Total paid</b></td><td align="right"><b>₹{{ total }}</b></td></tr></table>
+<p style="font-size:13px;color:#6B6A85">Payment ID {{ payment.razorpay_payment_id }} · {{ payment.paid_at|date:"d M Y H:i" }}<br>
+{% if company_name %}{{ company_name }}{% if company_gstin %} · GSTIN {{ company_gstin }}{% endif %}{% if company_address %}<br>{{ company_address|linebreaksbr }}{% endif %}{% endif %}
+{% if payment.restaurant.gstin %}<br>Billed to GSTIN {{ payment.restaurant.gstin }}{% endif %}</p>{% endblock %}

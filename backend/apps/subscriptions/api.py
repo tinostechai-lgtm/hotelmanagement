@@ -72,7 +72,7 @@ def checkout(request):
     order = razorpay_client.create_order(amount + tax, f"sub-{r.id}-{plan.code}", {"restaurant": r.id, "plan": plan.code, "cycle": cycle})
     SaasPayment.objects.create(restaurant=r, plan=plan, cycle=cycle, amount=amount, gst=tax, razorpay_order_id=order["id"])
     return Response({
-        "key": settings.RAZORPAY_KEY_ID or "rzp_test_demo", "order_id": order["id"], "amount": order["amount"], "currency": "INR",
+        "key": razorpay_client.key_id(), "order_id": order["id"], "amount": order["amount"], "currency": "INR",
         "name": "Servora", "description": f"{plan.name} plan — {cycle}", "demo": bool(order.get("demo")),
         "prefill": {"name": str(request.user), "contact": request.user.username, "email": request.user.email},
     })
@@ -91,6 +91,16 @@ def _mark_paid(pay, payment_id):
         sub.current_period_end = timezone.now()
     sub.plan = pay.plan
     sub.activate(pay.cycle)
+    owner = pay.restaurant.owner
+    if owner and (owner.email or pay.restaurant.email):
+        from apps.superadmin.messaging import send_email
+        from apps.superadmin.models import get_settings
+
+        ps = get_settings()
+        ctx = {"payment": pay, "valid_till": sub.current_period_end, "total": pay.amount + pay.gst,
+               "company_name": ps.company_name, "company_gstin": ps.company_gstin, "company_address": ps.company_address}
+        to = owner.email or pay.restaurant.email
+        transaction.on_commit(lambda: send_email(to, f"Payment received — {pay.plan.name} plan", "subscription_receipt", ctx))
 
 
 @api_view(["POST"])

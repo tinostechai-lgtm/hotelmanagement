@@ -114,41 +114,58 @@ python -m unittest discover -s hardware-agent/tests
 
 ## Deploy to Vercel
 
-1. Import this GitHub repo in Vercel. `vercel.json` defines a single Django service rooted at `backend/` (entrypoint `servora.wsgi.application`, dependencies from `backend/requirements.txt`) and routes every path — pages, `/static/` and `/api/` — to it. Keep the root directory as the repo root.
-2. Add a Postgres database (Vercel Postgres, Neon or Supabase) and set the environment variables from `.env.example`. You need at least `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=false`, `DATABASE_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`.
-3. Create the tables once from your machine, or let the GitHub Action do it (set the `DATABASE_URL` and `DJANGO_SECRET_KEY` repo secrets):
-   ```bash
-   cd backend && DATABASE_URL=postgres://... python manage.py migrate && python manage.py seed
-   ```
-4. In Razorpay Dashboard → Webhooks, add `https://<your-domain>/api/razorpay/webhook` with the events `payment.captured` and `order.paid`.
-5. Point the mobile app and the hardware agent at your domain.
+1. Import this GitHub repo in Vercel and leave the Root Directory as the repo root. `vercel.json` defines a single Django service in `backend/`.
+2. Add a Postgres database: **Storage → Create → Neon**, connected to the project. It must be available as `DATABASE_URL`.
+3. Add **`DJANGO_SECRET_KEY`** (a long random string), then redeploy. Those two variables are all Vercel needs.
+4. Open your site. On first visit you're sent to **`/setup/`**, where you create the platform **super admin**. Tables and plans are created automatically on deploy (`servora/wsgi.py`), so no commands are needed.
+5. In **Super admin → Platform settings**, configure everything else. The go-live checklist on the overview page tracks it:
+   - **Razorpay:** Key ID, Key Secret and Webhook Secret, with a *Test keys* button. Add the webhook `https://<domain>/api/razorpay/webhook` for `payment.captured` and `order.paid`.
+   - **Email (SMTP):** Gmail, Zoho, SES, Brevo and others, with a *Send test email* button.
+   - **SMS & WhatsApp:** MSG91, Twilio, Fast2SMS, and the WhatsApp Cloud API.
+   - **Maps & integrations:** Google Maps key and the aggregator webhook secret.
+   - **General:** site address, company GSTIN for invoices, support contacts, an announcement banner.
+   - **Sign-up & trial:** open or pause sign-ups, trial length and plan, grace days.
 
-Without `DATABASE_URL`, the deployment boots a throw-away SQLite demo in `/tmp` so you can preview it immediately. Data in that demo is not kept. Without Razorpay keys, checkout runs in a clearly labelled demo mode.
+Keys and passwords are **encrypted in the database** with a key derived from `DJANGO_SECRET_KEY`. If you change that variable, re-enter the secrets.
 
-Vercel functions can't hold websockets, so the dashboard, KDS and rider tracking poll lightweight endpoints every 5–10 s (`/api/orders/live`, `/api/kots`, `/api/delivery/live-map`).
+`/healthz` reports app and database status, pending migrations, and whether a super admin exists. It never shows secrets.
+
+Without `DATABASE_URL`, the deployment runs a throw-away demo (orange banner) with the "Spice Garden" sample data.
+
+Vercel functions can't hold websockets, so the dashboard, kitchen display and rider tracking poll lightweight endpoints every 5–10 s.
+
+### Super admin dashboard (`/superadmin/`)
+
+- **Overview:** restaurants, paying customers, MRR, revenue, expiring trials, latest sign-ups, go-live checklist.
+- **Restaurants:** search and filter; change plan, status and validity; extend by 7/14/30/365 days; suspend or re-activate (staff are locked out and the store goes offline); email the owner.
+- **Plans & pricing:** edit prices, limits and features. Re-seeding never overwrites your edits.
+- **Payments:** all Razorpay subscription payments.
+- **Users:** enable or disable accounts, grant or remove super admin.
+- **Platform settings:** as listed above.
+
+Emails sent automatically: welcome on sign-up, subscription receipt (with your GSTIN), online order confirmation, and password reset by mobile number or email. Customers get order updates on WhatsApp or SMS when those are enabled.
 
 ## Go-live checklist
 
-1. **Vercel env vars:** `DJANGO_SECRET_KEY` (long and random; the app refuses to start against a real database without it), `DJANGO_DEBUG=false`, `DATABASE_URL`, and `DJANGO_ALLOWED_HOSTS` / `DJANGO_CSRF_TRUSTED_ORIGINS` including your custom domain.
-2. **Database:** run `python manage.py migrate && python manage.py seed` once against the production `DATABASE_URL`. Use `seed` without `--demo` so the demo restaurant isn't created.
-3. **Platform admin:** `python manage.py createsuperuser`, then sign in at `/admin/` to manage tenants, plans and subscriptions.
-4. **Razorpay:**
-   - Switch to live keys.
-   - Add the webhook `https://<domain>/api/razorpay/webhook` for `payment.captured` and `order.paid`, and set `RAZORPAY_WEBHOOK_SECRET`.
-   - Edit plan prices in `/admin/` if needed.
+1. **Vercel env vars:** `DATABASE_URL` and `DJANGO_SECRET_KEY` (long and random; the app refuses to start against a real database without it). For a custom domain, also add `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS`.
+2. **First visit:** create the super admin at `/setup/`. Tables are created automatically.
+3. **Super admin → Platform settings:** finish the checklist on the overview page: Razorpay live keys and webhook, SMTP email, site address, GSTIN, support contacts.
+4. **Plans:** adjust prices and features under Super admin → Plans & pricing.
 5. **Legal:** have a lawyer review `/terms/` and `/privacy/` (`backend/templates/legal/page.html`). They are starting templates.
 6. **Mobile:**
    - `flutter create .`, then `dart run flutter_launcher_icons`, then `flutter analyze`.
    - Set your domain as the default server in `lib/core/config.dart`, then build and sign the release APK / IPA.
-7. **Hardware agent:** set `DEFAULT_SERVER` in `hardware-agent/servora_agent.py` to your domain before you hand it out.
+7. **Hardware agent:** set `DEFAULT_SERVER` in `hardware-agent/servora_agent.py` to your domain.
 
 Security already in place:
-- HTTPS redirect and HSTS when `DEBUG` is off; secure cookies
-- login, signup and PIN brute-force throttling (10/min) plus general API rate limits
-- tenant isolation checks on every foreign key and many-to-many field
-- Razorpay HMAC signature verification; HMAC-signed aggregator webhooks
-- open-redirect protection on login
-- unpaid online orders auto-cancel after 20 minutes (`UNPAID_ONLINE_ORDER_TTL_MINUTES`)
+- HTTPS redirect and HSTS; secure, signed, HttpOnly session cookies
+- secrets encrypted at rest
+- login, signup and PIN throttling plus API rate limits
+- tenant isolation on every foreign key and many-to-many field
+- restaurant suspension
+- Razorpay and aggregator HMAC verification
+- open-redirect protection
+- unpaid online orders auto-cancel after 20 minutes
 
 ## Mobile app
 

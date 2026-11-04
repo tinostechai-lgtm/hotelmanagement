@@ -50,6 +50,8 @@ class Restaurant(models.Model):
     avg_prep_minutes = models.PositiveIntegerField(default=20)
     accept_cod = models.BooleanField(default=True)
     is_open = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, help_text="Suspended restaurants can't log in or take online orders")
+    suspended_reason = models.CharField(max_length=200, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

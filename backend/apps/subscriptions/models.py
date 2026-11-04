@@ -104,8 +104,13 @@ class Subscription(models.Model):
         self.save()
 
     @classmethod
-    def start_trial(cls, restaurant, plan_code="pro", days=14):
-        plan = Plan.objects.filter(code=plan_code).first() or Plan.objects.order_by("-sort").first()
+    def start_trial(cls, restaurant, plan_code=None, days=None):
+        from apps.superadmin.models import get_settings
+
+        ps = get_settings()
+        days = ps.trial_days if days is None else days
+        plan = (Plan.objects.filter(code=plan_code).first() if plan_code else None) or ps.trial_plan \
+            or Plan.objects.filter(code="pro").first() or Plan.objects.order_by("-sort").first()
         return cls.objects.create(restaurant=restaurant, plan=plan, status=cls.Status.TRIAL,
                                   current_period_end=timezone.now() + timedelta(days=days))
 

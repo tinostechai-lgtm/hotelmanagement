@@ -36,6 +36,10 @@ NAV = [
 
 
 def home(request):
+    from django.contrib.auth import get_user_model
+
+    if not get_user_model().objects.filter(is_superuser=True).exists():
+        return redirect("setup")
     plans = Plan.objects.filter(is_public=True)
     return render(request, "marketing/home.html", {"plans": plans, "features": FEATURES})
 
@@ -56,7 +60,11 @@ def login_view(request):
             login(request, user)
             cache.delete(key)
             nxt = request.GET.get("next", "")
-            return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else "web:dashboard")
+            if nxt.startswith("/") and not nxt.startswith("//"):
+                return redirect(nxt)
+            if user.is_superuser and not Membership.objects.filter(user=user, is_active=True).exists():
+                return redirect("superadmin:overview")
+            return redirect("web:dashboard")
         cache.set(key, cache.get(key, 0) + 1, 300)
         messages.error(request, "Incorrect mobile number or password.")
     return render(request, "auth/login.html")
@@ -65,7 +73,11 @@ def login_view(request):
 def signup_view(request):
     from apps.accounts.api import SignupSerializer, create_account
 
+    from apps.superadmin.models import get_settings
+
     plans = Plan.objects.filter(is_public=True).exclude(code="enterprise")
+    if not get_settings().signup_enabled:
+        return render(request, "auth/signup_closed.html")
     if request.method == "POST":
         s = SignupSerializer(data=request.POST)
         if s.is_valid():
@@ -97,7 +109,10 @@ def app_page(perm=None, feature=None):
         def wrapper(request, *a, **kw):
             r = request.restaurant
             if not r:
-                return render(request, "app/no_restaurant.html")
+                if request.user.is_superuser:
+                    return redirect("superadmin:overview")
+                suspended = Membership.objects.filter(user=request.user, restaurant__is_active=False).select_related("restaurant").first()
+                return render(request, "app/no_restaurant.html", {"suspended": suspended})
             m = request.membership
             nav = []
             for section, items in NAV:
@@ -208,7 +223,7 @@ def qr_sheet(request):
 
 
 def store(request, slug):
-    r = get_object_or_404(Restaurant, slug=slug)
+    r = get_object_or_404(Restaurant, slug=slug, is_active=True)
     return render(request, "store/store.html", {"r": r})
 
 

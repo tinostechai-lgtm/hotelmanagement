@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.crm",
     "apps.hardware",
     "apps.web",
+    "apps.superadmin",
 ]
 
 MIDDLEWARE = [
@@ -146,7 +147,11 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL", True)
 CORS_ALLOW_HEADERS = ["*", "authorization", "content-type", "x-restaurant", "x-device-key"]
 
-# Razorpay — set in Vercel project environment variables.
+# Email uses the SMTP settings saved in Super admin → Platform settings → Email.
+EMAIL_BACKEND = "apps.superadmin.email_backend.PlatformEmailBackend"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Servora <no-reply@servora.app>")
+
+# Razorpay — normally set in Super admin → Platform settings; env vars are a fallback.
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
 RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")

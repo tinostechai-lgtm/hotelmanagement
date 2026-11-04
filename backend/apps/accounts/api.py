@@ -95,12 +95,19 @@ def create_account(data):
                                   business_type=data.get("business_type", "restaurant"), city=data.get("city", ""))
     Role.ensure_defaults(r)
     Membership.objects.create(user=user, restaurant=r, role=Role.objects.get(restaurant=r, name="Owner"))
-    Subscription.start_trial(r, "pro")
+    Subscription.start_trial(r)
     # Sensible starter setup so the POS works on minute one.
     KitchenStation.objects.create(restaurant=r, name="Kitchen")
     area = Area.objects.create(restaurant=r, name="Main")
     for i in range(1, 9):
         Table.objects.create(restaurant=r, area=area, name=str(i), seats=4)
+    if user.email:
+        from apps.superadmin.messaging import send_email
+
+        sub = r.subscription
+        transaction.on_commit(lambda: send_email(user.email, f"Welcome to Servora — {r.name} is ready", "welcome", {
+            "name": user.first_name, "restaurant": r, "phone": user.username,
+            "plan": sub.plan.name if sub else "", "trial_end": sub.current_period_end if sub else None}))
     return user, r
 
 
@@ -108,6 +115,10 @@ def create_account(data):
 @permission_classes([AllowAny])
 @throttle_classes([LoginThrottle])
 def signup(request):
+    from apps.superadmin.models import get_settings
+
+    if not get_settings().signup_enabled:
+        return Response({"detail": "New sign-ups are paused. Please contact support."}, status=403)
     s = SignupSerializer(data=request.data)
     s.is_valid(raise_exception=True)
     user, _ = create_account(s.validated_data)

@@ -1,0 +1,10 @@
+{% extends "superadmin/shell.html" %}
+{% block page_title %}{{ plan.name|default:"New plan" }}{% endblock %}
+{% block heading %}<a href="{% url 'superadmin:plans' %}" class="muted" style="font-weight:600">Plans /</a> {{ plan.name|default:"New plan" }}{% endblock %}
+{% block content %}
+<form method="post" class="card" style="max-width:860px">{% csrf_token %}
+  {% include "superadmin/_form.html" with wide_fields="tagline" %}
+  <p class="small muted">Users / devices: 0 means unlimited. Prices of 0 show "Contact sales" (no online checkout).</p>
+  <button class="btn btn-primary">Save plan</button> <a class="btn" href="{% url 'superadmin:plans' %}">Cancel</a>
+</form>
+{% endblock %}

@@ -9,6 +9,9 @@ class WebPagesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("seed", demo=True, stdout=open("/dev/null", "w"))
+        from apps.accounts.models import User
+
+        User.objects.create_superuser("7000000000", "admin@example.com", "Adm1n-Passw0rd")
 
     def setUp(self):
         cache.clear()

@@ -1,0 +1,43 @@
+{% extends "superadmin/shell.html" %}
+{% block page_title %}{{ title }}{% endblock %}{% block heading %}Platform settings{% endblock %}
+{% block content %}
+<div class="tabs">{% for key, s in sections.items %}<a class="tab {% if key == section %}active{% endif %}" href="{% url 'superadmin:settings' key %}">{{ s.0 }}</a>{% endfor %}</div>
+<div class="grid" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start" id="st-grid">
+  <form method="post" class="card">{% csrf_token %}
+    <h3>{{ title }}</h3>
+    {% include "superadmin/_form.html" with wide_fields="site_url announcement razorpay_key_id razorpay_key_secret razorpay_webhook_secret email_password sms_api_key whatsapp_token google_maps_api_key aggregator_webhook_secret" %}
+    <button class="btn btn-primary"><i data-lucide="save"></i>Save</button>
+    <p class="tiny muted" style="margin-top:12px"><i data-lucide="lock" style="width:12px"></i> Keys and passwords are encrypted in the database and never shown again after saving.</p>
+  </form>
+  <div class="stack">
+    {% if section == "payments" %}
+    <div class="card"><h3>How to connect Razorpay</h3><ol class="small" style="padding-left:18px">
+      <li>Razorpay Dashboard → <b>Account & Settings → API Keys</b> → generate keys. Use <b>Test</b> keys first, then Live keys.</li>
+      <li>Paste the Key ID & Key Secret here and Save.</li>
+      <li>Dashboard → <b>Webhooks → Add</b>: URL <code style="word-break:break-all">{{ webhook_url }}</code>, events <b>payment.captured</b> & <b>order.paid</b>, secret = the Webhook Secret you save here.</li></ol>
+      <form method="post" action="{% url 'superadmin:test' 'razorpay' %}">{% csrf_token %}<input type="hidden" name="back" value="{{ request.path }}"><button class="btn"><i data-lucide="plug-zap"></i>Test Razorpay keys</button></form>
+      <p class="tiny muted" style="margin-top:8px">Until keys are added, checkout runs in a clearly-labelled demo mode.</p></div>
+    {% elif section == "email" %}
+    <div class="card"><h3>Send a test email</h3>
+      <form method="post" action="{% url 'superadmin:test' 'email' %}" class="row">{% csrf_token %}<input type="hidden" name="back" value="{{ request.path }}"><input type="email" name="to" value="{{ request.user.email }}" placeholder="you@example.com"><button class="btn">Send</button></form>
+      <p class="small muted" style="margin-top:12px"><b>Gmail / Google Workspace:</b> smtp.gmail.com, port 587, STARTTLS, your address as username and an <b>App Password</b>.<br>
+      <b>Zoho:</b> smtp.zoho.in, 587, STARTTLS.<br><b>Amazon SES / Brevo / SendGrid:</b> use the SMTP credentials from their console.</p>
+      <p class="small muted">Emails sent: welcome on sign-up, subscription receipts, password reset, online order confirmations and messages you send to restaurant owners.</p></div>
+    {% elif section == "sms" %}
+    <div class="card"><h3>Send a test message</h3>
+      <form method="post" action="{% url 'superadmin:test' 'sms' %}" class="row" style="margin-bottom:8px">{% csrf_token %}<input type="hidden" name="back" value="{{ request.path }}"><input type="tel" name="to" placeholder="Mobile number"><button class="btn">Test SMS</button></form>
+      <form method="post" action="{% url 'superadmin:test' 'whatsapp' %}" class="row">{% csrf_token %}<input type="hidden" name="back" value="{{ request.path }}"><input type="tel" name="to" placeholder="Mobile number"><button class="btn">Test WhatsApp</button></form>
+      <p class="small muted" style="margin-top:12px">Customers get order updates (placed, confirmed, out for delivery with OTP, delivered) on WhatsApp when enabled, otherwise by SMS. In India, SMS needs a DLT-registered sender ID and template.</p></div>
+    {% elif section == "integrations" %}
+    <div class="card"><h3>Aggregator orders</h3><p class="small">Point Swiggy / Zomato orders (through UrbanPiper or similar middleware) at:</p><code class="small" style="word-break:break-all">{{ aggregator_url }}</code>
+      <p class="small muted">Requests must carry <code>X-Signature</code> = HMAC-SHA256 of the body with the secret saved here.</p></div>
+    {% elif section == "signup" %}
+    <div class="card"><h3>About trials</h3><p class="small muted">New restaurants get the trial plan for the number of days set here. When it ends they can keep billing for the grace period, then must choose a paid plan. Pause sign-ups to run invite-only.</p></div>
+    {% else %}
+    <div class="card"><h3>Tips</h3><p class="small muted">The site address is used in emails, SMS and QR links. Company name, address and GSTIN appear on subscription invoices. The announcement shows as a banner to every restaurant user — useful for maintenance notices.</p></div>
+    {% endif %}
+    <div class="card"><h3>Deployment</h3><p class="small muted">Only two values stay in Vercel environment variables: <code>DATABASE_URL</code> and <code>DJANGO_SECRET_KEY</code>. Everything else is managed here.</p></div>
+  </div>
+</div>
+<style>@media(max-width:980px){#st-grid{grid-template-columns:1fr!important}}</style>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% extends "emails/_base.html" %}{% block content %}<h2 style="margin:0 0 12px">Order #{{ order.number }} confirmed</h2>
+<p>Thanks for ordering from <b>{{ order.restaurant.name }}</b>!</p>
+<table width="100%" cellpadding="6" style="border-collapse:collapse;font-size:14px;margin:12px 0">
+{% for li in order.live_items %}<tr><td style="border-bottom:1px solid #eee">{{ li.quantity|floatformat:"-3" }} × {{ li.display_name }}</td><td align="right" style="border-bottom:1px solid #eee">₹{{ li.line_total }}</td></tr>{% endfor %}
+<tr><td><b>Total</b></td><td align="right"><b>₹{{ order.total }}</b></td></tr></table>
+{% if track_url %}<p><a href="{{ track_url }}" style="display:inline-block;background:#F4632F;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Track your order</a></p>{% endif %}{% endblock %}

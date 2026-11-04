@@ -1,0 +1,18 @@
+{% extends "superadmin/shell.html" %}{% load humanize %}
+{% block page_title %}Plans{% endblock %}{% block heading %}Plans & pricing{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="{% url 'superadmin:plan_new' %}"><i data-lucide="plus"></i>New plan</a>{% endblock %}
+{% block content %}
+<p class="muted">Prices are per outlet and exclude 18% GST. Changes apply to new checkouts immediately; existing subscribers keep their current period.</p>
+<div class="table-wrap"><table class="data">
+  <thead><tr><th>Plan</th><th>Monthly</th><th>Yearly</th><th>Users / devices</th><th>Features</th><th>Subscribers</th><th></th></tr></thead>
+  <tbody>{% for p in plans %}<tr>
+    <td><b>{{ p.name }}</b> {% if p.is_popular %}<span class="badge b-primary">Popular</span>{% endif %}{% if not p.is_public %} <span class="badge">Hidden</span>{% endif %}<div class="tiny muted">{{ p.code }}</div></td>
+    <td>{% if p.price_monthly %}₹{{ p.price_monthly|floatformat:0|intcomma }}{% else %}Custom{% endif %}</td>
+    <td>{% if p.price_yearly %}₹{{ p.price_yearly|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+    <td class="small">{{ p.max_users|default:"∞" }} / {{ p.max_devices|default:"∞" }}</td>
+    <td class="small">{{ p.features|length }} features</td>
+    <td>{% for k, v in counts.items %}{% if k == p.id %}{{ v }}{% endif %}{% endfor %}</td>
+    <td class="right"><a class="btn btn-sm" href="{% url 'superadmin:plan_edit' p.pk %}">Edit</a></td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

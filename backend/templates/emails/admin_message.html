@@ -1,0 +1,1 @@
+{% extends "emails/_base.html" %}{% block content %}<p>Hello {{ restaurant.owner.first_name|default:"there" }},</p><p>{{ message|linebreaksbr }}</p><p>— The {{ site_name }} team</p>{% endblock %}

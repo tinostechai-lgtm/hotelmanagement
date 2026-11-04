@@ -1,0 +1,68 @@
+{% extends "superadmin/shell.html" %}{% load humanize %}
+{% block page_title %}{{ r.name }}{% endblock %}
+{% block heading %}<a href="{% url 'superadmin:restaurants' %}" class="muted" style="font-weight:600">Restaurants /</a> {{ r.name }}{% endblock %}
+{% block actions %}<a class="btn btn-sm" href="/s/{{ r.slug }}/" target="_blank"><i data-lucide="store"></i>Online store</a>{% endblock %}
+{% block content %}
+{% if not r.is_active %}<div class="msg error">Suspended{% if r.suspended_reason %}: {{ r.suspended_reason }}{% endif %}. Staff can't log in and the online store is offline.</div>{% endif %}
+<div class="grid g4">
+  <div class="card kpi"><span class="l">Plan</span><span class="v" style="font-size:20px">{% if sub %}{{ sub.plan.name }} <span class="badge {% if not sub.is_active %}b-danger{% elif sub.status == 'trial' %}b-warning{% else %}b-success{% endif %}">{{ sub.get_status_display }}</span>{% else %}None{% endif %}</span><span class="small muted">{% if sub %}till {{ sub.current_period_end|date:"d M Y" }} ({{ sub.days_left }} days){% endif %}</span></div>
+  <div class="card kpi"><span class="l">Orders (7 days)</span><span class="v">{{ stats.orders_week }}</span><span class="small muted">{{ stats.orders }} all time</span></div>
+  <div class="card kpi"><span class="l">Sales (7 days)</span><span class="v">₹{{ stats.sales_week|floatformat:0|intcomma }}</span><span class="small muted">completed orders</span></div>
+  <div class="card kpi"><span class="l">Last order</span><span class="v" style="font-size:18px">{{ stats.last_order|naturaltime|default:"—" }}</span><span class="small muted">joined {{ r.created_at|date:"d M Y" }}</span></div>
+</div>
+<div class="grid g2" style="margin-top:16px;align-items:start">
+  <div class="card">
+    <h3>Subscription</h3>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="subscription">
+      {% include "superadmin/_form.html" with form=adjust %}
+      <button class="btn btn-primary">Update subscription</button>
+    </form>
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+    <form method="post" class="row wrap">{% csrf_token %}<input type="hidden" name="action" value="extend">
+      <span class="small"><b>Extend</b> current period by</span>
+      <button class="btn btn-sm" name="days" value="7">7 days</button><button class="btn btn-sm" name="days" value="14">14 days</button>
+      <button class="btn btn-sm" name="days" value="30">30 days</button><button class="btn btn-sm" name="days" value="365">1 year</button>
+    </form>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <h3>Business details</h3>
+      <div class="small" style="line-height:1.8">
+        <b>Owner:</b> {{ r.owner|default:"—" }} · {{ r.owner.username }} {% if r.owner.email %}· {{ r.owner.email }}{% endif %}<br>
+        <b>Type:</b> {{ r.get_business_type_display }} · <b>City:</b> {{ r.city|default:"—" }}<br>
+        <b>GSTIN:</b> {{ r.gstin|default:"—" }} · <b>FSSAI:</b> {{ r.fssai|default:"—" }}<br>
+        <b>Store:</b> <code>/s/{{ r.slug }}/</code> · online ordering {{ r.online_ordering_enabled|yesno:"on,off" }} · delivery {{ r.delivery_enabled|yesno:"on,off" }}
+      </div>
+    </div>
+    <div class="card">
+      <h3>Team ({{ staff|length }})</h3>
+      {% for m in staff %}<div class="row between small" style="padding:4px 0"><span>{{ m.user }} <span class="muted">{{ m.user.username }}</span></span><span class="badge">{{ m.role.name }}</span></div>{% endfor %}
+    </div>
+    <div class="card">
+      <h3>Access</h3>
+      {% if r.is_active %}
+      <form method="post" class="row wrap">{% csrf_token %}<input type="hidden" name="action" value="suspend">
+        <input name="reason" placeholder="Reason shown to the restaurant (e.g. payment overdue)" class="grow">
+        <button class="btn btn-danger" onclick="return confirm('Suspend {{ r.name|escapejs }}? Their staff will be logged out and the online store goes offline.')">Suspend</button>
+      </form>
+      {% else %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="activate"><button class="btn btn-success">Re-activate restaurant</button></form>
+      {% endif %}
+    </div>
+    {% if r.owner.email %}
+    <div class="card">
+      <h3>Email the owner</h3>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="email_owner">
+        <div class="field"><input name="subject" placeholder="Subject" required></div>
+        <div class="field"><textarea name="message" placeholder="Message" required></textarea></div>
+        <button class="btn">Send email</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+<div class="card" style="margin-top:16px"><h3>Subscription payments</h3>
+  {% for p in payments %}<div class="row between small" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>{{ p.created_at|date:"d M Y" }} · {{ p.plan.name }} {{ p.cycle }} <span class="mono muted">{{ p.razorpay_payment_id|default:p.razorpay_order_id }}</span></span><span>₹{{ p.amount|floatformat:0|intcomma }} + GST <span class="badge {% if p.status == 'paid' %}b-success{% elif p.status == 'failed' %}b-danger{% endif %}">{{ p.status }}</span></span></div>
+  {% empty %}<div class="muted small">No payments yet.</div>{% endfor %}
+</div>
+{% endblock %}

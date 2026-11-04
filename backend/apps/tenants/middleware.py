@@ -22,7 +22,7 @@ class TenantMiddleware:
 def resolve_restaurant(request, user):
     from apps.accounts.models import Membership
 
-    memberships = Membership.objects.filter(user=user, is_active=True).select_related("restaurant")
+    memberships = Membership.objects.filter(user=user, is_active=True, restaurant__is_active=True).select_related("restaurant")
     wanted = request.headers.get("X-Restaurant") or request.session.get("restaurant_id")
     if wanted:
         m = memberships.filter(restaurant_id=wanted).first() if str(wanted).isdigit() else memberships.filter(restaurant__slug=wanted).first()

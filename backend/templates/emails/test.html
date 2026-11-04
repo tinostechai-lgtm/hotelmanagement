@@ -1,0 +1,2 @@
+{% extends "emails/_base.html" %}{% block content %}<h2 style="margin:0 0 12px">Email is working 🎉</h2>
+<p>Hi {{ user.first_name|default:"there" }}, this is a test email from {{ site_name }}. Your SMTP settings are correct.</p>{% endblock %}
