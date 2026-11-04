@@ -51,11 +51,11 @@ jobs:
           for attempt in 1 2 3 4; do
             git fetch --depth=1 origin "$BRANCH"
             git checkout -B publish FETCH_HEAD
-            mkdir -p backend/public/downloads
-            cp "$RUNNER_TEMP/servora.apk" backend/public/downloads/servora.apk
-            SIZE=$(stat -c %s backend/public/downloads/servora.apk)
-            printf '{"version": "%s", "size_bytes": %s, "published_at": "%s", "url": "/downloads/servora.apk"}\n' "$VERSION" "$SIZE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > backend/public/downloads/android.json
-            git add backend/public/downloads
+            mkdir -p public/downloads
+            cp "$RUNNER_TEMP/servora.apk" public/downloads/servora.apk
+            SIZE=$(stat -c %s public/downloads/servora.apk)
+            printf '{"version": "%s", "size_bytes": %s, "published_at": "%s", "url": "/downloads/servora.apk"}\n' "$VERSION" "$SIZE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > public/downloads/android.json
+            git add public/downloads
             git commit -m "Publish Android app $VERSION [skip ci]" || exit 0
             if git push origin "HEAD:$BRANCH"; then exit 0; fi
             sleep $((attempt * 5))
