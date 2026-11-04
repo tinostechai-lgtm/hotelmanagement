@@ -164,6 +164,11 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
+# Signed-cookie sessions: logins work on every serverless instance and need no
+# session table. (Cookies are signed with SECRET_KEY and are HttpOnly.)
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+# True on Vercel without DATABASE_URL: data lives in per-instance /tmp SQLite.
+DEMO_MODE = bool(os.environ.get("VERCEL")) and not os.environ.get("DATABASE_URL")
 # Online order tabs left unpaid at Razorpay are auto-cancelled after this many minutes.
 UNPAID_ONLINE_ORDER_TTL_MINUTES = int(os.environ.get("UNPAID_ONLINE_ORDER_TTL_MINUTES", "20"))
 
