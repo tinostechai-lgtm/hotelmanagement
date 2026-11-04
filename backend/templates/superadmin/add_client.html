@@ -1,0 +1,11 @@
+{% extends "superadmin/shell.html" %}
+{% block page_title %}Add client{% endblock %}
+{% block heading %}<a href="{% url 'superadmin:restaurants' %}" class="muted" style="font-weight:600">Restaurants /</a> Add client{% endblock %}
+{% block content %}
+<form method="post" class="card" style="max-width:860px">{% csrf_token %}
+  <p class="muted">Creates the restaurant, its owner login, default roles, 8 tables and a kitchen — ready to bill straight away.</p>
+  {% include "superadmin/_form.html" with wide_fields="restaurant_name" %}
+  <button class="btn btn-primary btn-lg"><i data-lucide="user-plus"></i>Create client</button>
+  <a class="btn btn-lg" href="{% url 'superadmin:restaurants' %}">Cancel</a>
+</form>
+{% endblock %}

@@ -64,7 +64,9 @@ def login_view(request):
             nxt = request.GET.get("next", "")
             if nxt.startswith("/") and not nxt.startswith("//"):
                 return redirect(nxt)
-            if user.is_superuser and not Membership.objects.filter(user=user, is_active=True).exists():
+            from apps.superadmin.models import platform_permissions
+
+            if platform_permissions(user) and not Membership.objects.filter(user=user, is_active=True).exists():
                 return redirect("superadmin:overview")
             return redirect("web:dashboard")
         cache.set(key, cache.get(key, 0) + 1, 300)
@@ -111,7 +113,9 @@ def app_page(perm=None, feature=None):
         def wrapper(request, *a, **kw):
             r = request.restaurant
             if not r:
-                if request.user.is_superuser:
+                from apps.superadmin.models import platform_permissions
+
+                if platform_permissions(request.user):
                     return redirect("superadmin:overview")
                 suspended = Membership.objects.filter(user=request.user, restaurant__is_active=False).select_related("restaurant").first()
                 return render(request, "app/no_restaurant.html", {"suspended": suspended})

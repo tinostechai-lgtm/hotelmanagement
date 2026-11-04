@@ -1,5 +1,6 @@
 {% extends "superadmin/shell.html" %}{% load humanize %}
-{% block page_title %}Restaurants{% endblock %}{% block heading %}Restaurants{% endblock %}
+{% block page_title %}Restaurants{% endblock %}{% block heading %}Restaurants & clients{% endblock %}
+{% block actions %}{% if "restaurants_create" in pperms %}<a class="btn btn-primary" href="{% url 'superadmin:add_client' %}"><i data-lucide="user-plus"></i>Add client</a>{% endif %}{% endblock %}
 {% block content %}
 <form class="row wrap" style="margin-bottom:14px">
   <input type="search" name="q" value="{{ q }}" placeholder="Search name, phone, city, email…" style="max-width:320px">

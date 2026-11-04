@@ -62,6 +62,9 @@ class Command(BaseCommand):
                 Plan.objects.update_or_create(code=p["code"], defaults=p)
             else:  # keep prices edited in the super admin
                 Plan.objects.get_or_create(code=p["code"], defaults=p)
+        from apps.superadmin.models import PlatformRole
+
+        PlatformRole.ensure_defaults()
         self.stdout.write(self.style.SUCCESS(f"{len(PLANS)} plans ready"))
         if opts["demo"]:
             self.demo()

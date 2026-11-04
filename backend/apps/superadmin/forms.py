@@ -87,3 +87,94 @@ class SetupForm(forms.Form):
         if get_user_model().objects.filter(username=v).exists():
             raise forms.ValidationError("This mobile number is already registered")
         return v
+
+
+BUSINESS_TYPES = [("restaurant", "Restaurant"), ("hotel", "Hotel F&B"), ("cafe", "Cafe / QSR"), ("cloud_kitchen", "Cloud kitchen"),
+                  ("bar", "Bar & lounge"), ("bakery", "Bakery")]
+
+
+def _phone_free(v):
+    if get_user_model().objects.filter(username=v).exists():
+        raise forms.ValidationError("This mobile number already has an account")
+    return v
+
+
+class AddClientForm(forms.Form):
+    restaurant_name = forms.CharField(max_length=150)
+    business_type = forms.ChoiceField(choices=BUSINESS_TYPES)
+    city = forms.CharField(max_length=80, required=False)
+    gstin = forms.CharField(label="GSTIN", max_length=15, required=False)
+    owner_name = forms.CharField(max_length=150)
+    owner_phone = forms.RegexField(r"^\+?\d{10,13}$", label="Owner mobile (login)")
+    owner_email = forms.EmailField(required=False, help_text="Login details are emailed here (if email is configured)")
+    password = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), min_length=8,
+                               help_text="Leave blank to generate one — it is shown once after saving")
+    plan = forms.ModelChoiceField(queryset=Plan.objects.all())
+    status = forms.ChoiceField(choices=[("trial", "Free trial"), ("active", "Active (paid / offline payment)")])
+    days = forms.IntegerField(min_value=1, max_value=3650, initial=14, label="Valid for (days)")
+    send_email = forms.BooleanField(required=False, initial=True, label="Email login details to the owner")
+
+    def clean_owner_phone(self):
+        return _phone_free(self.cleaned_data["owner_phone"])
+
+
+class AddRestaurantUserForm(forms.Form):
+    name = forms.CharField(max_length=150)
+    phone = forms.RegexField(r"^\+?\d{10,13}$", label="Mobile (login)")
+    email = forms.EmailField(required=False)
+    role = forms.ModelChoiceField(queryset=None)
+    password = forms.CharField(required=False, widget=forms.PasswordInput, min_length=8, help_text="Leave blank to generate one")
+
+    def __init__(self, restaurant, *a, **kw):
+        super().__init__(*a, **kw)
+        from apps.accounts.models import Role
+
+        self.restaurant = restaurant
+        self.fields["role"].queryset = Role.objects.filter(restaurant=restaurant)
+
+    def clean_phone(self):
+        from apps.accounts.models import Membership
+
+        v = self.cleaned_data["phone"]
+        if Membership.objects.filter(restaurant=self.restaurant, user__username=v).exists():
+            raise forms.ValidationError("Already a member of this restaurant")
+        return v
+
+
+class TeamMemberForm(forms.Form):
+    name = forms.CharField(max_length=150)
+    phone = forms.RegexField(r"^\+?\d{10,13}$", label="Mobile (login)", help_text="Existing users keep their password")
+    email = forms.EmailField(required=False)
+    role = forms.ModelChoiceField(queryset=None)
+    password = forms.CharField(required=False, widget=forms.PasswordInput, min_length=10,
+                               help_text="For new users. Leave blank to generate one")
+
+    def __init__(self, *a, **kw):
+        from .models import PlatformRole
+
+        super().__init__(*a, **kw)
+        self.fields["role"].queryset = PlatformRole.objects.all()
+
+
+class PlatformRoleForm(forms.ModelForm):
+    permissions = forms.MultipleChoiceField(choices=[], widget=forms.CheckboxSelectMultiple, required=False)
+
+    class Meta:
+        from .models import PlatformRole
+
+        model = PlatformRole
+        fields = ["name", "description", "permissions"]
+
+    def __init__(self, *a, allowed=None, **kw):
+        from .models import PLATFORM_PERMISSIONS
+
+        super().__init__(*a, **kw)
+        self.allowed = allowed if allowed is not None else set(PLATFORM_PERMISSIONS)
+        self.fields["permissions"].choices = list(PLATFORM_PERMISSIONS.items())
+
+    def clean_permissions(self):
+        perms = self.cleaned_data["permissions"]
+        extra = set(perms) - self.allowed
+        if extra:
+            raise forms.ValidationError("You can't grant permissions you don't have yourself")
+        return perms

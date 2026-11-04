@@ -1,0 +1,11 @@
+{% extends "superadmin/shell.html" %}
+{% block page_title %}{{ role.name|default:"New role" }}{% endblock %}
+{% block heading %}<a href="{% url 'superadmin:team' %}" class="muted" style="font-weight:600">Team & roles /</a> {{ role.name|default:"New role" }}{% endblock %}
+{% block content %}
+<form method="post" class="card" style="max-width:760px">{% csrf_token %}
+  {% include "superadmin/_form.html" with wide_fields="name description" %}
+  <p class="small muted">You can only grant permissions your own role has. "Platform settings" exposes API keys — give it to trusted administrators only.</p>
+  <div class="row"><button class="btn btn-primary">Save role</button><a class="btn" href="{% url 'superadmin:team' %}">Cancel</a>
+  {% if role and not role.is_system %}<button class="btn btn-danger" name="delete" value="1" style="margin-left:auto" onclick="return confirm('Delete this role?')">Delete role</button>{% endif %}</div>
+</form>
+{% endblock %}

@@ -20,14 +20,14 @@
     <a class="brand" href="{% url 'superadmin:overview' %}">{% include "partials/logo_svg.html" with cls="sv-static" uid="sa" %}<span>{{ ps.site_name }}<span class="sa-tag">ADMIN</span></span></a>
     <div class="nav-section">Platform</div>
     <nav class="nav">
-      {% for key, label, icon in sa_nav %}
+      {% for key, label, icon, perm in sa_nav %}
       <a href="{% if key == 'settings' %}{% url 'superadmin:settings_home' %}{% else %}{% url 'superadmin:'|add:key %}{% endif %}" class="{% if active == key %}active{% endif %}"><i data-lucide="{{ icon }}"></i>{{ label }}</a>
       {% endfor %}
     </nav>
     <div class="nav-section">Shortcuts</div>
     <nav class="nav">
       <a href="/" target="_blank"><i data-lucide="globe"></i>Public website</a>
-      <a href="/admin/"><i data-lucide="database"></i>Raw data (Django admin)</a>
+      {% if request.user.is_superuser %}<a href="/admin/"><i data-lucide="database"></i>Raw data (Django admin)</a>{% endif %}
       <a href="/healthz" target="_blank"><i data-lucide="activity"></i>Health check</a>
       {% if request.user.memberships.exists %}<a href="{% url 'web:dashboard' %}"><i data-lucide="store"></i>My restaurant</a>{% endif %}
     </nav>
@@ -38,7 +38,7 @@
       <h1 class="grow">{% block heading %}{% endblock %}</h1>
       {% block actions %}{% endblock %}
       <button class="btn btn-ghost icon-btn" data-theme-toggle title="Light / dark"><i data-lucide="moon"></i></button>
-      <span class="small"><b>{{ request.user.first_name|default:request.user.username }}</b><div class="tiny muted">Super admin</div></span>
+      <span class="small"><b>{{ request.user.first_name|default:request.user.username }}</b><div class="tiny muted">{% if request.user.is_superuser %}Super admin{% else %}{{ request.user.platform_staff.role.name }}{% endif %}</div></span>
       <a class="btn btn-ghost icon-btn" href="{% url 'web:logout' %}" title="Log out"><i data-lucide="log-out"></i></a>
     </header>
     <main class="content">

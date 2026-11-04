@@ -115,3 +115,94 @@ def get_settings(fresh=False):
         obj = PlatformSettings(pk=1)
     _cache.update(obj=obj, at=time.time())
     return obj
+
+
+# ---------------------------------------------------------------------------
+# Platform team & role-based access
+# ---------------------------------------------------------------------------
+
+PLATFORM_PERMISSIONS = {
+    "overview": "View dashboard & revenue numbers",
+    "restaurants_view": "View restaurants & their details",
+    "restaurants_create": "Add new clients (restaurant + owner login)",
+    "restaurants_manage": "Change plans, validity & extend trials",
+    "restaurants_suspend": "Suspend / re-activate restaurants",
+    "restaurants_email": "Email restaurant owners",
+    "plans": "Edit plans & pricing",
+    "payments": "View subscription payments",
+    "users": "View users, enable / disable accounts",
+    "users_manage": "Add users to restaurants & reset passwords",
+    "settings": "Platform settings & API keys (Razorpay, email, SMS)",
+    "team": "Manage platform team & roles",
+    "activity": "View platform activity log",
+}
+
+DEFAULT_PLATFORM_ROLES = {
+    "Administrator": list(PLATFORM_PERMISSIONS),
+    "Support": ["overview", "restaurants_view", "restaurants_create", "restaurants_manage", "restaurants_email", "users", "users_manage"],
+    "Finance": ["overview", "restaurants_view", "payments", "plans", "activity"],
+    "Sales": ["overview", "restaurants_view", "restaurants_create", "restaurants_email"],
+}
+
+
+class PlatformRole(models.Model):
+    name = models.CharField(max_length=60, unique=True)
+    description = models.CharField(max_length=200, blank=True)
+    permissions = models.JSONField(default=list)
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def ensure_defaults(cls):
+        for name, perms in DEFAULT_PLATFORM_ROLES.items():
+            cls.objects.get_or_create(name=name, defaults={"permissions": perms, "is_system": True})
+
+
+class PlatformStaff(models.Model):
+    """A user who can access /superadmin/ with a limited role.
+    Django superusers always have full access and don't need this."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="platform_staff")
+    role = models.ForeignKey(PlatformRole, on_delete=models.PROTECT, related_name="members")
+    is_active = models.BooleanField(default=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user} ({self.role})"
+
+
+def platform_permissions(user):
+    """Set of platform permissions for a user (empty set = no access)."""
+    if not user or not user.is_authenticated or not user.is_active:
+        return set()
+    if user.is_superuser:
+        return set(PLATFORM_PERMISSIONS)
+    try:
+        staff = user.platform_staff
+    except PlatformStaff.DoesNotExist:
+        return set()
+    return set(staff.role.permissions) if staff.is_active else set()
+
+
+class PlatformAuditLog(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    action = models.CharField(max_length=60)
+    target = models.CharField(max_length=150, blank=True)
+    detail = models.CharField(max_length=500, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    @classmethod
+    def record(cls, request, action, target="", detail=""):
+        ip = (request.META.get("HTTP_X_FORWARDED_FOR") or request.META.get("REMOTE_ADDR") or "").split(",")[0].strip() or None
+        return cls.objects.create(user=request.user if request.user.is_authenticated else None, action=action,
+                                  target=str(target)[:150], detail=str(detail)[:500], ip=ip)

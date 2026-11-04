@@ -22,7 +22,7 @@
         {% endfor %}
       </nav>
     {% endfor %}
-    {% if request.user.is_superuser %}<nav class="nav"><a href="{% url 'superadmin:overview' %}"><i data-lucide="shield"></i>Super admin</a></nav>{% endif %}
+    {% if request.user.is_superuser or request.user.platform_staff.is_active %}<nav class="nav"><a href="{% url 'superadmin:overview' %}"><i data-lucide="shield"></i>Super admin</a></nav>{% endif %}
     <div class="plan">
       {% if subscription %}
         <div style="color:#fff;font-weight:700">{{ subscription.plan.name }} plan</div>

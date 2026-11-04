@@ -1,0 +1,5 @@
+{% extends "emails/_base.html" %}{% block content %}<h2 style="margin:0 0 12px">Welcome to {{ site_name }}, {{ name }}!</h2>
+<p>Your account for <b>{{ restaurant.name }}</b> is ready on the <b>{{ plan }}</b> plan (valid till {{ valid_till|date:"d M Y" }}).</p>
+<table cellpadding="6" style="background:#F6F6FA;border-radius:10px;font-size:14px;margin:12px 0"><tr><td>Login (mobile)</td><td><b>{{ phone }}</b></td></tr><tr><td>Temporary password</td><td><b>{{ password }}</b></td></tr></table>
+<p>Please change your password after your first login.</p>
+{% if site_url %}<p><a href="{{ site_url }}/login/" style="display:inline-block;background:#F4632F;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Log in</a></p>{% endif %}{% endblock %}
