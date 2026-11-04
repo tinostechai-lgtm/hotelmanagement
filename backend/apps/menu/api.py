@@ -18,6 +18,20 @@ class ItemViewSet(TenantViewSet):
     serializer_class = ItemSerializer
     perm = "menu"
 
+    def perform_update(self, serializer):
+        from apps.accounts.models import AuditLog
+
+        old = serializer.instance.price
+        item = serializer.save()
+        if item.price != old:
+            AuditLog.record(item.restaurant, self.request.user, "menu.price", item.name, f"₹{old} → ₹{item.price}")
+
+    def perform_destroy(self, instance):
+        from apps.accounts.models import AuditLog
+
+        AuditLog.record(instance.restaurant, self.request.user, "menu.delete", instance.name, f"₹{instance.price}")
+        instance.delete()
+
     def get_queryset(self):
         qs = super().get_queryset()
         p = self.request.query_params

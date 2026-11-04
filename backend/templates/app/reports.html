@@ -3,7 +3,7 @@
 {% block heading %}Reports & insights{% endblock %}
 {% block topbar_actions %}
 <select id="range" style="width:auto;min-height:38px"><option value="0">Today</option><option value="1">Yesterday</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>
-<button class="btn btn-sm" id="csv"><i data-lucide="download"></i>Export</button>
+{% if "export" in perms %}<button class="btn btn-sm" id="csv"><i data-lucide="download"></i>Export</button>{% endif %}
 {% endblock %}
 {% block content %}
 <div class="grid g4">
@@ -56,7 +56,7 @@
     }
   }
   S.$("#range").onchange = load;
-  S.$("#csv").onclick = () => {
+  if (S.$("#csv")) S.$("#csv").onclick = () => {
     if (!last) return;
     const lines = [["Metric", "Value"], ["Period", `${last.start} to ${last.end}`], ["Net sales", last.sales], ["Orders", last.orders], ["AOV", last.avg_order_value], ["GST", last.tax], ["Discounts", last.discount], ["Service charge", last.service_charge], ["Delivery fees", last.delivery_fees], [], ["Item", "Qty", "Amount"]]
       .concat(last.top_items.map((t) => [t.name, t.qty, t.amount])).concat([[], ["Payment mode", "Amount"]]).concat(last.by_payment.map((p) => [p.method, p.amount]));

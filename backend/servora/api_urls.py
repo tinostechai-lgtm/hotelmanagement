@@ -51,6 +51,7 @@ router.register("devices", hardware.DeviceViewSet)
 router.register("print-jobs", hardware.PrintJobViewSet)
 router.register("roles", accounts.RoleViewSet)
 router.register("staff", accounts.StaffViewSet)
+router.register("activity", accounts.AuditLogViewSet)
 
 urlpatterns = [
     path("auth/login", accounts.login),

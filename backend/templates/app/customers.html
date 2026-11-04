@@ -13,7 +13,7 @@
   S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
   const tierCls = { Platinum: "b-info", Gold: "b-warning", Silver: "", Bronze: "b-primary" };
   S.crud(S.$("#customers"), { endpoint: "customers", title: "Customer",
-    toolbar: '<button class="btn" id="export"><i data-lucide="download"></i>Export CSV</button>',
+    toolbar: SV.perms.includes("export") ? '<button class="btn" id="export"><i data-lucide="download"></i>Export CSV</button>' : "",
     columns: [{ key: "name", label: "Customer", render: (c) => `<b>${S.esc(c.name || "Guest")}</b> <span class="badge ${tierCls[c.tier]}">${c.tier}</span><div class="tiny muted">${S.esc(c.phone)} ${S.esc(c.email)}</div>` },
       { key: "visits", label: "Visits" }, { key: "total_spent", label: "Lifetime spend", render: (c) => S.money(c.total_spent) }, { key: "loyalty_points", label: "Points" },
       { key: "last_visit", label: "Last visit", render: (c) => (c.last_visit ? S.date(c.last_visit) : "—") }],

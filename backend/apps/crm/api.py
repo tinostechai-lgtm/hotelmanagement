@@ -41,7 +41,15 @@ class FeedbackSerializer(TenantSerializer):
 class CustomerViewSet(TenantViewSet):
     queryset = Customer.objects.prefetch_related("addresses")
     serializer_class = CustomerSerializer
-    perm = "customers"
+    perm = read_perm = "customers"
+
+    def get_permissions(self):
+        if self.action == "lookup":  # cashiers/captains can look up one number while billing
+            from apps.accounts.permissions import require
+            from rest_framework.permissions import IsAuthenticated
+
+            return [IsAuthenticated(), require("pos")()]
+        return super().get_permissions()
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -67,10 +75,10 @@ class CustomerViewSet(TenantViewSet):
 class CouponViewSet(TenantViewSet):
     queryset = Coupon.objects.all()
     serializer_class = CouponSerializer
-    perm = "customers"
+    perm = read_perm = "customers"
 
 
 class FeedbackViewSet(TenantViewSet):
     queryset = Feedback.objects.select_related("customer")
     serializer_class = FeedbackSerializer
-    perm = "customers"
+    perm = read_perm = "customers"

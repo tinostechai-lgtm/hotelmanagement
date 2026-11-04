@@ -27,7 +27,12 @@ def restaurant(request):
             return Response({"detail": "Settings permission required"}, status=403)
         s = RestaurantSerializer(r, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
+        changed = [k for k, v in s.validated_data.items() if getattr(r, k) != v]
         s.save()
+        if changed:
+            from apps.accounts.models import AuditLog
+
+            AuditLog.record(r, request.user, "settings.update", r.name, "changed: " + ", ".join(changed))
     return Response(RestaurantSerializer(r).data)
 
 

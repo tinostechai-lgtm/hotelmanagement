@@ -5,26 +5,39 @@ from apps.tenants.models import Restaurant
 
 PERMISSIONS = {
     "pos": "Take orders & billing",
-    "discount": "Apply discounts",
-    "void": "Cancel orders / void items",
+    "discount": "Apply discounts & coupons",
+    "void": "Cancel orders / void items sent to kitchen",
+    "shifts": "Open / close cash shifts & cash drawer",
     "kitchen": "Kitchen display",
-    "menu": "Manage menu",
-    "tables": "Manage tables & rooms",
-    "delivery": "Manage home delivery",
+    "menu": "Manage menu & prices",
+    "tables": "Manage tables, rooms & reservations setup",
+    "delivery": "Manage home delivery & riders",
     "rider": "Deliver orders (rider app)",
-    "inventory": "Manage inventory",
-    "reports": "View reports",
-    "customers": "Manage customers & loyalty",
-    "staff": "Manage staff & roles",
+    "inventory": "Manage inventory & purchases",
+    "reports": "View sales reports & insights",
+    "customers": "View & manage customers, loyalty, coupons",
+    "marketing": "Marketing campaigns & online store SEO",
+    "export": "Export data (CSV downloads)",
+    "staff": "Manage staff, roles & view activity log",
     "settings": "Restaurant settings & hardware",
     "billing": "Subscription & payments",
 }
 
+# Grouping for the permission matrix UI.
+PERMISSION_GROUPS = [
+    ("Front of house", ["pos", "discount", "void", "shifts", "customers"]),
+    ("Kitchen & delivery", ["kitchen", "delivery", "rider"]),
+    ("Back office", ["menu", "tables", "inventory", "reports", "marketing", "export"]),
+    ("Administration", ["staff", "settings", "billing"]),
+]
+
+OWNER_ROLE = "Owner"
+
 DEFAULT_ROLES = {
     "Owner": list(PERMISSIONS),
     "Manager": [p for p in PERMISSIONS if p not in ("billing",)],
-    "Cashier": ["pos", "discount", "customers"],
-    "Captain": ["pos", "tables"],
+    "Cashier": ["pos", "discount", "customers", "shifts"],
+    "Captain": ["pos"],
     "Kitchen": ["kitchen"],
     "Delivery Rider": ["rider"],
     "Store Keeper": ["inventory"],
@@ -81,3 +94,25 @@ class Membership(models.Model):
 
     def can(self, perm):
         return perm in (self.role.permissions or [])
+
+
+class AuditLog(models.Model):
+    """Who did what in a restaurant — visible to owners & managers."""
+
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name="audit_logs")
+    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+    action = models.CharField(max_length=60)
+    target = models.CharField(max_length=150, blank=True)
+    detail = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["restaurant", "created_at"])]
+
+    @classmethod
+    def record(cls, restaurant, user, action, target="", detail=""):
+        if restaurant is None:
+            return None
+        u = user if getattr(user, "is_authenticated", False) else None
+        return cls.objects.create(restaurant=restaurant, user=u, action=action, target=str(target)[:150], detail=str(detail)[:500])

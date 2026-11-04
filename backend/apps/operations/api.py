@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.accounts.models import AuditLog
 from apps.tenants.api_base import TenantViewSet
 
 from . import services
@@ -193,6 +194,8 @@ class OrderViewSet(TenantViewSet):
                 if li.status != "new" and not request.membership.can("void"):
                     return Response({"detail": "Only managers can void items sent to kitchen"}, status=403)
                 services.void_item(li, request.data.get("reason", ""))
+                AuditLog.record(order.restaurant, request.user, "order.void_item", f"#{order.number}",
+                                f"{li.quantity.normalize():f} × {li.display_name} (₹{li.line_total}) — {request.data.get('reason', '')}")
             else:
                 services.update_item(li, request.data.get("quantity"), request.data.get("notes"))
         except services.OrderError as e:
@@ -216,6 +219,8 @@ class OrderViewSet(TenantViewSet):
                 if not request.membership.can("void") and order.status != "pending":
                     return Response({"detail": "Only managers can cancel accepted orders"}, status=403)
                 services.cancel_order(order, request.data.get("reason", "Cancelled"), request.user)
+                AuditLog.record(order.restaurant, request.user, "order.cancel", f"#{order.number}",
+                                f"₹{order.total} — {request.data.get('reason', '')}")
             elif new == "completed":
                 services.settle_order(order, request.user)
             else:
@@ -238,6 +243,8 @@ class OrderViewSet(TenantViewSet):
                 services.apply_discount(order, request.data.get("amount"), request.data.get("percent"), request.data.get("reason", ""))
         except services.OrderError as e:
             return _err(e)
+        AuditLog.record(order.restaurant, request.user, "order.discount", f"#{order.number}",
+                        f"₹{order.discount} off — {order.discount_reason}")
         return self._ok(order)
 
     @action(detail=True, methods=["post"])
@@ -354,7 +361,7 @@ class NotificationViewSet(TenantViewSet):
 class ShiftViewSet(TenantViewSet):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
-    perm = "pos"
+    perm = read_perm = "shifts"
     http_method_names = ["get", "post", "head", "options"]
 
     def perform_create(self, serializer):
@@ -372,4 +379,6 @@ class ShiftViewSet(TenantViewSet):
         shift.closed_at = timezone.now()
         shift.notes = request.data.get("notes", "")
         shift.save()
+        AuditLog.record(shift.restaurant, request.user, "shift.close", f"Shift {shift.pk}",
+                        f"expected ₹{shift.expected_cash}, counted ₹{shift.closing_cash}, difference ₹{shift.closing_cash - shift.expected_cash}")
         return Response(ShiftSerializer(shift).data)

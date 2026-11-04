@@ -36,6 +36,14 @@ class DeviceViewSet(TenantViewSet):
     serializer_class = DeviceSerializer
     perm = "settings"
 
+    def get_permissions(self):
+        if self.action == "open_drawer":
+            from apps.accounts.permissions import require
+            from rest_framework.permissions import IsAuthenticated
+
+            return [IsAuthenticated(), require("shifts")()]
+        return super().get_permissions()
+
     def create(self, request, *args, **kwargs):
         sub = request.restaurant.subscription
         limit = sub.plan.max_devices if sub else 2
@@ -50,7 +58,10 @@ class DeviceViewSet(TenantViewSet):
 
     @action(detail=False, methods=["post"], url_path="open-drawer")
     def open_drawer(self, request):
+        from apps.accounts.models import AuditLog
+
         services.open_drawer(request.restaurant)
+        AuditLog.record(request.restaurant, request.user, "drawer.open", "Cash drawer", "opened manually")
         return Response({"ok": True})
 
     @action(detail=True, methods=["post"], url_path="rotate-key")

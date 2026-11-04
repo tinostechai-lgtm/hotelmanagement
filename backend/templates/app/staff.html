@@ -1,37 +1,109 @@
 {% extends "app/shell.html" %}
 {% block page_title %}Staff{% endblock %}
 {% block heading %}Staff & roles{% endblock %}
+{% block head %}<style>
+  .matrix { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; }
+  .matrix th, .matrix td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: center; background: var(--surface); }
+  .matrix th:first-child, .matrix td:first-child { text-align: left; position: sticky; left: 0; z-index: 1; min-width: 240px; }
+  .matrix thead th { position: sticky; top: 0; z-index: 2; font-size: 13px; vertical-align: bottom; }
+  .matrix thead th:first-child { z-index: 3; }
+  .matrix .grp td { background: var(--surface-2); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); text-align: left; }
+  .matrix input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
+  .matrix input:disabled { cursor: not-allowed; opacity: .55; }
+  .matrix .rolename { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
+  .matrix tr.changed td { animation: flash .8s; }
+  @keyframes flash { from { background: var(--success-soft); } }
+</style>{% endblock %}
 {% block content %}
-<div class="tabs" id="tabs"><button class="tab active" data-t="s">Team members</button><button class="tab" data-t="r">Roles & permissions</button><button class="tab" data-t="sh">Cash shifts</button></div>
-<section data-p="s"><div id="staff"></div><p class="small muted" style="margin-top:12px">Staff log in on the web or the Servora app with their mobile number and password. A 4–6 digit PIN lets them switch quickly on a shared POS terminal.</p></section>
-<section data-p="r" class="hidden"><div id="roles"></div></section>
+<div class="tabs" id="tabs"><button class="tab active" data-t="s">Team members</button><button class="tab" data-t="r">Roles & permissions</button><button class="tab" data-t="a">Activity log</button>{% if "shifts" in perms %}<button class="tab" data-t="sh">Cash shifts</button>{% endif %}</div>
+<section data-p="s"><div id="staff"></div><p class="small muted" style="margin-top:12px">Staff log in on the web or the Servora app with their mobile number and password. A 4–6 digit PIN lets them switch quickly on a shared POS terminal. You can only give people a role with the same or less access than your own.</p></section>
+<section data-p="r" class="hidden">
+  <div class="row between wrap" style="margin-bottom:12px">
+    <p class="small muted" style="margin:0">Tick a box to grant a permission — changes save instantly. The <b>Owner</b> role always has full access.</p>
+    <button class="btn btn-primary" id="new-role"><i data-lucide="plus"></i>New role</button>
+  </div>
+  <div class="table-wrap" style="max-height:70vh"><table class="matrix" id="matrix"></table></div>
+</section>
+<section data-p="a" class="hidden">
+  <div class="row wrap" style="margin-bottom:12px"><input type="search" id="a-q" placeholder="Filter: void, discount, price, staff…" style="max-width:320px"></div>
+  <div id="activity"></div>
+</section>
 <section data-p="sh" class="hidden"><div id="shifts"></div></section>
-{{ permission_catalog|json_script:"perm-catalog" }}
 {% endblock %}
 {% block page_scripts %}
 <script>
 (async function () {
-  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); };
-  const catalog = JSON.parse(S.$("#perm-catalog").textContent);
+  S.$("#tabs").onclick = (e) => { const t = e.target.closest("[data-t]"); if (!t) return; S.$$(".tab").forEach((x) => x.classList.toggle("active", x === t)); S.$$("[data-p]").forEach((p) => p.classList.toggle("hidden", p.dataset.p !== t.dataset.t)); if (t.dataset.t === "a") loadActivity(); };
+  const cat = await S.api("roles/catalog");
+  const mine = new Set(cat.my_permissions);
+  const canGrant = (p) => cat.is_owner || mine.has(p);
   let roles = await S.list("roles");
+
+  /* ---------- Team members ---------- */
   S.crud(S.$("#staff"), { endpoint: "staff", title: "Team member",
     columns: [{ key: "name", label: "Name", render: (s) => `<b>${S.esc(s.name)}</b><div class="tiny muted">${S.esc(s.phone)}</div>` }, { key: "role_name", label: "Role", render: (s) => `<span class="badge b-primary">${S.esc(s.role_name)}</span>` },
       { key: "has_pin", label: "PIN", render: (s) => (s.has_pin ? "✓" : "—") }, { key: "is_active", label: "Status", render: (s) => (s.is_active ? '<span class="badge b-success">Active</span>' : '<span class="badge">Disabled</span>') }],
     fields: () => [{ name: "name", label: "Full name", required: true, half: true }, { name: "phone", label: "Mobile number (login)", type: "tel", required: true, half: true },
-      { name: "role", label: "Role", type: "select", required: true, half: true, options: roles.map((r) => [r.id, r.name]) }, { name: "pin", label: "Quick PIN (4–6 digits)", half: true },
+      { name: "role", label: "Role", type: "select", required: true, half: true, options: roles.filter((r) => r.permissions.every(canGrant)).map((r) => [r.id, r.name]) }, { name: "pin", label: "Quick PIN (4–6 digits)", half: true },
       { name: "password", label: "Password (leave blank to keep)", type: "password" }, { name: "is_active", label: "Active", type: "checkbox", default: true }] });
-  const permFields = Object.entries(catalog).map(([k, v]) => ({ name: "p_" + k, label: v, type: "checkbox" }));
-  S.crud(S.$("#roles"), { endpoint: "roles", title: "Role", onLoad: (r) => (roles = r),
-    columns: [{ key: "name", label: "Role", render: (r) => `<b>${S.esc(r.name)}</b> ${r.is_system ? '<span class="badge">default</span>' : ""}` }, { key: "members", label: "People" },
-      { key: "permissions", label: "Can", render: (r) => `<span class="small">${r.permissions.map((p) => S.esc(catalog[p] || p)).join(" · ")}</span>` }],
-    fields: [{ name: "name", label: "Role name", required: true }, { type: "section", label: "Permissions" }].concat(permFields),
-    beforeSave: (b) => { const perms = Object.keys(catalog).filter((k) => b["p_" + k]); Object.keys(catalog).forEach((k) => delete b["p_" + k]); return { ...b, permissions: perms }; } });
-  // pre-tick permission checkboxes when editing a role
-  S.$("#roles").addEventListener("click", (e) => {
-    const tr = e.target.closest("tr[data-id]"); if (!tr || !e.target.closest("[data-edit]")) return;
-    setTimeout(() => { const role = roles.find((r) => r.id == tr.dataset.id); role.permissions.forEach((p) => { const c = document.querySelector(`.modal [name="p_${p}"]`); if (c) c.checked = true; }); }, 0);
+
+  /* ---------- Permission matrix ---------- */
+  function renderMatrix() {
+    const head = `<thead><tr><th>Permission</th>${roles.map((r) => `<th><span class="rolename"><b>${S.esc(r.name)}</b><span class="tiny muted">${r.members} ${r.members === 1 ? "person" : "people"}</span>
+      ${!r.is_system ? `<span><button class="btn btn-sm btn-ghost" data-rename="${r.id}" title="Rename"><i data-lucide="pencil" style="width:14px"></i></button><button class="btn btn-sm btn-ghost" data-delrole="${r.id}" title="Delete"><i data-lucide="trash-2" style="width:14px"></i></button></span>` : ""}</span></th>`).join("")}</tr></thead>`;
+    const body = cat.groups.map(([g, perms]) => `<tr class="grp"><td colspan="${roles.length + 1}">${S.esc(g)}</td></tr>` + perms.map((p) => `<tr data-perm="${p}"><td><b>${S.esc(cat.permissions[p])}</b><div class="tiny muted mono">${p}</div></td>
+      ${roles.map((r) => { const locked = (r.is_system && r.name === cat.owner_role) || !canGrant(p); return `<td><input type="checkbox" data-role="${r.id}" data-code="${p}" ${r.permissions.includes(p) ? "checked" : ""} ${locked ? "disabled" : ""} title="${locked ? (r.name === cat.owner_role ? "Owner always has full access" : "You don't have this permission yourself") : ""}"></td>`; }).join("")}</tr>`).join("")).join("");
+    S.$("#matrix").innerHTML = head + `<tbody>${body}</tbody>`;
+    S.icons();
+  }
+  renderMatrix();
+  S.$("#matrix").addEventListener("change", async (e) => {
+    const c = e.target.closest("[data-role]"); if (!c) return;
+    const role = roles.find((r) => r.id == c.dataset.role);
+    const perms = c.checked ? [...new Set([...role.permissions, c.dataset.code])] : role.permissions.filter((x) => x !== c.dataset.code);
+    try {
+      const updated = await S.api(`roles/${role.id}`, { method: "PATCH", body: { permissions: perms } });
+      Object.assign(role, updated); c.closest("tr").classList.add("changed"); setTimeout(() => c.closest("tr")?.classList.remove("changed"), 900);
+      S.toast(`${role.name}: ${c.checked ? "granted" : "removed"} “${cat.permissions[c.dataset.code]}”`, "ok");
+    } catch (err) { c.checked = !c.checked; }
   });
-  S.crud(S.$("#shifts"), { endpoint: "shifts", title: "Shift", noDelete: true,
+  S.$("#matrix").addEventListener("click", async (e) => {
+    const rn = e.target.closest("[data-rename]"), dl = e.target.closest("[data-delrole]");
+    if (rn) { const r = roles.find((x) => x.id == rn.dataset.rename); const v = await S.prompt("Rename role", [{ name: "name", label: "Role name", default: r.name, required: true }]); if (v) { Object.assign(r, await S.api(`roles/${r.id}`, { method: "PATCH", body: v })); renderMatrix(); } }
+    if (dl) { const r = roles.find((x) => x.id == dl.dataset.delrole); if (await S.confirm(`Delete role “${r.name}”?`, "Delete", true)) { await S.api(`roles/${r.id}`, { method: "DELETE" }); roles = roles.filter((x) => x !== r); renderMatrix(); } }
+  });
+  S.$("#new-role").onclick = async () => {
+    const v = await S.prompt("New role", [{ name: "name", label: "Role name (e.g. Head Chef, Night Manager)", required: true }, { name: "copy", label: "Start from", type: "select", options: roles.map((r) => [r.id, r.name]) }], "Create");
+    if (!v) return;
+    const src = roles.find((r) => r.id == v.copy);
+    const perms = src ? src.permissions.filter(canGrant) : [];
+    const created = await S.api("roles", { body: { name: v.name, permissions: perms } });
+    roles.push({ ...created, members: 0 }); renderMatrix(); S.toast("Role created — tick the permissions it needs", "ok");
+  };
+
+  /* ---------- Activity ---------- */
+  const actionLabel = { "order.void_item": ["Void", "b-danger"], "order.cancel": ["Cancel", "b-danger"], "order.discount": ["Discount", "b-warning"], "menu.price": ["Price change", "b-info"],
+    "menu.delete": ["Item deleted", "b-danger"], "staff.add": ["Staff added", "b-success"], "staff.update": ["Staff updated", "b-info"], "staff.remove": ["Staff removed", "b-danger"],
+    "role.create": ["Role created", "b-success"], "role.update": ["Role changed", "b-info"], "role.delete": ["Role deleted", "b-danger"], "settings.update": ["Settings", "b-info"],
+    "drawer.open": ["Drawer opened", "b-warning"], "shift.close": ["Shift closed", ""], "campaign.send": ["Campaign", "b-primary"] };
+  let activity = [];
+  async function loadActivity() {
+    activity = await S.list("activity");
+    renderActivity();
+  }
+  function renderActivity() {
+    const q = S.$("#a-q").value.toLowerCase();
+    const rows = activity.filter((a) => !q || JSON.stringify(a).toLowerCase().includes(q));
+    S.$("#activity").innerHTML = rows.length ? `<div class="table-wrap"><table class="data"><thead><tr><th>When</th><th>Who</th><th>What</th><th>On</th><th>Details</th></tr></thead><tbody>${rows.map((a) => {
+      const [l, cls] = actionLabel[a.action] || [a.action, ""];
+      return `<tr><td class="small nowrap">${S.date(a.created_at)}</td><td>${S.esc(a.user_name)}</td><td><span class="badge ${cls}">${S.esc(l)}</span></td><td>${S.esc(a.target)}</td><td class="small muted">${S.esc(a.detail)}</td></tr>`; }).join("")}</tbody></table></div>`
+      : '<div class="card empty"><i data-lucide="history"></i><div>No activity yet. Voids, cancellations, discounts, price and staff changes appear here.</div></div>';
+    S.icons();
+  }
+  S.$("#a-q").oninput = renderActivity;
+
+  /* ---------- Shifts ---------- */
+  if (S.$("#shifts")) S.crud(S.$("#shifts"), { endpoint: "shifts", title: "Shift", noDelete: true,
     columns: [{ key: "created_at", label: "Opened", render: (s) => `${S.date(s.created_at)}<div class="tiny muted">${S.esc(s.opened_by_name)}</div>` }, { key: "opening_cash", label: "Opening cash", render: (s) => S.money(s.opening_cash) },
       { key: "expected_cash", label: "Expected", render: (s) => (s.expected_cash ? S.money(s.expected_cash) : "—") }, { key: "closing_cash", label: "Counted", render: (s) => (s.closing_cash ? S.money(s.closing_cash) : "—") },
       { key: "diff", label: "Difference", render: (s) => (s.closed_at ? `<b style="color:${Number(s.closing_cash) - Number(s.expected_cash) < 0 ? "var(--danger)" : "var(--success)"}">${S.money(Number(s.closing_cash) - Number(s.expected_cash))}</b>` : '<span class="badge b-warning">Open</span>') }],
