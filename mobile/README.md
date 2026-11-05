@@ -35,21 +35,35 @@ flutter build appbundle --release      # for the Play Store
 Configure signing in `android/key.properties` + `android/app/build.gradle` as described
 in the Flutter docs before publishing.
 
-## iOS notes
+## iOS (iPhone / iPad)
 
-After `flutter create`, add these keys to `ios/Runner/Info.plist`:
+The iOS project is committed in `ios/` and is ready to build: bundle id `com.servora.servora`,
+iOS 15.5+, Servora icons and navy launch screen, and every permission prompt already in
+`Info.plist` (camera for scanning, location for riders, Bluetooth and local-network printers,
+`tel:`/Maps links, `ITSAppUsesNonExemptEncryption = NO`).
 
-| Key | Why |
+**Automatic builds:** `.github/workflows/ios.yml` runs on a macOS runner for every change to `mobile/`:
+
+1. Always builds the app and uploads an *unsigned* `.ipa` artifact (proves the iOS build is healthy).
+2. When these repository secrets exist, it also signs the app and uploads it to App Store Connect →
+   TestFlight:
+
+| Secret | Where to get it |
 | --- | --- |
-| `NSCameraUsageDescription` | Barcode / QR scanning on the order screen |
-| `NSLocationWhenInUseUsageDescription` | Rider location pings while online |
-| `NSLocationAlwaysAndWhenInUseUsageDescription` | Same, if riders lock the phone |
-| `NSBluetoothAlwaysUsageDescription` | Bluetooth thermal printers |
-| `NSLocalNetworkUsageDescription` | Printing to LAN printers on port 9100 |
-| `LSApplicationQueriesSchemes` = `tel`, `comgooglemaps` | Call customer, open Maps |
+| `APPLE_TEAM_ID` | developer.apple.com → Membership → Team ID |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID` | App Store Connect → Users and Access → Integrations → App Store Connect API (create a key with **Admin** access) |
+| `ASC_KEY_P8` | Paste the full contents of the downloaded `AuthKey_XXXX.p8` file |
 
-Then `cd ios && pod install` and build with `flutter build ipa`. Bluetooth printing on
-iOS works only with BLE printers that `print_bluetooth_thermal` supports.
+Before the first upload, create the app once in App Store Connect (My Apps → + → New App,
+bundle ID `com.servora.servora`, name "Servora"). Signing certificates and profiles are created
+automatically (cloud-managed) by the API key.
+
+Then in TestFlight add testers (or turn on a **public link**) and paste that link — or the App
+Store link once the app is live — into **Super admin → General → iPhone app link**. The website's
+download page then shows an App Store / TestFlight button and iPhone QR scans go straight to it.
+
+Local build on a Mac: `flutter build ipa` (open `ios/Runner.xcworkspace` in Xcode once to pick
+your team). Bluetooth printing on iOS works with BLE printers that `print_bluetooth_thermal` supports.
 
 ## Server
 

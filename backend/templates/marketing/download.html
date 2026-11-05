@@ -42,6 +42,12 @@
         <svg viewBox="0 0 24 24" fill="#3DDC84"><path d="M17.6 9.48l1.84-3.18a.38.38 0 0 0-.66-.38l-1.86 3.22a11.4 11.4 0 0 0-9.84 0L5.22 5.92a.38.38 0 0 0-.66.38L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
         <span><small>{% if is_play_store %}GET IT ON{% else %}DOWNLOAD FOR{% endif %}</small><b>{% if is_play_store %}Google Play{% else %}Android (APK){% endif %}</b></span>
       </a>
+      {% if ios_url %}
+      <a class="play-btn" href="{{ ios_url }}" id="ios-btn" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.97-3.46-1.07-1.57-2.74-1.78-3.33-1.8-1.42-.15-2.77.83-3.49.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.78 2.29-1.61 2.8-.41 6.94 1.16 9.21.77 1.11 1.68 2.36 2.88 2.31 1.16-.05 1.6-.75 3-.75s1.79.75 3.01.72c1.25-.02 2.04-1.13 2.8-2.25.88-1.29 1.24-2.54 1.26-2.6-.03-.01-2.42-.93-2.47-3.71zM14.08 5.84c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.77-.97 2.82 1.02.08 2.07-.52 2.71-1.28z"/></svg>
+        <span><small>{% if is_testflight %}TEST ON{% else %}DOWNLOAD ON THE{% endif %}</small><b>{% if is_testflight %}iPhone (TestFlight){% else %}App Store{% endif %}</b></span>
+      </a>
+      {% endif %}
       <a class="btn btn-lg" style="background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.2)" href="{% url 'web:login' %}">Use it on the web</a>
     </div>
     <p class="small" style="margin-top:16px;font-size:13px"><span id="apk-meta"></span>Android 5.0+ · Free with every {{ platform.site_name|default:"Servora" }} plan · Updated automatically on this page</p>
@@ -78,8 +84,8 @@
   fetch("/downloads/android.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((m) => {
     if (m && m.version) document.getElementById("apk-meta").textContent = `Version ${m.version} · ${(m.size_bytes / 1048576).toFixed(1)} MB · `;
   }).catch(() => {});
-  // iPhone visitors: the app is Android-only for now — point them at the web app.
-  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+  // iPhone visitors without an App Store / TestFlight link yet: point them at the web app.
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !document.getElementById("ios-btn")) {
     const b = document.getElementById("dl-btn");
     b.insertAdjacentHTML("afterend", '<p class="small" style="width:100%;color:#FFD2B3">On iPhone? Use the web app — it works in Safari and can be added to your Home Screen.</p>');
   }

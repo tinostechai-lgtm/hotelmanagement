@@ -106,3 +106,30 @@ class DownloadAppTests(TestCase):
         self.assertEqual(self.client.get("/download/android")["Location"], ps.android_app_url)
         self.assertContains(self.client.get("/download/"), "Google Play")
         self.assertEqual(self.client.get("/get/")["Location"], ps.android_app_url)
+
+
+class IosAppLinkTests(TestCase):
+    def setUp(self):
+        from apps.superadmin.models import get_settings
+
+        cache.clear()
+        get_settings(fresh=True)  # drop the per-process settings cache left by other tests
+
+    def test_iphone_without_link_sees_web_app_hint(self):
+        page = self.client.get("/get/", HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(self.client.get("/download/"), 'id="ios-btn"')
+
+    def test_iphone_link_from_super_admin(self):
+        from apps.superadmin.models import get_settings
+
+        ps = get_settings()
+        ps.ios_app_url = "https://testflight.apple.com/join/AbCdEf12"
+        ps.save()
+        get_settings(fresh=True)
+        res = self.client.get("/get/", HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res["Location"], ps.ios_app_url)
+        # Android phones still get the APK page
+        self.assertEqual(self.client.get("/get/", HTTP_USER_AGENT="Mozilla/5.0 (Linux; Android 14)").status_code, 200)
+        self.assertContains(self.client.get("/download/"), "iPhone (TestFlight)")

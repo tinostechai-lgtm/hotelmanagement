@@ -7,7 +7,7 @@ from .models import EncryptedTextField, PlatformSettings
 
 SECTIONS = {
     "general": ("General & branding", ["site_name", "site_url", "company_name", "company_address", "company_gstin",
-                                       "support_email", "support_phone", "android_app_url", "announcement"]),
+                                       "support_email", "support_phone", "android_app_url", "ios_app_url", "announcement"]),
     "signup": ("Sign-up & trial", ["signup_enabled", "trial_days", "trial_plan", "grace_days"]),
     "payments": ("Razorpay payments", ["razorpay_key_id", "razorpay_key_secret", "razorpay_webhook_secret"]),
     "email": ("Email (SMTP)", ["email_enabled", "email_host", "email_port", "email_use_tls", "email_use_ssl",

@@ -1,0 +1,99 @@
+name: iOS app
+on:
+  push:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+# Always: builds the iPhone app (unsigned .ipa artifact) so every change is proven to compile for iOS.
+# With Apple keys set as repository secrets it also signs the app and uploads it to TestFlight / App Store Connect:
+#   APPLE_TEAM_ID          10-character Apple Developer Team ID
+#   ASC_KEY_ID             App Store Connect API key ID
+#   ASC_ISSUER_ID          App Store Connect API issuer ID
+#   ASC_KEY_P8             contents of the AuthKey_XXXX.p8 file (role: Admin, for cloud-managed signing)
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUILD_NAME: 1.0.${{ github.run_number }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.27.4"
+          cache: true
+      - name: Generate missing iOS platform files (keeps committed files)
+        run: flutter create . --platforms=ios --org com.servora --project-name servora
+      - run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build iPhone app (unsigned)
+        run: flutter build ios --release --no-codesign --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+      - name: Package unsigned .ipa
+        run: |
+          mkdir -p build/ipa-unsigned/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa-unsigned/Payload/
+          (cd build/ipa-unsigned && zip -qry "../Servora-$BUILD_NAME-unsigned.ipa" Payload)
+          ls -la build/*.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: servora-ios-unsigned-ipa
+          path: mobile/build/Servora-*-unsigned.ipa
+
+      # ---- Signed build + TestFlight upload (runs only when the Apple secrets are configured) ----
+      - name: Signed archive
+        if: env.APPLE_TEAM_ID != '' && env.ASC_KEY_ID != '' && env.ASC_ISSUER_ID != '' && env.ASC_KEY_P8 != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          KEY="$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s' "$ASC_KEY_P8" > "$KEY"
+          # Team + automatic signing for the app target only (pods/frameworks are re-signed when embedded)
+          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = com.servora.servora;/PRODUCT_BUNDLE_IDENTIFIER = com.servora.servora; DEVELOPMENT_TEAM = $APPLE_TEAM_ID; CODE_SIGN_STYLE = Automatic;/" ios/Runner.xcodeproj/project.pbxproj
+          flutter build ios --release --config-only --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Servora.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            archive | tail -40
+          test -d "$RUNNER_TEMP/Servora.xcarchive"
+      - name: Upload to TestFlight
+        if: env.APPLE_TEAM_ID != '' && env.ASC_KEY_ID != '' && env.ASC_ISSUER_ID != '' && env.ASC_KEY_P8 != ''
+        run: |
+          KEY="$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Servora.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "Uploaded build $BUILD_NAME ($BUILD_NUMBER) to App Store Connect — it appears in TestFlight after Apple's processing."
+      - name: Signing skipped
+        if: env.APPLE_TEAM_ID == '' || env.ASC_KEY_ID == '' || env.ASC_ISSUER_ID == '' || env.ASC_KEY_P8 == ''
+        run: echo "::notice::Unsigned iOS build only. Add APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 repository secrets to sign and upload to TestFlight."

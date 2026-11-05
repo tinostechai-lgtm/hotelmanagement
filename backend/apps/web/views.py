@@ -385,8 +385,24 @@ def download_file(request, name):
     return resp
 
 
+def ios_app_url():
+    from django.conf import settings
+
+    from apps.superadmin.models import get_settings
+
+    return get_settings().ios_app_url or settings.IOS_APP_URL
+
+
+def _is_iphone(request):
+    ua = request.META.get("HTTP_USER_AGENT", "")
+    return any(k in ua for k in ("iPhone", "iPad", "iPod"))
+
+
 def get_app(request):
-    """Landing page for the QR / phone buttons: shows install steps and starts the download in the background."""
+    """Landing page for the QR / phone buttons: shows install steps and starts the download in the background.
+    iPhones go to the App Store / TestFlight link when one is set."""
+    if _is_iphone(request) and ios_app_url():
+        return redirect(ios_app_url())
     url = android_app_url()
     if "play.google.com" in url:
         return redirect(url)
@@ -397,4 +413,6 @@ def download_page(request):
     return render(request, "marketing/download.html", {
         "apk_url": request.build_absolute_uri("/get/"),
         "is_play_store": "play.google.com" in android_app_url(),
+        "ios_url": ios_app_url(),
+        "is_testflight": "testflight.apple.com" in ios_app_url(),
     })

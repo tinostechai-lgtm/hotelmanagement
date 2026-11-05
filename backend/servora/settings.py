@@ -179,6 +179,8 @@ DEMO_MODE = bool(os.environ.get("VERCEL")) and not os.environ.get("DATABASE_URL"
 # Latest Android APK: the Android workflow publishes it to backend/downloads/, served directly from this domain
 # by apps.web.views.download_file. Overridable in Super admin → General (e.g. a Play Store link).
 ANDROID_APK_URL = os.environ.get("ANDROID_APK_URL", "/downloads/servora.apk")
+# iPhone app: App Store / TestFlight public link (Super admin → General overrides it). Empty = web app.
+IOS_APP_URL = os.environ.get("IOS_APP_URL", "")
 # Online order tabs left unpaid at Razorpay are auto-cancelled after this many minutes.
 UNPAID_ONLINE_ORDER_TTL_MINUTES = int(os.environ.get("UNPAID_ONLINE_ORDER_TTL_MINUTES", "20"))
 

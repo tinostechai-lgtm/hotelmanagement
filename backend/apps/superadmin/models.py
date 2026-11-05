@@ -49,6 +49,8 @@ class PlatformSettings(models.Model):
     support_phone = models.CharField(max_length=20, blank=True)
     android_app_url = models.URLField("Android app download link", blank=True,
                                       help_text="Leave empty to use the latest APK built by GitHub Actions. Paste a Play Store link once published.")
+    ios_app_url = models.URLField("iPhone app link", blank=True,
+                                  help_text="App Store or TestFlight public link. Leave empty to send iPhone users to the web app.")
     announcement = models.CharField(max_length=255, blank=True, help_text="Banner shown to all restaurant users (leave empty to hide)")
 
     # Signup & trial
