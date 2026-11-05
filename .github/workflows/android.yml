@@ -33,10 +33,33 @@ jobs:
         run: dart run flutter_launcher_icons
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - name: Use the fixed Servora signing key (so every new version installs over the old one)
-        run: mkdir -p ~/.android && cp signing/servora-debug.keystore ~/.android/debug.keystore
+      - name: Sign with the fixed Servora key (so every new version installs over the old one)
+        run: |
+          python3 - <<'PY'
+          p = "android/app/build.gradle"
+          s = open(p).read()
+          if "signingConfigs.servora" not in s:
+              block = (
+                  "    signingConfigs {\n"
+                  "        servora {\n"
+                  "            storeFile file(\"../../signing/servora-debug.keystore\")\n"
+                  "            storePassword \"android\"\n"
+                  "            keyAlias \"androiddebugkey\"\n"
+                  "            keyPassword \"android\"\n"
+                  "        }\n"
+                  "    }\n\n"
+                  "    buildTypes {"
+              )
+              s = s.replace("    buildTypes {", block, 1)
+              s = s.replace("signingConfig = signingConfigs.debug", "signingConfig = signingConfigs.servora")
+              assert "signingConfigs.servora" in s, "could not patch signing config"
+              open(p, "w").write(s)
+          PY
+          grep -n "servora" android/app/build.gradle
       - name: Build release APK
         run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
+      - name: Verify signing key
+        run: keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -q "CN=Servora"
       - name: Rename
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk build/servora-1.0.${{ github.run_number }}.apk
