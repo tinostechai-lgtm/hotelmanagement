@@ -36,6 +36,8 @@ void main() {
 
   Future<void> open(WidgetTester t, String tile, Finder ready, String name) async {
     await home(t);
+    await t.ensureVisible(find.text(tile)); // e.g. Reports sits below the fold on phones
+    await pumpFor(t, 600);
     await t.tap(find.text(tile));
     await waitFor(t, ready);
     await pumpFor(t, 3000);

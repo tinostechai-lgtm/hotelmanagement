@@ -176,11 +176,13 @@ ThemeData buildServoraTheme() {
       surfaceTintColor: Colors.transparent,
       side: const BorderSide(color: Brand.line),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      labelStyle: WidgetStateTextStyle.resolveWith((s) => TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            color: s.contains(WidgetState.selected) ? Colors.white : Brand.ink,
-          )),
+      // Label colour resolved per state: dark text on white chips, white text on selected (orange) chips.
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+        color: WidgetStateColor.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : Brand.ink),
+      ),
+      secondaryLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white),
       iconTheme: const IconThemeData(color: Brand.orangeDeep, size: 18),
     ),
     listTileTheme: const ListTileThemeData(

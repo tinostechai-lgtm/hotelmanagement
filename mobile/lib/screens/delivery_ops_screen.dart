@@ -130,7 +130,7 @@ class _DeliveryOpsScreenState extends State<DeliveryOpsScreen> {
         const OfflineBanner(),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          child: SizedBox(height: 108, child: Row(children: [
+          child: SizedBox(height: 120, child: Row(children: [
             Expanded(child: StatCard(label: 'Active', value: '${_tasks.length}', icon: Icons.inventory_2_outlined)),
             const SizedBox(width: 10),
             Expanded(
