@@ -96,7 +96,7 @@ ThemeData buildServoraTheme() {
       actionsIconTheme: IconThemeData(color: Colors.white),
       titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.2),
     ),
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: Colors.white,
       unselectedLabelColor: Color(0xFFB9B7DA),
       indicatorColor: Brand.orange,
@@ -105,7 +105,7 @@ ThemeData buildServoraTheme() {
       labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
       unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
     ),
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       color: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -191,7 +191,7 @@ ThemeData buildServoraTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(14))),
     ),
     dividerTheme: const DividerThemeData(color: Brand.line, thickness: 1, space: 1),
-    dialogTheme: const DialogTheme(
+    dialogTheme: const DialogThemeData(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(24))),

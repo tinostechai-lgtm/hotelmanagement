@@ -136,7 +136,7 @@ class _PrintersScreenState extends State<PrintersScreen> {
               border: Border.all(color: Brand.line),
             ),
             child: Column(children: [
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 value: config.printFromDevice,
                 onChanged: config.setPrintFromDevice,
                 title: const Text('Print from this device', style: TextStyle(fontWeight: FontWeight.w800)),

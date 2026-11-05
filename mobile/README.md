@@ -20,7 +20,7 @@ flutter analyze                   # should report no errors before you build
 flutter run
 ```
 
-Requirements: Flutter 3.24 or newer (Dart 3.4+), Android SDK 34, Xcode 15 for iOS.
+Requirements: Flutter 3.35 or newer, Android SDK 34, Xcode 15 for iOS.
 
 `mobile_scanner` and `geolocator` need `minSdkVersion 21` or higher. Set it in
 `android/app/build.gradle` (`minSdk = 21`) if `flutter create` generated a lower value.
@@ -38,7 +38,7 @@ in the Flutter docs before publishing.
 ## iOS (iPhone / iPad)
 
 The iOS project is committed in `ios/` and is ready to build: bundle id `com.servora.servora`,
-iOS 15.5+, Servora icons and navy launch screen, and every permission prompt already in
+iOS 13+, Servora icons and navy launch screen, and every permission prompt already in
 `Info.plist` (camera for scanning, location for riders, Bluetooth and local-network printers,
 `tel:`/Maps links, `ITSAppUsesNonExemptEncryption = NO`).
 

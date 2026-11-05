@@ -31,7 +31,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.27.4"
+          flutter-version: "3.35.7"
           cache: true
       - name: Generate missing iOS platform files (keeps committed files)
         run: flutter create . --platforms=ios --org com.servora --project-name servora
@@ -97,3 +97,48 @@ jobs:
       - name: Signing skipped
         if: env.APPLE_TEAM_ID == '' || env.ASC_KEY_ID == '' || env.ASC_ISSUER_ID == '' || env.ASC_KEY_P8 == ''
         run: echo "::notice::Unsigned iOS build only. Add APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 repository secrets to sign and upload to TestFlight."
+
+  # Runs the real iOS app on an iPhone simulator, signs in with the Owner demo account (live server)
+  # and screenshots the main screens -> artifact "servora-ios-simulator-screens".
+  simulator-screens:
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.35.7"
+          cache: true
+      - run: flutter create . --platforms=ios --org com.servora --project-name servora
+      - run: flutter pub get
+      - name: Boot an iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          d = json.load(sys.stdin)["devices"]
+          def ver(k):
+              return [int(x) for x in re.findall(r"\d+", k.split("iOS")[-1])]
+          rts = sorted((k for k in d if "iOS" in k and d[k]), key=ver)
+          for rt in reversed(rts):
+              phones = [x for x in d[rt] if x["name"].startswith("iPhone")]
+              pro = [x for x in phones if "Pro" in x["name"] and "Max" not in x["name"]]
+              pick = (pro or phones)
+              if pick:
+                  print(pick[0]["udid"]); break
+          ')
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Run the app and capture screens
+        run: flutter drive --driver=test_driver/integration_test.dart --target=integration_test/screens_test.dart -d "${{ steps.sim.outputs.udid }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: servora-ios-simulator-screens
+          path: mobile/build/screenshots/

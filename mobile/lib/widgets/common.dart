@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../brand/theme.dart';
@@ -18,7 +19,28 @@ void toast(BuildContext context, String message, {bool error = false}) {
     ));
 }
 
+bool isCupertino(BuildContext context) {
+  final p = Theme.of(context).platform;
+  return p == TargetPlatform.iOS || p == TargetPlatform.macOS;
+}
+
 Future<bool> confirm(BuildContext context, String title, String message, {String ok = 'Yes'}) async {
+  if (isCupertino(context)) {
+    // Native iOS alert.
+    final r = await showCupertinoDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(padding: const EdgeInsets.only(top: 6), child: Text(message)),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(ctx, true), child: Text(ok)),
+        ],
+      ),
+    );
+    return r ?? false;
+  }
   final r = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(

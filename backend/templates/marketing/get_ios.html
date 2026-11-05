@@ -35,7 +35,7 @@
   <a class="btn btn-primary btn-lg" href="{% url 'web:login' %}">Open {{ platform.site_name|default:"Servora" }}</a>
   <div class="warn" id="not-safari">You're in another browser. Copy this link and open it in <b>Safari</b> to add {{ platform.site_name|default:"Servora" }} to your Home Screen.</div>
   <p class="note" id="installed" style="display:none">✓ {{ platform.site_name|default:"Servora" }} is already installed on this iPhone.</p>
-  <p class="note">Works on iPhone and iPad (iOS 15.5+). No App Store account needed.</p>
+  <p class="note">Works on iPhone and iPad (iOS 13+). No App Store account needed.</p>
 </main>
 {% endblock %}
 {% block scripts %}

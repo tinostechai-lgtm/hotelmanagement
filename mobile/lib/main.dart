@@ -95,7 +95,12 @@ class _ServoraAppState extends State<ServoraApp> {
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 1.0, maxScaleFactor: 1.15)),
-          child: child!,
+          // Tap anywhere outside a field to close the keyboard (iOS number pads have no Done key).
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: child!,
+          ),
         );
       },
       home: const SplashScreen(),

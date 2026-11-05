@@ -180,10 +180,10 @@ class _OnlineCard extends StatelessWidget {
             ? const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
             : Transform.scale(
                 scale: 1.3,
-                child: Switch(
+                child: Switch.adaptive(
                   value: online,
                   activeColor: Colors.white,
-                  activeTrackColor: Color(0xFFD8D7EE),
+                  activeTrackColor: Brand.success,
                   onChanged: onChanged,
                 ),
               ),
