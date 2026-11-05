@@ -56,13 +56,15 @@ void main() {
     await shot('02-home');
 
     await open(t, 'POS & Tables', find.text('Takeaway'), '03-tables');
-    final table = find.text('T1');
-    if (table.evaluate().isNotEmpty) {
-      await t.tap(table.first);
-      await waitFor(t, find.textContaining('View order'));
-      await pumpFor(t, 3000);
-      await shot('04-order');
-      await t.tap(find.textContaining('View order'));
+    // Open a table that has a running order (its tile shows "… · N items"), else any table.
+    final busy = find.textContaining(' items');
+    await t.tap(busy.evaluate().isNotEmpty ? busy.first : find.text('T2').first);
+    await waitFor(t, find.text('Search name or short code'));
+    await pumpFor(t, 3000);
+    await shot('04-order');
+    final cart = find.textContaining('View order');
+    if (cart.evaluate().isNotEmpty) {
+      await t.tap(cart.first);
       await pumpFor(t, 2500);
       await shot('05-cart');
     }
