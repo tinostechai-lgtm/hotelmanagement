@@ -230,7 +230,7 @@ class _PrintersScreenState extends State<PrintersScreen> {
                   builder: (ctx) => AlertDialog(
                     title: Text(j.title.isEmpty ? 'Preview' : j.title),
                     content: SingleChildScrollView(
-                      child: Text(j.text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                      child: Text(j.text, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
                     ),
                     actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
                   ),

@@ -131,18 +131,18 @@ class _DeliveryOpsScreenState extends State<DeliveryOpsScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
           child: SizedBox(height: 108, child: Row(children: [
-            Expanded(child: StatCard(label: 'Active tasks', value: '${_tasks.length}', icon: Icons.inventory_2_outlined)),
+            Expanded(child: StatCard(label: 'Active', value: '${_tasks.length}', icon: Icons.inventory_2_outlined)),
             const SizedBox(width: 10),
             Expanded(
               child: StatCard(
-                label: 'Unassigned',
+                label: 'Waiting',
                 value: '${_tasks.where((t) => t.status == 'unassigned').length}',
                 icon: Icons.warning_amber,
                 highlight: _tasks.any((t) => t.status == 'unassigned'),
               ),
             ),
             const SizedBox(width: 10),
-            Expanded(child: StatCard(label: 'Riders online', value: '$online/${_riders.length}', icon: Icons.two_wheeler, color: Brand.teal)),
+            Expanded(child: StatCard(label: 'Riders', value: '$online/${_riders.length}', icon: Icons.two_wheeler, color: Brand.teal)),
           ])),
         ),
         if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: const TextStyle(color: Brand.danger))),

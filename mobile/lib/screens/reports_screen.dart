@@ -259,7 +259,7 @@ class _Hourly extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text('$h', style: const TextStyle(fontSize: 10, color: Brand.muted)),
+                  Text('$h', style: const TextStyle(fontSize: 13, color: Brand.muted)),
                 ]),
               ),
             ),

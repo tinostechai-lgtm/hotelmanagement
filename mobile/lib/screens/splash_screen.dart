@@ -144,7 +144,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               TextSpan(text: 'Tinos Software & Security Solutions LLP', style: TextStyle(color: Brand.steam, fontWeight: FontWeight.w700)),
                             ]),
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xFFA3A2C2), fontSize: 12, height: 1.5),
+                            style: TextStyle(color: Color(0xFFA3A2C2), fontSize: 13, height: 1.5),
                           ),
                         ),
                       ),
@@ -166,7 +166,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           borderRadius: BorderRadius.circular(99),
           border: Border.all(color: Colors.white.withOpacity(0.16)),
         ),
-        child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+        child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
       );
 }
 

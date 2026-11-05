@@ -232,7 +232,7 @@ class _PaymentSheetState extends State<_PaymentSheet> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(widget.offline ? 'Estimated due (offline)' : 'Amount due',
-                      style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Text(Fmt.money(due), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900)),
                 ]),

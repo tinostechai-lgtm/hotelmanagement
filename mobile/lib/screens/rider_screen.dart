@@ -172,7 +172,7 @@ class _OnlineCard extends StatelessWidget {
               online
                   ? (service.lastPing != null ? 'Location shared ${Fmt.elapsed(service.lastPing)} ago' : 'Sharing location…')
                   : 'Go online to start receiving deliveries',
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: Colors.white),
             ),
           ]),
         ),
@@ -183,7 +183,7 @@ class _OnlineCard extends StatelessWidget {
                 child: Switch(
                   value: online,
                   activeColor: Colors.white,
-                  activeTrackColor: Colors.white38,
+                  activeTrackColor: Color(0xFFD8D7EE),
                   onChanged: onChanged,
                 ),
               ),

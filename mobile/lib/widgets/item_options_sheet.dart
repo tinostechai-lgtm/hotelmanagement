@@ -103,7 +103,7 @@ class _ItemOptionsSheetState extends State<_ItemOptionsSheet> {
                       g.name,
                       trailing: Text(
                         g.min > 0 ? 'Required${g.max > 0 ? ' · max ${g.max}' : ''}' : (g.max > 0 ? 'Up to ${g.max}' : 'Optional'),
-                        style: const TextStyle(color: Brand.muted, fontSize: 12),
+                        style: const TextStyle(color: Brand.muted, fontSize: 13),
                       ),
                     ),
                     Wrap(spacing: 8, runSpacing: 8, children: [

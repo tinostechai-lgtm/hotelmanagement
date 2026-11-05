@@ -36,7 +36,8 @@ class Fmt {
   /// "04:37" style clock for KDS cards.
   static String clock(DateTime since, [DateTime? now]) {
     final d = (now ?? DateTime.now()).difference(since);
-    final m = d.inMinutes.clamp(0, 999);
+    if (d.inHours >= 1) return '${d.inHours}h ${(d.inMinutes % 60).toString().padLeft(2, '0')}m';
+    final m = d.inMinutes.clamp(0, 59);
     final s = (d.inSeconds % 60).clamp(0, 59);
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }

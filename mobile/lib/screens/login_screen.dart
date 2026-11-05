@@ -91,18 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Scaffold(
         backgroundColor: Brand.ink,
         body: Stack(children: [
-          // Ambient glow behind the logo
-          Positioned(
-            top: -h * 0.12,
-            left: -80,
-            right: -80,
-            child: Container(
-              height: h * 0.55,
-              decoration: BoxDecoration(
-                gradient: RadialGradient(colors: [Brand.orange.withOpacity(0.32), Brand.orange.withOpacity(0)]),
-              ),
-            ),
-          ),
           SafeArea(
             bottom: false,
             child: SingleChildScrollView(
@@ -208,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextSpan(text: 'Tinos Software & Security Solutions LLP', style: TextStyle(fontWeight: FontWeight.w700, color: Brand.ink)),
             ]),
             textAlign: TextAlign.center,
-            style: TextStyle(color: Brand.muted, fontSize: 12),
+            style: TextStyle(color: Brand.muted, fontSize: 13),
           ),
         ],
       ),
@@ -227,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Demo accounts', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Brand.ink)),
-              Text('Tap a row to fill the form', style: TextStyle(fontSize: 12.5, color: Brand.muted)),
+              Text('Tap a row to fill the form', style: TextStyle(fontSize: 13.5, color: Brand.muted)),
             ]),
           ),
         ]),

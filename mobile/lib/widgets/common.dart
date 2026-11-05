@@ -78,7 +78,7 @@ class Pill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(color: filled ? Colors.white : color, fontWeight: FontWeight.w700, fontSize: 12),
+        style: TextStyle(color: filled ? Colors.white : Color.lerp(color, Colors.black, 0.45), fontWeight: FontWeight.w800, fontSize: 13),
       ),
     );
   }
@@ -127,7 +127,7 @@ class StatCard extends StatelessWidget {
             Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: highlight ? Colors.white : Brand.muted, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                style: TextStyle(color: highlight ? Colors.white : Brand.muted, fontWeight: FontWeight.w700, fontSize: 13.5)),
           ]),
         ],
       ),

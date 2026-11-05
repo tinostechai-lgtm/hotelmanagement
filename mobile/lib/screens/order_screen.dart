@@ -47,7 +47,7 @@ class _OrderView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(c.title, overflow: TextOverflow.ellipsis),
+          Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18)),
           Text(orderTypeLabels[c.orderType] ?? c.orderType,
               style: const TextStyle(fontSize: 13, color: Brand.steam, fontWeight: FontWeight.w600)),
         ]),
@@ -332,7 +332,7 @@ class _ItemTile extends StatelessWidget {
                   ]),
                   if (item.shortCode.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(item.shortCode, style: const TextStyle(fontSize: 11, color: Brand.muted, fontWeight: FontWeight.w700)),
+                    Text(item.shortCode, style: const TextStyle(fontSize: 13.5, color: Brand.muted, fontWeight: FontWeight.w700)),
                   ],
                 ]),
               ]),
@@ -476,18 +476,18 @@ class CartPanel extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
           child: Row(children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: c.busy ? null : () => _do(context, c.sendKot),
-                icon: const Icon(Icons.soup_kitchen_outlined),
-                label: const Text('KOT'),
+              child: _BarButton(
+                icon: Icons.soup_kitchen_rounded,
+                label: 'Send KOT',
+                onTap: c.busy ? null : () => _do(context, c.sendKot),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: c.busy ? null : () => _do(context, c.generateBill),
-                icon: const Icon(Icons.receipt_outlined),
-                label: const Text('Bill'),
+              child: _BarButton(
+                icon: Icons.receipt_long_rounded,
+                label: 'Bill',
+                onTap: c.busy ? null : () => _do(context, c.generateBill),
               ),
             ),
             const SizedBox(width: 8),
@@ -495,8 +495,8 @@ class CartPanel extends StatelessWidget {
               flex: 2,
               child: GradientButton(
                 label: 'Pay',
-                icon: Icons.payments_outlined,
-                height: 52,
+                icon: Icons.payments_rounded,
+                height: 60,
                 busy: c.busy,
                 onPressed: (o == null && c.cart.isEmpty) || (o != null && o.isPaid && c.cart.isEmpty) ? null : () => _pay(context),
               ),
@@ -504,6 +504,45 @@ class CartPanel extends StatelessWidget {
           ]),
         ),
     ]);
+  }
+}
+
+/// Compact icon-over-label button for the order action bar (never squeezes its text).
+class _BarButton extends StatelessWidget {
+  const _BarButton({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Brand.ink.withOpacity(enabled ? 0.18 : 0.08), width: 1.4),
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 22, color: enabled ? Brand.orangeDeep : Brand.muted),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label,
+                  maxLines: 1,
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: enabled ? Brand.ink : Brand.muted)),
+            ),
+          ]),
+        ),
+      ),
+    );
   }
 }
 
@@ -626,7 +665,7 @@ class _SentLine extends StatelessWidget {
             Text(
               [Fmt.titleCase(line.status), if (line.seat != null) 'Seat ${line.seat}', if (line.notes.isNotEmpty) line.notes]
                   .join(' · '),
-              style: const TextStyle(fontSize: 12, color: Brand.muted),
+              style: const TextStyle(fontSize: 13, color: Brand.muted),
             ),
           ]),
         ),
@@ -683,7 +722,7 @@ class _CartLineTile extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(line.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-              Text(sub.isEmpty ? 'Tap to add a note' : sub, style: const TextStyle(fontSize: 12, color: Brand.muted)),
+              Text(sub.isEmpty ? 'Tap to add a note' : sub, style: const TextStyle(fontSize: 13, color: Brand.muted)),
             ]),
           ),
           _Stepper(

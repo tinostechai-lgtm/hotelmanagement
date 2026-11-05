@@ -172,27 +172,47 @@ class _KdsScreenState extends State<KdsScreen> {
         backgroundColor: Brand.ink,
         foregroundColor: Colors.white,
         titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-        title: const Text('Kitchen'),
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Kitchen'),
+          Text(
+            _station == null ? 'All stations' : stations.where((x) => x.id == _station).map((x) => x.name).firstOrNull ?? 'Station',
+            style: const TextStyle(fontSize: 13, color: Brand.steam, fontWeight: FontWeight.w600),
+          ),
+        ]),
         actions: [
           if (stations.isNotEmpty)
-            DropdownButtonHideUnderline(
-              child: DropdownButton<int?>(
-                value: _station,
-                dropdownColor: Brand.ink,
-                iconEnabledColor: Colors.white,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
-                items: [
-                  const DropdownMenuItem<int?>(value: null, child: Text('All stations')),
-                  for (final s in stations) DropdownMenuItem<int?>(value: s.id, child: Text(s.name)),
-                ],
-                onChanged: (v) {
-                  setState(() {
-                    _station = v;
-                    _kots = [];
-                  });
-                  _load();
-                },
-              ),
+            IconButton(
+              tooltip: 'Choose station',
+              icon: const Icon(Icons.tune_rounded),
+              onPressed: () async {
+                final picked = await showSheet<int>(
+                  context,
+                  (ctx) => SheetFrame(
+                    title: 'Station',
+                    child: ListView(shrinkWrap: true, padding: const EdgeInsets.only(bottom: 12), children: [
+                      ListTile(
+                        leading: const Icon(Icons.all_inclusive_rounded),
+                        title: const Text('All stations'),
+                        trailing: _station == null ? const Icon(Icons.check_rounded, color: Brand.orangeDeep) : null,
+                        onTap: () => Navigator.pop(ctx, -1),
+                      ),
+                      for (final st in stations)
+                        ListTile(
+                          leading: const Icon(Icons.soup_kitchen_rounded),
+                          title: Text(st.name),
+                          trailing: _station == st.id ? const Icon(Icons.check_rounded, color: Brand.orangeDeep) : null,
+                          onTap: () => Navigator.pop(ctx, st.id),
+                        ),
+                    ]),
+                  ),
+                );
+                if (picked == null) return;
+                setState(() {
+                  _station = picked == -1 ? null : picked;
+                  _kots = [];
+                });
+                _load();
+              },
             ),
           IconButton(
             tooltip: config.kdsSound ? 'Mute' : 'Unmute',
@@ -233,9 +253,9 @@ class _KdsScreenState extends State<KdsScreen> {
           child: visible.isEmpty
               ? const Center(
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.check_circle_outline, color: Colors.white38, size: 72),
+                    Icon(Icons.check_circle_outline, color: Color(0xFFD8D7EE), size: 72),
                     SizedBox(height: 12),
-                    Text('All caught up', style: TextStyle(color: Colors.white70, fontSize: 20, fontWeight: FontWeight.w700)),
+                    Text('All caught up', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
                   ]),
                 )
               : GridView.builder(
@@ -301,7 +321,7 @@ class _KotCard extends StatelessWidget {
                     'KOT ${kot.number} · #${kot.orderNumber}${kot.stationName.isNotEmpty ? ' · ${kot.stationName}' : ''}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ]),
               ),
@@ -309,7 +329,7 @@ class _KotCard extends StatelessWidget {
                 Text(Fmt.clock(kot.createdAt),
                     style: const TextStyle(
                         color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, fontFeatures: [FontFeature.tabularFigures()])),
-                Text(kot.source.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w800)),
+                Text(kot.source.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
               ]),
             ]),
           ),

@@ -17,7 +17,7 @@ class Brand {
   static const Color info = Color(0xFF3B82F6);
   static const Color violet = Color(0xFF7C3AED);
   static const Color teal = Color(0xFF0EA5A4);
-  static const Color muted = Color(0xFF5E5D78);
+  static const Color muted = Color(0xFF45445E);
   static const Color line = Color(0xFFE4E3EF);
 
   static const LinearGradient gradient = LinearGradient(
@@ -74,7 +74,7 @@ ThemeData buildServoraTheme() {
         titleMedium: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Brand.ink),
         bodyLarge: const TextStyle(fontSize: 16, color: Brand.ink),
         bodyMedium: const TextStyle(fontSize: 14.5, color: Brand.ink),
-        bodySmall: const TextStyle(fontSize: 12.5, color: Brand.muted),
+        bodySmall: const TextStyle(fontSize: 13.5, color: Brand.muted),
       );
   return base.copyWith(
     scaffoldBackgroundColor: Brand.background,
@@ -210,8 +210,9 @@ ThemeData buildServoraTheme() {
       textStyle: TextStyle(color: Brand.ink, fontSize: 15, fontWeight: FontWeight.w600),
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : null),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Brand.success : null),
+      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : Brand.ink),
+      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Brand.success : const Color(0xFFD9D8E8)),
+      trackOutlineColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Brand.success : Brand.ink),
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(color: Brand.orangeDeep, linearTrackColor: Color(0x22F0502A)),
     snackBarTheme: const SnackBarThemeData(

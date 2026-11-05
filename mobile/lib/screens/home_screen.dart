@@ -34,15 +34,15 @@ class AppMode {
 
 final List<AppMode> appModes = [
   AppMode('pos', 'POS & Tables', 'Take orders, bill & settle', Icons.point_of_sale_rounded, (_) => const TablesScreen(),
-      [Brand.orange, Brand.orangeDeep]),
+      [Color(0xFFEA580C), Color(0xFFB4290F)]),
   AppMode('kitchen', 'Kitchen', 'Live KOTs by station', Icons.soup_kitchen_rounded, (_) => const KdsScreen(),
-      [Color(0xFF8B5CF6), Color(0xFF5B21B6)]),
+      [Color(0xFF7C3AED), Color(0xFF4C1D95)]),
   AppMode('delivery', 'Delivery', 'Assign riders, track', Icons.delivery_dining_rounded, (_) => const DeliveryOpsScreen(),
-      [Color(0xFF14B8A6), Color(0xFF0F766E)]),
+      [Color(0xFF0F766E), Color(0xFF134E4A)]),
   AppMode('rider', 'Rider', 'My deliveries & maps', Icons.two_wheeler_rounded, (_) => const RiderScreen(),
-      [Color(0xFF22C55E), Color(0xFF15803D)]),
+      [Color(0xFF15803D), Color(0xFF14532D)]),
   AppMode('reports', 'Reports', 'Sales at a glance', Icons.insights_rounded, (_) => const ReportsScreen(),
-      [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
+      [Color(0xFF2563EB), Color(0xFF1E3A8A)]),
 ];
 
 class HomeScreen extends StatefulWidget {
@@ -118,18 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
                   ),
                   child: Stack(children: [
-                    Positioned(
-                      right: -60,
-                      top: -40,
-                      child: Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(colors: [Brand.orange.withOpacity(0.35), Brand.orange.withOpacity(0)]),
-                        ),
-                      ),
-                    ),
                     SafeArea(
                       bottom: false,
                       child: Padding(
@@ -148,11 +136,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Brand.orange.withOpacity(0.22),
+                                    color: const Color(0xFF4A2C3A),
                                     borderRadius: BorderRadius.circular(99),
                                   ),
                                   child: Text(auth.membership?.role ?? '',
-                                      style: const TextStyle(color: Brand.steam, fontSize: 12, fontWeight: FontWeight.w700)),
+                                      style: const TextStyle(color: Brand.steam, fontSize: 13, fontWeight: FontWeight.w700)),
                                 ),
                               ]),
                             ),
@@ -266,9 +254,9 @@ class _HeaderStat extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: const Color(0xFF2E2A6E),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border: Border.all(color: const Color(0xFF3F3B85)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(icon, size: 18, color: Brand.steam),
@@ -281,7 +269,7 @@ class _HeaderStat extends StatelessWidget {
           Text(label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFFCFCDEB), fontSize: 12, fontWeight: FontWeight.w600)),
+              style: const TextStyle(color: Color(0xFFCFCDEB), fontSize: 13, fontWeight: FontWeight.w600)),
         ]),
       ),
     );
@@ -327,11 +315,6 @@ class _ModeCardState extends State<_ModeCard> {
               boxShadow: [BoxShadow(color: m.colors[1].withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 10))],
             ),
             child: Stack(children: [
-              Positioned(
-                right: -18,
-                bottom: -18,
-                child: Icon(m.icon, size: 110, color: Colors.white.withOpacity(0.12)),
-              ),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -342,14 +325,17 @@ class _ModeCardState extends State<_ModeCard> {
                     child: Icon(m.icon, color: Colors.white, size: 27),
                   ),
                   const Spacer(),
-                  Text(m.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -0.3)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(m.title,
+                        maxLines: 1,
+                        style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -0.3)),
+                  ),
                   const SizedBox(height: 2),
                   Text(m.subtitle,
                       maxLines: 2,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500, height: 1.3)),
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.3)),
                 ]),
               ),
             ]),

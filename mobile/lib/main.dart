@@ -89,6 +89,15 @@ class _ServoraAppState extends State<ServoraApp> {
       debugShowCheckedModeBanner: false,
       navigatorKey: rootNavigator,
       theme: buildServoraTheme(),
+      themeMode: ThemeMode.light, // one carefully tuned light theme, even when the phone is in dark mode
+      // Respect the phone's font size, but cap it so very large settings can't break layouts or clip text.
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 1.0, maxScaleFactor: 1.15)),
+          child: child!,
+        );
+      },
       home: const SplashScreen(),
     );
   }

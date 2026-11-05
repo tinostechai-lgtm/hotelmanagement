@@ -128,7 +128,7 @@ class _TablesScreenState extends State<TablesScreen> {
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Text(r.number, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                   if (r.guestName.isNotEmpty)
-                    Text(r.guestName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                    Text(r.guestName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
                 ]),
               ),
           ],
@@ -335,7 +335,7 @@ class _TableTile extends StatelessWidget {
                     ),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Icon(Icons.person_rounded, size: 13, color: fg),
-                      Text(' ${o?.guests ?? table.seats}', style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
+                      Text(' ${o?.guests ?? table.seats}', style: TextStyle(color: fg, fontSize: 13, fontWeight: FontWeight.w700)),
                     ]),
                   ),
                 ]),
@@ -356,7 +356,7 @@ class _TableTile extends StatelessWidget {
                         '${Fmt.elapsed(o.since ?? table.occupiedSince)} · ${o.items} items',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ]),
@@ -445,7 +445,7 @@ class _RunningOrdersSheetState extends State<_RunningOrdersSheet> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(Fmt.money(o.total), style: const TextStyle(fontWeight: FontWeight.w800)),
+                                Text(Fmt.money(o.total), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Brand.ink)),
                                 if (o.isPaid) const Pill('PAID', color: Brand.success),
                               ],
                             ),
