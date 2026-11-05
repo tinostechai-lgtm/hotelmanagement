@@ -35,10 +35,14 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Sign with the fixed Servora key (so every new version installs over the old one)
         run: python3 tool/patch_android_signing.py
+      - name: Smaller APK (barcode model from Google Play services instead of bundled)
+        run: echo "dev.steenbakker.mobile_scanner.useUnbundled=true" >> android/gradle.properties
       - name: Build release APK
-        run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
+        run: flutter build apk --release --target-platform android-arm,android-arm64 --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
       - name: Verify signing key
-        run: keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -q "CN=Servora"
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | tee /dev/stderr | grep -q "CN=Servora"
       - name: Rename
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk build/servora-1.0.${{ github.run_number }}.apk
