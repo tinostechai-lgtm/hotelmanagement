@@ -401,12 +401,19 @@ def _is_iphone(request):
 def get_app(request):
     """Landing page for the QR / phone buttons: shows install steps and starts the download in the background.
     iPhones go to the App Store / TestFlight link when one is set."""
-    if _is_iphone(request) and ios_app_url():
-        return redirect(ios_app_url())
+    if _is_iphone(request):
+        return redirect("web:get_ios")
     url = android_app_url()
     if "play.google.com" in url:
         return redirect(url)
     return render(request, "marketing/get_app.html", {"apk_url": url, "meta_url": "/downloads/android.json"})
+
+
+def get_ios(request):
+    """iPhone install page: App Store / TestFlight when a link is set in Super admin, otherwise Add to Home Screen."""
+    if ios_app_url():
+        return redirect(ios_app_url())
+    return render(request, "marketing/get_ios.html")
 
 
 def download_page(request):

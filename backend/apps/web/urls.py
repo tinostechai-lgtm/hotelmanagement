@@ -8,6 +8,7 @@ urlpatterns = [
     path("robots.txt", views.robots_txt),
     path("download/", views.download_page, name="download"),
     path("get/", views.get_app, name="get_app"),
+    path("get/ios/", views.get_ios, name="get_ios"),
     path("download/android", views.download_android, name="download_android"),
     path("downloads/<str:name>", views.download_file, name="download_file"),
     path("sitemap.xml", views.sitemap_xml),

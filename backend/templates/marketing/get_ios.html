@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ platform.site_name|default:"Servora" }} for iPhone{% endblock %}
+{% block robots %}<meta name="robots" content="noindex">{% endblock %}
+{% block head %}<style>
+  body { background: radial-gradient(600px 320px at 50% -10%, rgba(255,122,61,.35), transparent), #14123A; color: #fff; min-height: 100vh; }
+  .gi { max-width: 440px; margin: 0 auto; padding: 44px 22px 40px; text-align: center; }
+  .gi .sv-mark { width: 96px; height: 96px; filter: drop-shadow(0 14px 30px rgba(240,80,42,.4)); }
+  .gi h1 { font-size: 26px; margin: 20px 0 6px; }
+  .gi p { color: #D9D7F2; margin: 0; }
+  .steps { text-align: left; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 18px; padding: 6px 16px; margin: 24px 0 20px; list-style: none; }
+  .steps li { display: flex; gap: 12px; align-items: center; padding: 12px 0; color: #F4F3FF; font-size: 15px; line-height: 1.4; }
+  .steps li + li { border-top: 1px solid rgba(255,255,255,.1); }
+  .steps .n { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--grad); display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+  .steps b { color: #FFD2B3; }
+  .steps svg.ic { width: 20px; height: 20px; vertical-align: -4px; color: #7FB3FF; }
+  .gi .btn { width: 100%; }
+  .note { margin-top: 16px; font-size: 13px; color: #CFCDEB; }
+  .warn { display: none; background: rgba(255,210,179,.12); border: 1px solid rgba(255,210,179,.35); color: #FFE2CC; border-radius: 14px; padding: 12px 14px; font-size: 14px; margin-top: 18px; text-align: left; }
+</style>{% endblock %}
+{% block body %}
+<main class="gi">
+  {% include "partials/logo_svg.html" with cls="sv-anim" uid="gi" %}
+  <h1>{{ platform.site_name|default:"Servora" }} for iPhone</h1>
+  <p>Install it on your Home Screen. It opens full-screen like any app, with the same POS, kitchen, delivery and reports.</p>
+
+  <ol class="steps">
+    <li><span class="n">1</span><span>Open this page in <b>Safari</b>.</span></li>
+    <li><span class="n">2</span><span>Tap the <b>Share</b> button
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+      at the bottom of the screen.</span></li>
+    <li><span class="n">3</span><span>Choose <b>Add to Home Screen</b>, then tap <b>Add</b>.</span></li>
+    <li><span class="n">4</span><span>Open <b>{{ platform.site_name|default:"Servora" }}</b> from your Home Screen and sign in with your mobile number or email.</span></li>
+  </ol>
+
+  <a class="btn btn-primary btn-lg" href="{% url 'web:login' %}">Open {{ platform.site_name|default:"Servora" }}</a>
+  <div class="warn" id="not-safari">You're in another browser. Copy this link and open it in <b>Safari</b> to add {{ platform.site_name|default:"Servora" }} to your Home Screen.</div>
+  <p class="note" id="installed" style="display:none">✓ {{ platform.site_name|default:"Servora" }} is already installed on this iPhone.</p>
+  <p class="note">Works on iPhone and iPad (iOS 15.5+). No App Store account needed.</p>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const ua = navigator.userAgent;
+  // Chrome / Firefox / Edge / in-app browsers on iOS can't add web apps to the Home Screen reliably.
+  if (/iPhone|iPad|iPod/.test(ua) && /CriOS|FxiOS|EdgiOS|FBAN|FBAV|Instagram|Line\//.test(ua)) {
+    document.getElementById("not-safari").style.display = "block";
+  }
+  if (window.navigator.standalone) document.getElementById("installed").style.display = "block";
+})();
+</script>
+{% endblock %}
