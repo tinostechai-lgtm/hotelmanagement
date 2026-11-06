@@ -319,6 +319,8 @@ class OrderItem(models.Model):
     tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     notes = models.CharField(max_length=160, blank=True)
     seat = models.PositiveSmallIntegerField(null=True, blank=True)
+    batch_ref = models.CharField(max_length=64, blank=True, db_index=True,
+                                 help_text="Idempotency key of the request that added this line (blocks duplicate re-sends)")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.NEW)
     kot = models.ForeignKey("KOT", null=True, blank=True, on_delete=models.SET_NULL, related_name="lines")
     is_void = models.BooleanField(default=False)

@@ -178,7 +178,7 @@ class OrderViewSet(TenantViewSet):
         s = LineSpec(data=request.data.get("items", []), many=True)
         s.is_valid(raise_exception=True)
         try:
-            services.add_items(order, [dict(i) for i in s.validated_data])
+            services.add_items(order, [dict(i) for i in s.validated_data], batch_ref=str(request.data.get("client_ref") or "")[:64])
             if request.data.get("send_kot"):
                 services.send_kot(order)
         except services.OrderError as e:

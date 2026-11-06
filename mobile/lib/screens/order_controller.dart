@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../core/api_client.dart';
@@ -94,6 +96,26 @@ class OrderController extends ChangeNotifier {
     }
   }
 
+  // Idempotency key for the current batch of new items. Re-sending the same items (after a timeout,
+  // a double tap or an offline replay) reuses it, so the server never adds them twice; a changed cart
+  // gets a new key.
+  String? _batchRef;
+  String? _batchSig;
+
+  String _refFor(List<Map<String, dynamic>> specs) {
+    final sig = jsonEncode(specs);
+    if (_batchRef == null || _batchSig != sig) {
+      _batchRef = uuid4();
+      _batchSig = sig;
+    }
+    return _batchRef!;
+  }
+
+  Map<String, dynamic> _itemsBody() {
+    final specs = cart.toSpecs();
+    return {'items': specs, 'send_kot': true, 'client_ref': _refFor(specs)};
+  }
+
   Map<String, dynamic> _createBody({required bool sendKot}) => {
         'order_type': target.orderType,
         'source': 'pos',
@@ -104,7 +126,7 @@ class OrderController extends ChangeNotifier {
         'delivery_address': deliveryAddress.text.trim(),
         'items': cart.toSpecs(),
         'send_kot': sendKot,
-        'client_ref': uuid4(),
+        'client_ref': _refFor(cart.toSpecs()),
       };
 
   Future<void> _queueOffline(Map<String, dynamic> body, {List<Map<String, dynamic>> payments = const [], bool complete = false}) async {
@@ -152,7 +174,7 @@ class OrderController extends ChangeNotifier {
           _setOrder(await api.post('/orders/${current.id}/kot', {'print': true}));
           return 'KOT sent to kitchen';
         }
-        _setOrder(await api.post('/orders/${current.id}/items', {'items': cart.toSpecs(), 'send_kot': true}));
+        _setOrder(await api.post('/orders/${current.id}/items', _itemsBody()));
         cart.clear();
         return 'KOT sent to kitchen';
       });
@@ -174,7 +196,7 @@ class OrderController extends ChangeNotifier {
             if (cart.isEmpty) return true;
             _setOrder(await api.post('/orders', _createBody(sendKot: true)));
           } else if (!cart.isEmpty) {
-            _setOrder(await api.post('/orders/${current.id}/items', {'items': cart.toSpecs(), 'send_kot': true}));
+            _setOrder(await api.post('/orders/${current.id}/items', _itemsBody()));
           }
         } on NetworkException {
           return false;

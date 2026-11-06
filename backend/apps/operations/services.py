@@ -31,20 +31,34 @@ def get_or_create_customer(restaurant, phone, name="", email=""):
     return c
 
 
+def _already_applied(restaurant, ref):
+    """The order a request with this idempotency key already created or added items to (None if new)."""
+    if not ref:
+        return None
+    order = Order.objects.filter(restaurant=restaurant, client_ref=ref).first()
+    if order:
+        return order
+    line = OrderItem.objects.filter(order__restaurant=restaurant, batch_ref=ref).select_related("order").first()
+    return line.order if line else None
+
+
 @transaction.atomic
 def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, room=None, user=None,
                  customer_phone="", customer_name="", guests=1, notes="", items=None, status=None,
                  delivery_address="", delivery_lat=None, delivery_lng=None, coupon_code="", payment_mode="",
                  external_id="", customer_email="", client_ref=""):
-    if client_ref:
-        dup = Order.objects.filter(restaurant=restaurant, client_ref=client_ref).first()
-        if dup:
-            return dup
+    if table is not None:
+        # One request at a time per table: two devices (or a double tap) can't both see "no open order"
+        # and each start one.
+        table = Table.objects.select_for_update().get(pk=table.pk)
+    dup = _already_applied(restaurant, client_ref)
+    if dup:
+        return dup  # re-sent request (retry, offline replay, double click): don't add anything again
     if table is not None and order_type == "dine_in":
         existing = table.active_order
         if existing and source in ("pos", "captain", "qr"):
             if items:
-                add_items(existing, items)
+                add_items(existing, items, batch_ref=client_ref)
             return existing
     customer = get_or_create_customer(restaurant, customer_phone, customer_name, customer_email)
     if status is None:
@@ -64,7 +78,7 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
         table.occupied_since = table.occupied_since or timezone.now()
         table.save(update_fields=["status", "occupied_since"])
     if items:
-        add_items(order, items)
+        add_items(order, items, batch_ref=client_ref)
     else:
         order.recalc()
     if source not in ("pos", "captain") and payment_mode != "online":
@@ -78,8 +92,16 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
     return order
 
 
-def add_items(order, items):
-    """items: [{item_id, quantity, variant_id?, addon_ids?, notes?, seat?, price?}]"""
+@transaction.atomic
+def add_items(order, items, batch_ref=""):
+    """items: [{item_id, quantity, variant_id?, addon_ids?, notes?, seat?, price?}]
+
+    batch_ref: idempotency key of the request. Re-sending the same batch adds nothing."""
+    if order.pk:
+        # Lock the order row so concurrent adds to the same order run one after another.
+        order.status = Order.objects.select_for_update().only("status").get(pk=order.pk).status
+    if batch_ref and order.items.filter(batch_ref=batch_ref).exists():
+        return []
     if order.status in ("completed", "cancelled"):
         raise OrderError("Order is closed")
     restaurant = order.restaurant
@@ -107,7 +129,7 @@ def add_items(order, items):
                   for a in Addon.objects.filter(pk__in=spec.get("addon_ids") or [], group__restaurant=restaurant, is_available=True)]
         li = OrderItem.objects.create(order=order, item=item, name=item.name, variant_name=variant_name, addons=addons,
                                       quantity=qty, unit_price=price, tax_percent=item.effective_tax,
-                                      notes=spec.get("notes", "")[:160], seat=spec.get("seat"))
+                                      notes=spec.get("notes", "")[:160], seat=spec.get("seat"), batch_ref=batch_ref[:64])
         if item.track_stock:
             item.stock_qty -= int(qty)
             if item.stock_qty <= 0:
