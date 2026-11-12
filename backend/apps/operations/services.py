@@ -19,6 +19,38 @@ class OrderError(Exception):
     pass
 
 
+class TableBusy(OrderError):
+    """Another attendant is serving this table (HTTP 409)."""
+
+
+def _staff_name(user):
+    return str(user).strip() or "another attendant"
+
+
+def table_busy_reason(table, user):
+    """Why `user` may not take orders on `table` right now, or None if they may.
+
+    Attendant A holds a table while it is open on their screen and while its running order is theirs;
+    attendant B is blocked until A is done. Customer QR orders (no user) are never blocked."""
+    if user is None or table is None:
+        return None
+    holder = table.live_lock
+    if holder is not None and holder.pk != user.pk:
+        return f"Table {table.name} is being served by {_staff_name(holder)} right now."
+    o = table.active_order
+    if o and o.taken_by_id and o.taken_by_id != user.pk:
+        return f"Table {table.name} already has an order taken by {_staff_name(o.taken_by)}. Ask them or a manager."
+    return None
+
+
+def check_table_access(table, user, can_override=False):
+    if can_override:
+        return
+    reason = table_busy_reason(table, user)
+    if reason:
+        raise TableBusy(reason)
+
+
 def get_or_create_customer(restaurant, phone, name="", email=""):
     phone = (phone or "").strip()
     if not phone:
@@ -46,7 +78,7 @@ def _already_applied(restaurant, ref):
 def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, room=None, user=None,
                  customer_phone="", customer_name="", guests=1, notes="", items=None, status=None,
                  delivery_address="", delivery_lat=None, delivery_lng=None, coupon_code="", payment_mode="",
-                 external_id="", customer_email="", client_ref=""):
+                 external_id="", customer_email="", client_ref="", can_override=False):
     if table is not None:
         # One request at a time per table: two devices (or a double tap) can't both see "no open order"
         # and each start one.
@@ -54,6 +86,8 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
     dup = _already_applied(restaurant, client_ref)
     if dup:
         return dup  # re-sent request (retry, offline replay, double click): don't add anything again
+    if table is not None and order_type == "dine_in" and source in ("pos", "captain"):
+        check_table_access(table, user, can_override)  # one attendant per table
     if table is not None and order_type == "dine_in":
         existing = table.active_order
         if existing and source in ("pos", "captain", "qr"):
@@ -128,7 +162,7 @@ def add_items(order, items, batch_ref=""):
         addons = [{"id": a.pk, "name": a.name, "price": str(a.price)}
                   for a in Addon.objects.filter(pk__in=spec.get("addon_ids") or [], group__restaurant=restaurant, is_available=True)]
         li = OrderItem.objects.create(order=order, item=item, name=item.name, variant_name=variant_name, addons=addons,
-                                      quantity=qty, unit_price=price, tax_percent=item.effective_tax,
+                                      quantity=qty, unit_price=price, tax_percent=restaurant.tax_rate_for(item),
                                       notes=spec.get("notes", "")[:160], seat=spec.get("seat"), batch_ref=batch_ref[:64])
         if item.track_stock:
             item.stock_qty -= int(qty)
@@ -303,10 +337,12 @@ def split_bill(order, mode="equal", parts=2, groups=None):
             sub = sum((li.line_total for li in lines), Decimal("0"))
             disc = sub - sub * disc_ratio
             tax = sum((li.line_total * disc_ratio * li.tax_percent / 100 for li in lines), Decimal("0"))
-            if r.prices_include_tax:
+            if r.includes_tax:
                 tax = sum((li.line_total * disc_ratio - li.line_total * disc_ratio / (1 + li.tax_percent / 100) for li in lines), Decimal("0"))
+            if not r.gst_enabled:
+                tax = Decimal("0")
             svc = (sub - disc) * r.service_charge_percent / 100 if order.order_type == "dine_in" else Decimal("0")
-            gross = sub - disc + svc + (Decimal("0") if r.prices_include_tax else tax)
+            gross = sub - disc + svc + (Decimal("0") if r.includes_tax else tax)
             total = gross.quantize(Decimal("1")) if r.round_off_bills else money(gross)
             bills.append(Bill.objects.create(
                 restaurant=r, order=order, number=_new_bill_number(r), label=f"Split {idx}/{len(groups)}",

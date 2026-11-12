@@ -23,6 +23,9 @@ class Base(TestCase):
         self.assertEqual(res.status_code, 200, res.content)
         self.c.credentials(HTTP_AUTHORIZATION="Bearer " + res.json()["access"])
         self.r = Restaurant.objects.get(slug="spice-garden")
+        # These flows check GST maths, so this restaurant charges GST (the default for new ones is off).
+        Restaurant.objects.filter(pk=self.r.pk).update(gst_enabled=True)
+        self.r.refresh_from_db()
 
     def item(self, name):
         return Item.objects.get(restaurant=self.r, name=name)

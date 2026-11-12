@@ -2,7 +2,7 @@
 {% block page_title %}Menu{% endblock %}
 {% block heading %}Menu{% endblock %}
 {% block content %}
-<div class="tabs" id="tabs"><button class="tab active" data-t="items">Items</button><button class="tab" data-t="cats">Categories</button><button class="tab" data-t="addons">Add-ons</button><button class="tab" data-t="hsn">HSN & GST</button><button class="tab" data-t="stations">Kitchen stations</button></div>
+<div class="tabs" id="tabs"><button class="tab active" data-t="items">Items</button><button class="tab" data-t="cats">Categories</button><button class="tab" data-t="addons">Add-ons</button>{% if gst %}<button class="tab" data-t="hsn">HSN & GST</button>{% endif %}<button class="tab" data-t="stations">Kitchen stations</button></div>
 <section data-p="items"><div id="items"></div></section>
 <section data-p="cats" class="hidden"><div id="cats"></div></section>
 <section data-p="addons" class="hidden"><div id="addons"></div></section>
@@ -25,8 +25,8 @@
       { key: "name", label: "Item", render: (i) => `<div class="row" style="gap:8px"><span class="diet ${i.diet}"></span><div><b>${S.esc(i.name)}</b> ${i.is_bestseller ? '<span class="badge b-primary">Bestseller</span>' : ""}<div class="tiny muted">${S.esc(i.short_code)} ${i.variants.length ? "· " + i.variants.map((v) => S.esc(v.name)).join("/") : ""}</div></div></div>` },
       { key: "category_name", label: "Category" },
       { key: "price", label: "Price", render: (i) => S.money(i.price) + (i.delivery_price ? `<div class="tiny muted">Online ${S.money(i.delivery_price)}</div>` : "") },
-      { key: "effective_tax", label: "GST", render: (i) => i.effective_tax + "%" },
-      { key: "is_available", label: "Available", render: (i) => `<label class="check"><input type="checkbox" data-toggle="${i.id}" ${i.is_available ? "checked" : ""}> ${i.track_stock ? `<span class="small muted">${i.stock_qty} left</span>` : ""}</label>` }],
+{% if gst %}      { key: "effective_tax", label: "GST", render: (i) => i.effective_tax + "%" },
+{% endif %}      { key: "is_available", label: "Available", render: (i) => `<label class="check"><input type="checkbox" data-toggle="${i.id}" ${i.is_available ? "checked" : ""}> ${i.track_stock ? `<span class="small muted">${i.stock_qty} left</span>` : ""}</label>` }],
     fields: () => [
       { name: "name", label: "Item name", required: true },
       { name: "category", label: "Category", type: "select", required: true, half: true, options: cats.map((c) => [c.id, c.name]) },
@@ -35,9 +35,9 @@
       { name: "delivery_price", label: "Online / delivery price (optional)", type: "number", half: true, nullable: true },
       { name: "short_code", label: "Short code (type-to-bill)", half: true },
       { name: "barcode", label: "Barcode", half: true },
-      { name: "hsn", label: "HSN code", type: "select", half: true, options: hsn.map((h) => [h.id, `${h.code} (${h.gst_percent}%)`]) },
+{% if gst %}      { name: "hsn", label: "HSN code", type: "select", half: true, options: hsn.map((h) => [h.id, `${h.code} (${h.gst_percent}%)`]) },
       { name: "tax_percent", label: "GST % (if no HSN)", type: "number", half: true, default: 5 },
-      { name: "station", label: "Kitchen station", type: "select", half: true, options: stations.map((s) => [s.id, s.name]) },
+{% endif %}      { name: "station", label: "Kitchen station", type: "select", half: true, options: stations.map((s) => [s.id, s.name]) },
       { name: "prep_minutes", label: "Prep time (min)", type: "number", half: true, default: 15 },
       { name: "variants_text", label: "Variants (e.g. Half:180, Full:300)", help: "Leave empty if the item has a single price" },
       { name: "description", label: "Description", type: "textarea" },
@@ -63,7 +63,7 @@
   });
   S.$("#items").addEventListener("click", (e) => {
     if (!e.target.closest("#bulk")) return;
-    const m = S.modal({ title: "Import items from CSV", body: '<p class="small muted">One item per line: <code>name,category,price,diet,short_code,gst</code>. Missing categories are created.</p><textarea id="csv" style="min-height:180px" placeholder="Masala Dosa,South Indian,90,veg,MD,5"></textarea>',
+    const m = S.modal({ title: "Import items from CSV", body: '<p class="small muted">One item per line: <code>name,category,price,diet,short_code{% if gst %},gst{% endif %}</code>. Missing categories are created.</p><textarea id="csv" style="min-height:180px" placeholder="Masala Dosa,South Indian,90,veg,MD,5"></textarea>',
       footer: '<button class="btn" data-close>Cancel</button><button class="btn btn-primary" id="go">Import</button>' });
     m.$("#go").onclick = async () => {
       let n = 0;
@@ -88,7 +88,7 @@
     fields: () => [{ name: "name", label: "Group name", required: true }, { name: "min_select", label: "Min choices", type: "number", half: true }, { name: "max_select", label: "Max choices", type: "number", half: true, default: 3 },
       { name: "addons_text", label: "Add-ons (Extra cheese:40, Less spicy:0)" }, { name: "items", label: "Applies to items (Ctrl/Cmd-click to pick several)", type: "multiselect", options: items.map((i) => [i.id, i.name]) }],
     beforeSave: (b, row) => { if (b.addons_text || !row) b.addons = parsePairs(b.addons_text); delete b.addons_text; return b; } });
-  S.crud(S.$("#hsn"), { endpoint: "hsn", title: "HSN code", onLoad: (r) => (hsn = r),
+  if (S.$("#hsn") && {{ gst|yesno:"true,false" }}) S.crud(S.$("#hsn"), { endpoint: "hsn", title: "HSN code", onLoad: (r) => (hsn = r),
     columns: [{ key: "code", label: "HSN / SAC" }, { key: "description", label: "Description" }, { key: "gst_percent", label: "GST %" }, { key: "cess_percent", label: "Cess %" }],
     fields: [{ name: "code", label: "HSN / SAC code", required: true, half: true }, { name: "gst_percent", label: "GST %", type: "number", half: true, default: 5 }, { name: "description", label: "Description" }, { name: "cess_percent", label: "Cess %", type: "number" }] });
   S.crud(S.$("#stations"), { endpoint: "stations", title: "Station", onLoad: (r) => (stations = r),

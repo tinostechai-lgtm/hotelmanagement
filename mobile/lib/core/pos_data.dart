@@ -34,6 +34,7 @@ class PosData extends ChangeNotifier {
 
   bool get isLoaded => fetchedAt != null;
   String get restaurantName => asStr(restaurant['name'], 'Restaurant');
+  bool get gstEnabled => restaurant['gst_enabled'] == true;
   bool hasFeature(String code) => features.contains(code);
 
   Iterable<MenuItem> get allItems sync* {

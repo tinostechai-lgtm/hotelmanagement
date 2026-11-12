@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../brand/theme.dart';
 import '../core/api_client.dart';
+import '../core/auth_store.dart';
 import '../core/format.dart';
 import '../core/json.dart';
 import '../core/pos_data.dart';
@@ -189,7 +190,32 @@ class _TablesScreenState extends State<TablesScreen> {
     );
   }
 
-  void _openTable(DiningTable t) {
+  /// One attendant per table: hold it on the server before opening (managers may take over).
+  Future<void> _openTable(DiningTable t) async {
+    final api = context.read<ApiClient>();
+    try {
+      await api.post('/tables/${t.id}/lock', const <String, dynamic>{});
+    } on ApiException catch (e) {
+      if (e.status != 409 || !mounted) return;
+      final canTakeOver = e.body is Map && e.body['can_take_over'] == true;
+      if (!canTakeOver) {
+        toast(context, e.message, error: true);
+        await context.read<PosData>().refreshTables();
+        return;
+      }
+      if (!await confirm(context, 'Table ${t.name} is in use', '${e.message}\n\nTake over this table? The running order moves to you.', ok: 'Take over')) {
+        return;
+      }
+      try {
+        await api.post('/tables/${t.id}/lock', {'take_over': true});
+      } catch (err) {
+        if (mounted) toast(context, errorText(err), error: true);
+        return;
+      }
+    } catch (_) {
+      // Offline: allow working on the table; the server re-checks when the order syncs.
+    }
+    if (!mounted) return;
     _open(OrderTarget(
       orderType: 'dine_in',
       tableId: t.id,
@@ -298,6 +324,7 @@ class _TableTile extends StatelessWidget {
     final color = tableStatusColors[status] ?? Brand.muted;
     final o = table.activeOrder;
     final busy = o != null;
+    final heldBy = table.heldByOther(context.read<AuthStore>().userId);
     final fg = busy ? Colors.white : Brand.ink;
     return Container(
       decoration: BoxDecoration(
@@ -339,6 +366,27 @@ class _TableTile extends StatelessWidget {
                     ]),
                   ),
                 ]),
+                if (heldBy.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: busy ? Colors.black.withOpacity(0.22) : const Color(0xFFFFF4E0),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.lock_rounded, size: 12, color: busy ? Colors.white : const Color(0xFF9A5B00)),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(heldBy,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w800, color: busy ? Colors.white : const Color(0xFF9A5B00))),
+                      ),
+                    ]),
+                  ),
+                ],
                 const Spacer(),
                 if (o != null) ...[
                   FittedBox(

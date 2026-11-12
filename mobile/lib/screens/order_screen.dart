@@ -44,6 +44,15 @@ class _OrderView extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.watch<OrderController>();
     final wide = isWide(context);
+    if (c.tableLost != null) {
+      final msg = c.tableLost!;
+      c.tableLost = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        toast(context, msg, error: true);
+        Navigator.of(context).maybePop();
+      });
+    }
     return Scaffold(
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -834,13 +843,13 @@ class _Totals extends StatelessWidget {
           row('Subtotal', o.subtotal),
           if (o.discount > 0) row('Discount', -o.discount, color: Brand.success),
           if (o.serviceCharge > 0) row('Service charge', o.serviceCharge),
-          row('Tax', o.tax),
+          if (o.tax > 0) row('GST', o.tax),
           if (o.extraCharges > 0) row('Delivery / packing / tip', o.extraCharges),
           row('Total', o.total, bold: true),
           if (o.paidAmount > 0) row('Paid', o.paidAmount, color: Brand.success),
           if (o.paidAmount > 0 && o.balance > 0) row('Balance', o.balance, bold: true, color: Brand.orangeDeep),
         ],
-        if (!cart.isEmpty) row('New items (est. incl. tax)', cart.total + cart.estimatedTax, bold: o == null),
+        if (!cart.isEmpty) row(cart.estimatedTax > 0 ? 'New items (est. incl. GST)' : 'New items', cart.total + cart.estimatedTax, bold: o == null),
       ]),
     );
   }

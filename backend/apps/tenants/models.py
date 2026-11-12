@@ -33,6 +33,8 @@ class Restaurant(models.Model):
     currency = models.CharField(max_length=3, default="INR")
 
     # Billing behaviour
+    gst_enabled = models.BooleanField("Charge GST on bills", default=False,
+                                      help_text="Off: bills carry no GST at all (no tax lines, HSN or GSTIN on bills and screens)")
     prices_include_tax = models.BooleanField(default=False)
     service_charge_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     round_off_bills = models.BooleanField(default=True)
@@ -69,6 +71,15 @@ class Restaurant(models.Model):
 
     class Meta:
         ordering = ["name"]
+
+    @property
+    def includes_tax(self):
+        """Menu prices already contain GST (only meaningful when GST is charged)."""
+        return self.gst_enabled and self.prices_include_tax
+
+    def tax_rate_for(self, item):
+        """GST % applied to an item on this restaurant's bills (0 when GST is off)."""
+        return item.effective_tax if self.gst_enabled else 0
 
     def __str__(self):
         return self.name

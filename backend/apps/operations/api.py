@@ -1,6 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -19,7 +20,8 @@ from .serializers import (AreaSerializer, BillSerializer, CreateOrderSerializer,
 
 
 def _err(e):
-    return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    code = status.HTTP_409_CONFLICT if isinstance(e, services.TableBusy) else status.HTTP_400_BAD_REQUEST
+    return Response({"detail": str(e), "code": "table_busy" if code == 409 else "error"}, status=code)
 
 
 class AreaViewSet(TenantViewSet):
@@ -43,8 +45,32 @@ class TableViewSet(TenantViewSet):
         t.save(update_fields=["status"])
         return Response(TableSerializer(t).data)
 
+    @action(detail=True, methods=["post"])
+    def lock(self, request, pk=None):
+        """Hold the table while it is open on this device (call again every ~30 s to keep it)."""
+        with transaction.atomic():
+            t = Table.objects.select_for_update().get(pk=self.get_object().pk)
+            reason = services.table_busy_reason(t, request.user)
+            if reason and not (request.data.get("take_over") and request.membership.can("void")):
+                return Response({"detail": reason, "code": "table_busy", "can_take_over": request.membership.can("void")}, status=409)
+            if reason:  # manager takes the table over: the running order is now theirs
+                o = t.active_order
+                if o and o.taken_by_id != request.user.pk:
+                    prev = services._staff_name(o.taken_by) if o.taken_by else "-"
+                    o.taken_by = request.user
+                    o.save(update_fields=["taken_by"])
+                    AuditLog.record(t.restaurant, request.user, "table.take_over", f"Table {t.name}", f"#{o.number} from {prev}")
+            t.locked_by, t.locked_at = request.user, timezone.now()
+            t.save(update_fields=["locked_by", "locked_at"])
+        return Response(TableSerializer(t).data)
+
+    @action(detail=True, methods=["post"])
+    def unlock(self, request, pk=None):
+        Table.objects.filter(pk=self.get_object().pk, locked_by=request.user).update(locked_by=None, locked_at=None)
+        return Response({"ok": True})
+
     def get_permissions(self):
-        if self.action == "status":
+        if self.action in ("status", "lock", "unlock"):
             return self._member_perms()
         return super().get_permissions()
 
@@ -135,6 +161,7 @@ class OrderViewSet(TenantViewSet):
                 customer_phone=d["customer_phone"], customer_name=d["customer_name"], guests=d["guests"], notes=d["notes"],
                 items=[dict(i) for i in d.get("items", [])], delivery_address=d["delivery_address"],
                 delivery_lat=d.get("delivery_lat"), delivery_lng=d.get("delivery_lng"), client_ref=d["client_ref"],
+                can_override=request.membership.can("void"),
                 payment_mode="cod" if d["order_type"] == "delivery" else "")
             if d["send_kot"]:
                 services.send_kot(order)
@@ -178,6 +205,8 @@ class OrderViewSet(TenantViewSet):
         s = LineSpec(data=request.data.get("items", []), many=True)
         s.is_valid(raise_exception=True)
         try:
+            if order.table_id and order.order_type == "dine_in":
+                services.check_table_access(order.table, request.user, request.membership.can("void"))
             services.add_items(order, [dict(i) for i in s.validated_data], batch_ref=str(request.data.get("client_ref") or "")[:64])
             if request.data.get("send_kot"):
                 services.send_kot(order)

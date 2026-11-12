@@ -53,6 +53,10 @@ class DiningTable {
     required this.status,
     required this.activeOrder,
     required this.occupiedSince,
+    this.inUseById,
+    this.inUseByName = '',
+    this.takenById,
+    this.takenByName = '',
   });
 
   factory DiningTable.fromJson(Map<String, dynamic> j) => DiningTable(
@@ -64,7 +68,24 @@ class DiningTable {
         status: asStr(j['status'], 'free'),
         activeOrder: j['active_order'] is Map ? TableOrderInfo.fromJson(asMap(j['active_order'])) : null,
         occupiedSince: asDate(j['occupied_since']),
+        inUseById: j['in_use_by'] is Map ? asIntOrNull(j['in_use_by']['id']) : null,
+        inUseByName: j['in_use_by'] is Map ? asStr(j['in_use_by']['name']) : '',
+        takenById: j['active_order'] is Map && j['active_order']['taken_by'] is Map ? asIntOrNull(j['active_order']['taken_by']['id']) : null,
+        takenByName: j['active_order'] is Map && j['active_order']['taken_by'] is Map ? asStr(j['active_order']['taken_by']['name']) : '',
       );
+
+  /// Attendant who has this table open right now / whose order it is.
+  final int? inUseById;
+  final String inUseByName;
+  final int? takenById;
+  final String takenByName;
+
+  /// Name of another attendant serving this table (empty if it's free or mine).
+  String heldByOther(int? me) {
+    if (inUseById != null && inUseById != me) return inUseByName;
+    if (takenById != null && takenById != me) return takenByName;
+    return '';
+  }
 
   final int id;
   final String name;

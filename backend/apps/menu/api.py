@@ -91,7 +91,7 @@ def menu_payload(restaurant, online=False):
         by_cat.setdefault(it.category_id, []).append({
             "id": it.id, "name": it.name, "description": it.description, "price": str(it.delivery_price or it.price) if online else str(it.price),
             "dine_in_price": str(it.price), "image_url": it.image_url, "diet": it.diet, "short_code": it.short_code, "barcode": it.barcode,
-            "tax_percent": str(it.effective_tax), "available": it.in_stock, "bestseller": it.is_bestseller, "is_weighted": it.is_weighted,
+            "tax_percent": str(restaurant.tax_rate_for(it)), "available": it.in_stock, "bestseller": it.is_bestseller, "is_weighted": it.is_weighted,
             "spice_level": it.spice_level, "prep_minutes": it.prep_minutes,
             "variants": [{"id": v.id, "name": v.name, "price": str(v.price)} for v in it.variants.all()],
             "addon_groups": [{"id": g.id, "name": g.name, "min": g.min_select, "max": g.max_select,

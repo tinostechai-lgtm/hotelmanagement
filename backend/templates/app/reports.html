@@ -10,7 +10,7 @@
   <div class="card kpi"><span class="l">Net sales</span><span class="v" id="k-sales">—</span></div>
   <div class="card kpi"><span class="l">Orders</span><span class="v" id="k-orders">—</span></div>
   <div class="card kpi"><span class="l">Avg. order value</span><span class="v" id="k-aov">—</span></div>
-  <div class="card kpi"><span class="l">GST collected</span><span class="v" id="k-tax">—</span></div>
+  {% if gst %}<div class="card kpi"><span class="l">GST collected</span><span class="v" id="k-tax">—</span></div>{% endif %}
 </div>
 <div class="grid g2" style="margin-top:16px">
   <div class="card"><div class="card-h"><h3>Sales trend</h3></div><canvas id="c-daily" height="220"></canvas></div>
@@ -41,7 +41,7 @@
     if (days === 1) { start.setDate(start.getDate() - 1); end.setDate(end.getDate() - 1); } else if (days > 1) start.setDate(start.getDate() - days + 1);
     const iso = (d) => d.toLocaleDateString("en-CA");
     const r = (last = await S.api(`reports/summary?start=${iso(start)}&end=${iso(end)}`));
-    S.$("#k-sales").textContent = S.money(r.sales); S.$("#k-orders").textContent = r.orders; S.$("#k-aov").textContent = S.money(r.avg_order_value); S.$("#k-tax").textContent = S.money(r.tax);
+    S.$("#k-sales").textContent = S.money(r.sales); S.$("#k-orders").textContent = r.orders; S.$("#k-aov").textContent = S.money(r.avg_order_value); if (S.$("#k-tax")) S.$("#k-tax").textContent = S.money(r.tax);
     S.$("#t-pay").innerHTML = bars(r.by_payment.map((x) => ({ ...x, method: labels[x.method] || x.method })), "method", "amount");
     S.$("#t-src").innerHTML = bars(r.by_source.map((x) => ({ ...x, source: labels[x.source] || x.source })), "source", "amount");
     S.$("#t-items").innerHTML = bars(r.top_items, "name", "qty", S.qty);
@@ -58,7 +58,7 @@
   S.$("#range").onchange = load;
   if (S.$("#csv")) S.$("#csv").onclick = () => {
     if (!last) return;
-    const lines = [["Metric", "Value"], ["Period", `${last.start} to ${last.end}`], ["Net sales", last.sales], ["Orders", last.orders], ["AOV", last.avg_order_value], ["GST", last.tax], ["Discounts", last.discount], ["Service charge", last.service_charge], ["Delivery fees", last.delivery_fees], [], ["Item", "Qty", "Amount"]]
+    const lines = [["Metric", "Value"], ["Period", `${last.start} to ${last.end}`], ["Net sales", last.sales], ["Orders", last.orders], ["AOV", last.avg_order_value], {% if gst %}["GST", last.tax], {% endif %}["Discounts", last.discount], ["Service charge", last.service_charge], ["Delivery fees", last.delivery_fees], [], ["Item", "Qty", "Amount"]]
       .concat(last.top_items.map((t) => [t.name, t.qty, t.amount])).concat([[], ["Payment mode", "Amount"]]).concat(last.by_payment.map((p) => [p.method, p.amount]));
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.map((l) => l.join(",")).join("\n")], { type: "text/csv" })); a.download = `sales-${last.start}-${last.end}.csv`; a.click();
   };

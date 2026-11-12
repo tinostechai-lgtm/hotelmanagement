@@ -14,11 +14,17 @@ class AreaSerializer(TenantSerializer):
 class TableSerializer(TenantSerializer):
     area_name = serializers.CharField(source="area.name", read_only=True, default="")
     active_order = serializers.SerializerMethodField()
+    in_use_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Table
-        exclude = ["restaurant"]
+        exclude = ["restaurant", "locked_by", "locked_at"]
         read_only_fields = ["qr_token", "occupied_since"]
+
+    def get_in_use_by(self, t):
+        """Attendant who has the table open right now: {id, name} or None."""
+        u = t.live_lock
+        return {"id": u.pk, "name": str(u)} if u else None
 
     def get_active_order(self, t):
         o = t.active_order
@@ -26,6 +32,7 @@ class TableSerializer(TenantSerializer):
             return None
         return {"id": o.id, "number": o.number, "total": str(o.total), "status": o.status, "guests": o.guests,
                 "items": o.live_items().count(), "since": o.created_at, "is_paid": o.is_paid,
+                "taken_by": ({"id": o.taken_by_id, "name": str(o.taken_by)} if o.taken_by_id else None),
                 "billed": o.bills.exclude(status="void").exists()}
 
 

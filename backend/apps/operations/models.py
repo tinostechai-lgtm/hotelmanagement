@@ -44,6 +44,11 @@ class Table(TenantModel):
     pos_y = models.PositiveIntegerField(default=0)
     qr_token = models.CharField(max_length=24, unique=True, editable=False)
     occupied_since = models.DateTimeField(null=True, blank=True)
+    # Who has this table open on their POS / app right now (renewed while the screen is open).
+    locked_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    locked_at = models.DateTimeField(null=True, blank=True)
+
+    LOCK_SECONDS = 90
 
     class Meta:
         ordering = ["area__sort", "name"]
@@ -59,6 +64,17 @@ class Table(TenantModel):
     @property
     def active_order(self):
         return self.orders.filter(status__in=Order.OPEN_STATUSES).order_by("-created_at").first()
+
+    @property
+    def live_lock(self):
+        """The user who has this table open right now (None if nobody, or the lock has expired)."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        if self.locked_by_id and self.locked_at and self.locked_at > timezone.now() - timedelta(seconds=self.LOCK_SECONDS):
+            return self.locked_by
+        return None
 
 
 class Room(TenantModel):
@@ -233,9 +249,9 @@ class Order(TenantModel):
             self.discount = d if not err else Decimal("0")
         discount = min(self.discount, subtotal)
         ratio = (subtotal - discount) / subtotal if subtotal else Decimal("0")
-        for li in lines:
+        for li in lines if r.gst_enabled else []:  # GST off: no tax at all
             taxable = li.line_total * ratio
-            if r.prices_include_tax:
+            if r.includes_tax:
                 tax += taxable - taxable / (1 + li.tax_percent / 100)
             else:
                 tax += taxable * li.tax_percent / 100
@@ -248,7 +264,7 @@ class Order(TenantModel):
         else:
             self.delivery_fee = Decimal("0")
         self.packaging_charge = r.packaging_charge if self.order_type in (self.Type.DELIVERY, self.Type.TAKEAWAY) and lines else Decimal("0")
-        gross = net + service + (Decimal("0") if r.prices_include_tax else tax) + self.delivery_fee + self.packaging_charge + self.tip
+        gross = net + service + (Decimal("0") if r.includes_tax else tax) + self.delivery_fee + self.packaging_charge + self.tip
         total = gross.quantize(Decimal("1"), rounding=ROUND_HALF_UP) if r.round_off_bills else money(gross)
         self.subtotal, self.discount, self.service_charge, self.tax = money(subtotal), money(discount), money(service), money(tax)
         self.round_off = money(total - gross)
@@ -259,12 +275,14 @@ class Order(TenantModel):
         return self
 
     def tax_breakup(self):
-        """GST split by rate: {rate: (taxable, cgst, sgst)}."""
+        """GST split by rate: {rate: (taxable, cgst, sgst)}. Empty when the restaurant doesn't charge GST."""
+        if not self.restaurant.gst_enabled:
+            return {}
         out = {}
         ratio = (self.subtotal - self.discount) / self.subtotal if self.subtotal else Decimal("0")
         for li in self.live_items():
             taxable = li.line_total * ratio
-            if self.restaurant.prices_include_tax:
+            if self.restaurant.includes_tax:
                 taxable = taxable / (1 + li.tax_percent / 100)
             t = taxable * li.tax_percent / 100
             row = out.setdefault(li.tax_percent, [Decimal("0"), Decimal("0")])

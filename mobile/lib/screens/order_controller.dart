@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -24,6 +25,44 @@ class OrderTarget {
 class OrderController extends ChangeNotifier {
   OrderController({required this.api, required this.queue, required this.target}) {
     cart.addListener(notifyListeners);
+    _ticker = Timer.periodic(const Duration(seconds: 10), (_) => _tick());
+  }
+
+  Timer? _ticker;
+  int _ticks = 0;
+  bool _disposed = false;
+
+  /// Set when another attendant took this table over while it was open here.
+  String? tableLost;
+
+  int? get _lockTableId => target.orderType == 'dine_in' ? target.tableId : null;
+
+  /// Every 10 s: refresh the order (live details from kitchen, cashier and other devices);
+  /// every 30 s: renew this device's hold on the table.
+  Future<void> _tick() async {
+    if (_disposed) return;
+    _ticks++;
+    final tid = _lockTableId;
+    if (tid != null && _ticks % 3 == 0) {
+      try {
+        await api.post('/tables/$tid/lock', const <String, dynamic>{});
+      } on ApiException catch (e) {
+        if (e.status == 409 && !_disposed) {
+          tableLost = e.message;
+          notifyListeners();
+          return;
+        }
+      } catch (_) {}
+    }
+    final id = order?.id;
+    if (id == null || busy || loading) return;
+    try {
+      final fresh = await api.get('/orders/$id');
+      if (!_disposed && !busy) {
+        _setOrder(fresh);
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   final ApiClient api;
@@ -285,6 +324,12 @@ class OrderController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _ticker?.cancel();
+    final tid = _lockTableId;
+    if (tid != null) {
+      api.post('/tables/$tid/unlock', const <String, dynamic>{}).catchError((_) => null); // release the table
+    }
     cart.removeListener(notifyListeners);
     cart.dispose();
     customerName.dispose();

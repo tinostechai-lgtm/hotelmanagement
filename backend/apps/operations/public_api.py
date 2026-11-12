@@ -41,7 +41,7 @@ def store_info(r):
             "delivery_fee": str(r.delivery_fee), "free_delivery_above": str(r.free_delivery_above), "min_order": str(r.delivery_min_order),
             "packaging_charge": str(r.packaging_charge), "prep_minutes": r.avg_prep_minutes, "lat": r.latitude, "lng": r.longitude,
             "qr_ordering": r.has_feature("qr_ordering"), "razorpay_key": razorpay_client.key_id(),
-            "razorpay_demo": not razorpay_client.enabled(), "prices_include_tax": r.prices_include_tax}
+            "razorpay_demo": not razorpay_client.enabled(), "prices_include_tax": r.includes_tax, "gst_enabled": r.gst_enabled}
 
 
 @api_view(["GET"])

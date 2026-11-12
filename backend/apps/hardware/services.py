@@ -39,11 +39,11 @@ def render_bill(bill, width=80):
     rest = bill.restaurant
     r = Receipt(width)
     r.text(rest.name, bold=True, big=True, align="center")
-    for line in filter(None, [rest.address, rest.phone and f"Ph: {rest.phone}", rest.gstin and f"GSTIN: {rest.gstin}",
+    for line in filter(None, [rest.address, rest.phone and f"Ph: {rest.phone}", rest.gst_enabled and rest.gstin and f"GSTIN: {rest.gstin}",
                               rest.fssai and f"FSSAI: {rest.fssai}"]):
         r.text(line, align="center")
     r.rule("=")
-    r.text("TAX INVOICE", bold=True, align="center")
+    r.text("TAX INVOICE" if rest.gst_enabled else "BILL", bold=True, align="center")
     r.pair(f"Bill: {bill.number}", timezone.localtime(bill.created_at).strftime("%d-%m-%Y %H:%M"))
     r.pair(o.label, f"Order {o.number}")
     if o.customer_name or o.customer_phone:
@@ -61,7 +61,7 @@ def render_bill(bill, width=80):
         r.pair("Discount", "-" + _fmt(bill.discount))
     if bill.service_charge:
         r.pair("Service charge", _fmt(bill.service_charge))
-    if bill.tax:
+    if bill.tax and rest.gst_enabled:
         half = Decimal(bill.tax) / 2
         r.pair("CGST", _fmt(half))
         r.pair("SGST", _fmt(Decimal(bill.tax) - half))

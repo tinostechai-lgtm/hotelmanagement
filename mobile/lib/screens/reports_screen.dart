@@ -5,6 +5,7 @@ import '../brand/theme.dart';
 import '../core/api_client.dart';
 import '../core/format.dart';
 import '../core/json.dart';
+import '../core/pos_data.dart';
 import '../widgets/common.dart';
 import '../widgets/offline_banner.dart';
 
@@ -103,7 +104,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         StatCard(label: 'Orders', value: '${asInt(d['orders'])}', icon: Icons.receipt_long_rounded, color: Brand.info),
                         StatCard(label: 'Avg order', value: Fmt.money(asDouble(d['avg_order_value'])), icon: Icons.trending_up_rounded, color: Brand.success),
                         StatCard(label: 'Guests', value: '${asInt(d['guests'])}', icon: Icons.groups_rounded, color: Brand.violet),
-                        StatCard(label: 'Tax', value: Fmt.money(asDouble(d['tax'])), icon: Icons.account_balance_rounded, color: Brand.teal),
+                        if (context.read<PosData>().gstEnabled)
+                          StatCard(label: 'GST', value: Fmt.money(asDouble(d['tax'])), icon: Icons.account_balance_rounded, color: Brand.teal),
                         StatCard(label: 'Discounts', value: Fmt.money(asDouble(d['discount'])), icon: Icons.local_offer_rounded, color: Brand.warning),
                         StatCard(label: 'Open orders', value: '${asInt(d['open_orders'])}', icon: Icons.pending_actions_rounded, color: Brand.orangeDeep),
                         StatCard(label: 'Cancelled', value: '${asInt(d['cancelled'])}', icon: Icons.cancel_rounded, color: Brand.danger),

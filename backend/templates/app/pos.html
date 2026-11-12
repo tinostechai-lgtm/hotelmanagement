@@ -139,6 +139,8 @@
       return `<button class="tbl st-${status}" data-table="${t.id}">
         <div class="row between"><span class="nm">${S.esc(t.name)}</span><span class="small muted"><i data-lucide="users" style="width:14px"></i> ${o ? o.guests : t.seats}</span></div>
         <span class="stt">${status === "occupied" ? "Running" : status}</span>
+        ${(() => { const who = (t.in_use_by && t.in_use_by.id !== ME) ? t.in_use_by.name : (o && o.taken_by && o.taken_by.id !== ME ? o.taken_by.name : "");
+           return who ? `<div class="small" style="color:var(--warning);font-weight:700"><i data-lucide="lock" style="width:13px;vertical-align:-2px"></i> ${S.esc(who)}</div>` : ""; })()}
         ${o ? `<div class="small muted">${S.ago(o.since)} · ${o.items} items</div><div class="amt">${S.money(o.total)}</div>` : `<div class="small muted amt" style="font-weight:500">${S.esc(t.area_name || "")}</div>`}
       </button>`;
     }).join("") || '<div class="empty">No tables yet. Add them under Tables & Rooms.</div>';
@@ -149,9 +151,37 @@
       || '<div class="muted small">None right now.</div>';
     S.icons();
   }
-  $("#tables").onclick = (e) => {
+  /* One attendant per table: hold the table while it is open here, release it when leaving. */
+  const ME = {{ request.user.id }};
+  async function acquireTable(id) {
+    try { await S.api(`tables/${id}/lock`, { body: {}, quiet: true }); return true; }
+    catch (e) {
+      if (e.status !== 409) { S.toast(e.message, "err"); return false; }
+      if (e.data && e.data.can_take_over && await S.confirm(`${e.message}\n\nTake over this table? The running order will move to you.`, "Take over")) {
+        try { await S.api(`tables/${id}/lock`, { body: { take_over: true } }); return true; } catch (_) { return false; }
+      }
+      if (!(e.data && e.data.can_take_over)) S.toast(e.message, "err");
+      return false;
+    }
+  }
+  function holdTable() {
+    clearInterval(st.lockTimer);
+    const id = st.ctx && st.ctx.table && st.ctx.table.id;
+    if (!id) return;
+    st.lockTimer = setInterval(() => S.api(`tables/${id}/lock`, { body: {}, quiet: true }).catch((e) => {
+      if (e.status === 409) { S.toast(e.message, "err"); clearInterval(st.lockTimer); back(true); }
+    }), 30000);
+  }
+  function releaseTable() {
+    clearInterval(st.lockTimer);
+    const id = st.ctx && st.ctx.table && st.ctx.table.id;
+    if (id) fetch(`/api/tables/${id}/unlock`, { method: "POST", keepalive: true, credentials: "same-origin", headers: { "X-CSRFToken": S.csrf() } }).catch(() => {});
+  }
+  window.addEventListener("pagehide", releaseTable);
+  $("#tables").onclick = async (e) => {
     const b = e.target.closest("[data-table]"); if (!b) return;
     const t = Number(b.dataset.table);
+    if (!(await acquireTable(t))) { loadFloor(); return; }
     S.list("tables").then((ts) => { const tb = ts.find((x) => x.id === t); tb.active_order ? openOrder(tb.active_order.id) : newOrder("dine_in", tb); });
   };
   $("#other-orders").onclick = (e) => { const b = e.target.closest("[data-order]"); b && openOrder(Number(b.dataset.order)); };
@@ -164,7 +194,7 @@
   }));
 
   /* ---------------- Order screen ---------------- */
-  function showOrder() { $("#floor").classList.add("hidden"); $("#order").classList.remove("hidden"); renderCats(); renderItems(); renderCart(); setTimeout(() => $("#search").focus(), 50); }
+  function showOrder() { $("#floor").classList.add("hidden"); $("#order").classList.remove("hidden"); renderCats(); renderItems(); renderCart(); holdTable(); setTimeout(() => $("#search").focus(), 50); }
   function newOrder(type, table = null, room = null) {
     st.order = null; st.draft = []; st.ctx = { type, table, room, guests: 2 };
     $("#c-phone").value = ""; $("#c-name").value = ""; $("#c-address").value = "";
@@ -175,9 +205,10 @@
     st.order = await S.api(`orders/${id}`); st.draft = [];
     st.ctx = { type: st.order.order_type, table: st.order.table ? { id: st.order.table, name: st.order.table_name } : null, room: st.order.room ? { id: st.order.room, number: st.order.room_number } : null, guests: st.order.guests };
     $("#c-phone").value = st.order.customer_phone || ""; $("#c-name").value = st.order.customer_name || ""; $("#c-address").value = st.order.delivery_address || "";
+    if (st.ctx.table && st.order.order_type === "dine_in" && !["completed", "cancelled"].includes(st.order.status) && !(await acquireTable(st.ctx.table.id))) { st.ctx.table = null; back(); return; }
     showOrder();
   }
-  function back() { $("#order").classList.add("hidden"); $("#floor").classList.remove("hidden"); history.replaceState(null, "", location.pathname); loadFloor(); }
+  function back() { releaseTable(); $("#order").classList.add("hidden"); $("#floor").classList.remove("hidden"); history.replaceState(null, "", location.pathname); loadFloor(); }
   $("#back").onclick = async () => { if (st.draft.length && !(await S.confirm("Discard items not yet saved?", "Discard", true))) return; back(); };
 
   function renderCats() {
@@ -263,7 +294,7 @@
         T("Service charge", o.service_charge) + T("GST", o.tax) + T("Delivery fee", o.delivery_fee) + T("Packaging", o.packaging_charge) + T("Round off", o.round_off) +
         (st.draft.length ? `<div class="row" style="color:var(--primary)"><span>Unsaved items</span><span>+${S.money(draftTotal())}</span></div>` : "") +
         `<div class="row grand"><span>Total</span><span>${S.money(Number(o.total) + draftTotal())}</span></div>` + (Number(o.paid_amount) ? T("Paid", o.paid_amount) + `<div class="row" style="font-weight:700"><span>Balance</span><span>${S.money(o.balance)}</span></div>` : "");
-    } else $("#totals").innerHTML = `<div class="row grand"><span>Total (before tax)</span><span>${S.money(draftTotal())}</span></div>`;
+    } else $("#totals").innerHTML = `<div class="row grand"><span>{% if gst %}Total (before tax){% else %}Total{% endif %}</span><span>${S.money(draftTotal())}</span></div>`;
     $("#m-total").textContent = S.money((o ? Number(o.total) : 0) + draftTotal());
     S.icons();
   }

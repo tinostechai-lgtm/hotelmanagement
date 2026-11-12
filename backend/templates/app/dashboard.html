@@ -45,7 +45,7 @@
   if (canReports) {
     const r = await S.api("reports/summary");
     S.$('[data-k="sales"]').textContent = S.money(r.sales);
-    S.$('[data-k="sales_sub"]').textContent = `GST ${S.money(r.tax)} · discounts ${S.money(r.discount)}`;
+    S.$('[data-k="sales_sub"]').textContent = {% if gst %}`GST ${S.money(r.tax)} · discounts ${S.money(r.discount)}`{% else %}`Discounts ${S.money(r.discount)}`{% endif %};
     S.$('[data-k="orders"]').textContent = r.orders;
     S.$('[data-k="guests"]').textContent = `${r.guests} guests · ${r.cancelled} cancelled`;
     S.$('[data-k="aov"]').textContent = S.money(r.avg_order_value);

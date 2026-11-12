@@ -43,6 +43,7 @@ class AuthStore extends ChangeNotifier {
 
   String get userName => asStr(user?['name'], 'Staff');
   String get phone => asStr(user?['phone']);
+  int? get userId => asIntOrNull(user?['id']);
 
   Membership? get membership {
     for (final m in memberships) {

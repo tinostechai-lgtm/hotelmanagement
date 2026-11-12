@@ -156,7 +156,7 @@ def app_page(perm=None, feature=None):
                 if visible:
                     nav.append((section, visible))
             ctx = {"nav": nav, "page": fn.__name__.replace("_page", ""), "memberships": Membership.objects.filter(user=request.user, is_active=True).select_related("restaurant"),
-                   "perms": m.role.permissions}
+                   "perms": m.role.permissions, "gst": r.gst_enabled}
             if perm and not m.can(perm):
                 return render(request, "app/forbidden.html", ctx, status=403)
             if feature and not r.has_feature(feature):
