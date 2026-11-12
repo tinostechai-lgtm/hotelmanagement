@@ -12,8 +12,10 @@ import '../core/print_service.dart';
 import '../widgets/common.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/settings_sheets.dart';
+import 'bills_screen.dart';
 import 'delivery_ops_screen.dart';
 import 'kds_screen.dart';
+import 'live_orders_screen.dart';
 import 'printers_screen.dart';
 import 'reports_screen.dart';
 import 'restaurant_picker_screen.dart';
@@ -35,6 +37,10 @@ class AppMode {
 final List<AppMode> appModes = [
   AppMode('pos', 'POS & Tables', 'Take orders, bill & settle', Icons.point_of_sale_rounded, (_) => const TablesScreen(),
       [Color(0xFFEA580C), Color(0xFFB4290F)]),
+  AppMode('pos', 'Live Orders', 'Every open order, live', Icons.radar_rounded, (_) => const LiveOrdersScreen(),
+      [Color(0xFFDB2777), Color(0xFF9D174D)]),
+  AppMode('pos', 'Bills', 'Past bills & reprint', Icons.receipt_long_rounded, (_) => const BillsScreen(),
+      [Color(0xFF475569), Color(0xFF1E293B)]),
   AppMode('kitchen', 'Kitchen', 'Live KOTs by station', Icons.soup_kitchen_rounded, (_) => const KdsScreen(),
       [Color(0xFF7C3AED), Color(0xFF4C1D95)]),
   AppMode('delivery', 'Delivery', 'Assign riders, track', Icons.delivery_dining_rounded, (_) => const DeliveryOpsScreen(),

@@ -20,6 +20,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   static const _ranges = {'today': 'Today', 'yesterday': 'Yesterday', '7d': '7 days', '30d': '30 days'};
   String _range = 'today';
   Map<String, dynamic>? _data;
+  Map<String, dynamic>? _items;
   String? _error;
   bool _loading = false;
 
@@ -44,8 +45,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _error = null;
     });
     try {
-      final d = asMap(await api.get('/reports/summary', query: {'start': Fmt.isoDate(start), 'end': Fmt.isoDate(end)}));
-      if (mounted) setState(() => _data = d);
+      final q = {'start': Fmt.isoDate(start), 'end': Fmt.isoDate(end)};
+      final res = await Future.wait([api.get('/reports/summary', query: q), api.get('/reports/items', query: q)]);
+      if (mounted) {
+        setState(() {
+          _data = asMap(res[0]);
+          _items = asMap(res[1]);
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = errorText(e));
     } finally {
@@ -123,7 +130,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           .map((e) => (Fmt.titleCase(asStr(e['order_type'])), asDouble(e['amount']), asInt(e['n'])))
                           .toList(),
                     ),
-                    _TopItems(rows: listOf(d['top_items'])),
+                    if (_items != null) _ItemSales(data: _items!),
                     _Hourly(rows: listOf(d['hourly'])),
                   ]),
                 ),
@@ -267,6 +274,47 @@ class _Hourly extends StatelessWidget {
             ),
         ]),
       ),
+    );
+  }
+}
+
+
+/// Every item sold in the period: quantity and amount, with totals.
+class _ItemSales extends StatelessWidget {
+  const _ItemSales({required this.data});
+
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = listOf(data['items']).map(asMap).toList();
+    TextStyle h = const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Brand.muted);
+    Widget line(String a, String b, String c, {bool bold = false, Color? color}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Row(children: [
+            Expanded(child: Text(a, style: TextStyle(fontWeight: bold ? FontWeight.w900 : FontWeight.w700, fontSize: 15, color: color))),
+            SizedBox(width: 56, child: Text(b, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: color))),
+            SizedBox(width: 96, child: Text(c, textAlign: TextAlign.right, style: TextStyle(fontWeight: bold ? FontWeight.w900 : FontWeight.w700, fontSize: 15, color: color))),
+          ]),
+        );
+    return _Panel(
+      title: 'Item-wise sales',
+      child: rows.isEmpty
+          ? const Text('No completed orders in this period', style: TextStyle(color: Brand.muted))
+          : Column(children: [
+              Row(children: [
+                Expanded(child: Text('ITEM', style: h)),
+                SizedBox(width: 56, child: Text('QTY', textAlign: TextAlign.right, style: h)),
+                SizedBox(width: 96, child: Text('AMOUNT', textAlign: TextAlign.right, style: h)),
+              ]),
+              const Divider(height: 14),
+              for (final r in rows) line(asStr(r['name']), Fmt.qty(asDouble(r['qty'])), Fmt.money(asDouble(r['amount']))),
+              const Divider(height: 14, thickness: 2),
+              line('Total (${data['item_count']} items)', Fmt.qty(asDouble(data['total_qty'])), Fmt.money(asDouble(data['total_amount'])), bold: true),
+              if (asDouble(data['discount']) > 0)
+                line('Less discounts', '', '-${Fmt.money(asDouble(data['discount']))}', color: Brand.success),
+              line('Net sales (${data['orders']} orders)', '', Fmt.money(asDouble(data['net_sales'])), bold: true, color: Brand.orangeDeep),
+            ]),
     );
   }
 }
