@@ -1,0 +1,78 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Bills{% endblock %}
+{% block heading %}Bills{% endblock %}
+{% block content %}
+<style>
+  .rcpt { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: #fff; color: #111; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; max-width: 420px; margin: 0 auto; }
+  .rcpt h4 { text-align: center; margin: 0 0 2px; font-size: 16px; }
+  .rcpt .c { text-align: center; }
+  .rcpt .r { display: flex; justify-content: space-between; gap: 10px; }
+  .rcpt .rule { border-top: 1px dashed #999; margin: 8px 0; }
+  .rcpt .g { font-weight: 800; font-size: 15px; }
+  @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; left: 0; top: 0; width: 100%; } .rcpt { border: 0; } }
+</style>
+<div class="row wrap" style="margin-bottom:14px;gap:10px">
+  <input type="date" id="d" style="max-width:180px">
+  <input type="search" id="q" placeholder="Bill no., order no., table, phone or name" style="max-width:320px">
+  <select id="st" style="max-width:160px"><option value="">All bills</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partly paid</option></select>
+  <span class="grow"></span><span class="small muted" id="sum" style="align-self:center"></span>
+</div>
+<div id="list"></div>
+<div id="print-area" style="display:none"></div>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(function () {
+  const restName = "{{ request.restaurant.name|escapejs }}", restAddr = "{{ request.restaurant.address|escapejs }}", restPhone = "{{ request.restaurant.phone|escapejs }}";
+  const footer = "{{ request.restaurant.bill_footer|escapejs }}";
+  const methods = { cash: "Cash", card: "Card", upi: "UPI", wallet: "Wallet", razorpay: "Online", cod: "Cash on delivery", room: "Room", credit: "Credit", loyalty: "Loyalty" };
+  S.$("#d").value = "{{ today }}";
+  let rows = [];
+  const badge = (b) => `<span class="badge ${b.status === "paid" ? "b-success" : b.status === "unpaid" ? "b-warning" : "b-info"}">${S.esc(b.status_display)}</span>`;
+  async function load() {
+    const q = S.$("#q").value.trim(), d = S.$("#d").value, st = S.$("#st").value;
+    rows = await S.list(`bills?${q ? "q=" + encodeURIComponent(q) : d ? "date=" + d : ""}${st ? "&status=" + st : ""}`);
+    const total = rows.reduce((s, b) => s + Number(b.total), 0);
+    S.$("#sum").textContent = rows.length ? `${rows.length} bills · ${S.money(total)}` : "";
+    S.$("#list").innerHTML = rows.length ? `<div class="table-wrap"><table class="data"><thead><tr><th>Bill</th><th>Order</th><th>Customer</th><th>Paid by</th><th>Status</th><th>Time</th><th class="right">Total</th><th></th></tr></thead><tbody>${rows.map((b, i) => `<tr data-i="${i}" style="cursor:pointer">
+      <td><b>${S.esc(b.number)}</b>${b.label ? `<div class="tiny muted">${S.esc(b.label)}</div>` : ""}</td>
+      <td>#${S.esc(b.order_number)}<div class="tiny muted">${S.esc(b.order_label)}</div></td>
+      <td>${S.esc(b.customer_name || "—")}<div class="tiny muted">${S.esc(b.customer_phone || "")}</div></td>
+      <td class="small">${b.payments.filter((p) => p.status === "success").map((p) => S.esc(methods[p.method] || p.method)).join(", ") || "—"}</td>
+      <td>${badge(b)}</td><td class="small muted">${S.date(b.created_at)}</td><td class="right"><b>${S.money(b.total)}</b></td>
+      <td class="right"><button class="btn btn-sm" data-i="${i}">View</button></td></tr>`).join("")}</tbody></table></div>`
+      : '<div class="card empty"><i data-lucide="file-search"></i><div>No bills for this day or search.</div></div>';
+    S.icons();
+  }
+  function receipt(b) {
+    const R = (l, v, cls = "") => `<div class="r ${cls}"><span>${l}</span><span>${v}</span></div>`;
+    const m = (v) => S.money(v);
+    return `<div class="rcpt">
+      <h4>${S.esc(restName)}</h4>${restAddr ? `<div class="c small">${S.esc(restAddr)}</div>` : ""}${restPhone ? `<div class="c small">Ph: ${S.esc(restPhone)}</div>` : ""}
+      <div class="rule"></div><div class="c"><b>BILL</b></div>
+      ${R("Bill: " + S.esc(b.number), new Date(b.created_at).toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }))}
+      ${R(S.esc(b.order_label), "Order " + S.esc(b.order_number))}
+      ${b.customer_name || b.customer_phone ? `<div>Guest: ${S.esc(b.customer_name)} ${S.esc(b.customer_phone)}</div>` : ""}
+      ${b.taken_by_name ? `<div>Served by: ${S.esc(b.taken_by_name)}</div>` : ""}
+      <div class="rule"></div>${R("<b>Item</b>", "<b>Qty · Amount</b>")}<div class="rule"></div>
+      ${b.lines.map((l) => R(S.esc(l.name), `${S.esc(l.qty)} · ${m(l.amount)}`)).join("")}
+      <div class="rule"></div>${R("Subtotal", m(b.subtotal))}
+      ${Number(b.discount) ? R("Discount", "-" + m(b.discount)) : ""}${Number(b.service_charge) ? R("Service charge", m(b.service_charge)) : ""}
+      ${Number(b.tax) ? R("GST", m(b.tax)) : ""}${Number(b.extra_charges) ? R("Delivery/Packing", m(b.extra_charges)) : ""}${Number(b.round_off) ? R("Round off", m(b.round_off)) : ""}
+      <div class="rule"></div>${R("GRAND TOTAL", m(b.total), "g")}<div class="rule"></div>
+      ${b.payments.filter((p) => p.status === "success").map((p) => R(S.esc(methods[p.method] || p.method) + (p.reference ? ` (${S.esc(p.reference)})` : ""), m(p.amount))).join("") || "<div>Not paid yet</div>"}
+      ${footer ? `<div class="rule"></div><div class="c small">${S.esc(footer)}</div>` : ""}</div>`;
+  }
+  function show(b) {
+    const md = S.modal({ title: `Bill ${b.number}`, wide: false, body: receipt(b),
+      footer: `<a class="btn" href="/app/pos/?order=${b.order_id}">Open order</a><button class="btn" data-send><i data-lucide="printer"></i>Send to printer</button><button class="btn btn-primary" data-print><i data-lucide="printer"></i>Print</button>` });
+    md.$("[data-print]").onclick = () => { const p = S.$("#print-area"); p.innerHTML = receipt(b); p.style.display = "block"; window.print(); p.style.display = "none"; };
+    md.$("[data-send]").onclick = async () => { const r = await S.api(`bills/${b.id}/print`, { body: {} }); S.toast(r.queued ? "Sent to the bill printer" : "No printer connected — use Print instead", r.queued ? "ok" : "err"); };
+  }
+  S.$("#list").onclick = (e) => { const t = e.target.closest("[data-i]"); if (t) show(rows[Number(t.dataset.i)]); };
+  S.$("#d").onchange = load; S.$("#st").onchange = load;
+  S.$("#q").oninput = () => { clearTimeout(window._bq); window._bq = setTimeout(load, 300); };
+  load();
+})();
+</script>
+{% endblock %}

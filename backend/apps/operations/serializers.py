@@ -188,3 +188,40 @@ class ShiftSerializer(serializers.ModelSerializer):
         model = Shift
         exclude = ["restaurant"]
         read_only_fields = ["opened_by", "expected_cash", "closed_at"]
+
+
+class LiveOrderSerializer(OrderListSerializer):
+    """Open order with its lines, for the live orders board."""
+    lines = serializers.SerializerMethodField()
+    taken_by_name = serializers.SerializerMethodField()
+    table_name = serializers.CharField(source="table.name", read_only=True, default=None)
+
+    class Meta(OrderListSerializer.Meta):
+        fields = OrderListSerializer.Meta.fields + ["lines", "taken_by_name", "table_name", "guests", "notes", "updated_at"]
+
+    def get_lines(self, o):
+        return [{"id": li.id, "name": li.display_name, "qty": str(li.quantity.normalize()), "status": li.status,
+                 "notes": li.notes, "amount": str(li.line_total)} for li in o.items.all() if not li.is_void]
+
+    def get_taken_by_name(self, o):
+        return str(o.taken_by) if o.taken_by_id else ""
+
+
+class BillHistorySerializer(serializers.ModelSerializer):
+    """A bill with everything needed to show or reprint it after payment."""
+    payments = PaymentSerializer(many=True, read_only=True)
+    order_id = serializers.IntegerField(source="order.id", read_only=True)
+    order_number = serializers.CharField(source="order.number", read_only=True)
+    order_label = serializers.CharField(source="order.label", read_only=True)
+    order_type = serializers.CharField(source="order.order_type", read_only=True)
+    customer_name = serializers.CharField(source="order.customer_name", read_only=True)
+    customer_phone = serializers.CharField(source="order.customer_phone", read_only=True)
+    taken_by_name = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = Bill
+        exclude = ["restaurant", "order"]
+
+    def get_taken_by_name(self, b):
+        return str(b.order.taken_by) if b.order.taken_by_id else ""

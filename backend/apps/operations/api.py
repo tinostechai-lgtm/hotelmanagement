@@ -14,7 +14,7 @@ from apps.tenants.api_base import TenantViewSet
 
 from . import services
 from .models import KOT, Area, Bill, Notification, Order, OrderItem, Reservation, Room, Shift, Table
-from .serializers import (AreaSerializer, BillSerializer, CreateOrderSerializer, KOTSerializer, LineSpec,
+from .serializers import (AreaSerializer, BillHistorySerializer, BillSerializer, LiveOrderSerializer, CreateOrderSerializer, KOTSerializer, LineSpec,
                           NotificationSerializer, OrderListSerializer, OrderSerializer, ReservationSerializer,
                           RoomSerializer, ShiftSerializer, TableSerializer)
 
@@ -194,7 +194,8 @@ class OrderViewSet(TenantViewSet):
         qs = qs.exclude(pk__in=services.awaiting_payment(qs).values("pk"))
         return Response({
             "server_time": timezone.now(),
-            "orders": OrderListSerializer(qs[:200], many=True).data,
+            "orders": (LiveOrderSerializer(qs.select_related("table", "taken_by").prefetch_related("items")[:200], many=True).data
+                       if request.query_params.get("details") else OrderListSerializer(qs[:200], many=True).data),
             "pending_online": qs.filter(status="pending").count(),
             "unread_notifications": Notification.objects.filter(restaurant=r, is_read=False).count(),
         })
@@ -411,3 +412,40 @@ class ShiftViewSet(TenantViewSet):
         AuditLog.record(shift.restaurant, request.user, "shift.close", f"Shift {shift.pk}",
                         f"expected ₹{shift.expected_cash}, counted ₹{shift.closing_cash}, difference ₹{shift.closing_cash - shift.expected_cash}")
         return Response(ShiftSerializer(shift).data)
+
+
+class BillViewSet(TenantViewSet):
+    """Bill history: find, view and reprint bills - including after they are paid."""
+    queryset = Bill.objects.select_related("order", "order__taken_by", "order__table").prefetch_related("payments")
+    serializer_class = BillHistorySerializer
+    perm = "pos"
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        qs = super().get_queryset().exclude(status="void").order_by("-created_at")
+        p = self.request.query_params
+        if p.get("date"):
+            qs = qs.filter(created_at__date=p["date"])
+        if p.get("start"):
+            qs = qs.filter(created_at__date__gte=p["start"])
+        if p.get("end"):
+            qs = qs.filter(created_at__date__lte=p["end"])
+        if p.get("status"):
+            qs = qs.filter(status__in=p["status"].split(","))
+        if p.get("q"):
+            q = p["q"].strip()
+            qs = qs.filter(Q(number__icontains=q) | Q(order__number__icontains=q) | Q(order__customer_phone__icontains=q)
+                           | Q(order__customer_name__icontains=q) | Q(order__table__name__iexact=q))
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        return Response({"detail": "Bills are created from orders"}, status=405)
+
+    @action(detail=True, methods=["post"], url_path="print")
+    def print_bill(self, request, pk=None):
+        """Reprint a bill (works after payment). Returns the receipt text for an on-screen preview."""
+        from apps.hardware.services import print_bill, render_bill
+
+        bill = self.get_object()
+        jobs = print_bill(bill) if request.data.get("to_printer", True) else []
+        return Response({"queued": len(jobs), "preview": render_bill(bill).plain})

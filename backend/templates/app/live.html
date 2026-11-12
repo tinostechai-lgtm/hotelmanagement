@@ -1,0 +1,69 @@
+{% extends "app/shell.html" %}
+{% block page_title %}Live Orders{% endblock %}
+{% block heading %}Live orders{% endblock %}
+{% block topbar_actions %}
+<span class="small muted" id="upd" style="align-self:center"></span>
+<select id="type" style="width:auto;min-height:38px"><option value="">All orders</option><option value="dine_in">Dine-in</option><option value="takeaway">Takeaway</option><option value="delivery">Delivery</option><option value="room_service">Room service</option></select>
+{% endblock %}
+{% block content %}
+<style>
+  .live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .lo { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; }
+  .lo-h { padding: 12px 16px; display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .lo-h b { font-size: 17px; }
+  .lo-b { padding: 8px 16px 12px; flex: 1; }
+  .lo-l { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+  .lo-l:last-child { border-bottom: 0; }
+  .lo-l .q { font-weight: 800; min-width: 30px; }
+  .lo-l .n { flex: 1; }
+  .lo-l .s { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; align-self: flex-start; white-space: nowrap; }
+  .s-new { background: #EEF2FF; color: #3730A3; } .s-sent { background: #FFF4E0; color: #9A5B00; } .s-preparing { background: #FFF4E0; color: #9A5B00; }
+  .s-ready { background: #DCFCE7; color: #166534; } .s-served { background: #F1F5F9; color: #334155; }
+  .lo-f { padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); }
+  .lo.fresh { animation: flash 1.2s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 3px var(--primary); } to { box-shadow: none; } }
+</style>
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="card kpi"><span class="l">Open orders</span><span class="v" id="k-open">—</span></div>
+  <div class="card kpi"><span class="l">Items in kitchen</span><span class="v" id="k-kitchen">—</span></div>
+  <div class="card kpi"><span class="l">Ready to serve</span><span class="v" id="k-ready">—</span></div>
+  <div class="card kpi"><span class="l">Running value</span><span class="v" id="k-value">—</span></div>
+</div>
+<div id="board" class="live-grid"></div>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(function () {
+  const statusLabel = { new: "Not sent", sent: "In kitchen", preparing: "Preparing", ready: "Ready", served: "Served" };
+  let seen = {};
+  async function load() {
+    let data;
+    try { data = await S.api("orders/live?details=1", { quiet: true }); } catch (e) { S.$("#upd").textContent = "Reconnecting…"; return; }
+    const type = S.$("#type").value;
+    const orders = data.orders.filter((o) => !type || o.order_type === type);
+    const lines = orders.flatMap((o) => o.lines);
+    S.$("#k-open").textContent = orders.length;
+    S.$("#k-kitchen").textContent = lines.filter((l) => ["sent", "preparing"].includes(l.status)).length;
+    S.$("#k-ready").textContent = lines.filter((l) => l.status === "ready").length;
+    S.$("#k-value").textContent = S.money(orders.reduce((s, o) => s + Number(o.total), 0));
+    S.$("#upd").textContent = "Live · updated " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    S.$("#board").innerHTML = orders.length ? orders.map((o) => {
+      const fresh = seen[o.id] && seen[o.id] !== o.updated_at;
+      return `<div class="lo ${fresh ? "fresh" : ""}">
+        <div class="lo-h"><div><b>${S.esc(o.table_name ? "Table " + o.table_name : o.label)}</b>
+          <div class="small muted">#${S.esc(o.number)} · ${S.esc(o.source_display)}${o.taken_by_name ? " · " + S.esc(o.taken_by_name) : ""}</div>
+          ${o.customer_name ? `<div class="small">${S.esc(o.customer_name)} ${S.esc(o.customer_phone || "")}</div>` : ""}</div>
+          <div style="text-align:right"><span class="badge b-info">${S.esc(o.status_display)}</span><div class="small muted" style="margin-top:4px">${S.ago(o.created_at)}</div></div></div>
+        <div class="lo-b">${o.lines.map((l) => `<div class="lo-l"><span class="q">${S.esc(l.qty)}×</span><span class="n">${S.esc(l.name)}${l.notes ? `<div class="tiny muted">${S.esc(l.notes)}</div>` : ""}</span><span class="s s-${l.status}">${statusLabel[l.status] || l.status}</span></div>`).join("") || '<div class="small muted">No items yet</div>'}
+          ${o.notes ? `<div class="small" style="margin-top:6px"><b>Note:</b> ${S.esc(o.notes)}</div>` : ""}</div>
+        <div class="lo-f"><b>${S.money(o.total)}</b> ${o.is_paid ? '<span class="badge b-success">Paid</span>' : ""}<a class="btn btn-sm" href="/app/pos/?order=${o.id}">Open</a></div></div>`;
+    }).join("") : '<div class="card empty" style="grid-column:1/-1"><i data-lucide="coffee"></i><div>No open orders right now.</div></div>';
+    seen = Object.fromEntries(orders.map((o) => [o.id, o.updated_at]));
+    S.icons();
+  }
+  S.$("#type").onchange = load;
+  load();
+  setInterval(() => { if (!document.hidden) load(); }, 5000);
+})();
+</script>
+{% endblock %}

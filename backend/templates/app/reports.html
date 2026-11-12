@@ -12,6 +12,17 @@
   <div class="card kpi"><span class="l">Avg. order value</span><span class="v" id="k-aov">—</span></div>
   {% if gst %}<div class="card kpi"><span class="l">GST collected</span><span class="v" id="k-tax">—</span></div>{% endif %}
 </div>
+<div class="card" id="daily-items" style="margin-top:16px">
+  <div class="card-h"><h3><i data-lucide="list-ordered" style="width:16px;color:var(--primary)"></i> Daily item sales</h3>
+    <div class="row" style="gap:8px"><input type="date" id="di-date" style="width:auto;min-height:36px"><button class="btn btn-sm" id="di-print"><i data-lucide="printer"></i>Print</button>{% if "export" in perms %}<button class="btn btn-sm" id="di-csv"><i data-lucide="download"></i>CSV</button>{% endif %}</div></div>
+  <div class="grid g4" style="margin-bottom:12px">
+    <div class="kpi"><span class="l">Items sold (qty)</span><span class="v" id="di-qty">—</span></div>
+    <div class="kpi"><span class="l">Item total</span><span class="v" id="di-amt">—</span></div>
+    <div class="kpi"><span class="l">Orders</span><span class="v" id="di-orders">—</span></div>
+    <div class="kpi"><span class="l">Net sales (billed)</span><span class="v" id="di-net">—</span></div>
+  </div>
+  <div id="di-table"></div>
+</div>
 <div class="grid g2" style="margin-top:16px">
   <div class="card"><div class="card-h"><h3>Sales trend</h3></div><canvas id="c-daily" height="220"></canvas></div>
   <div class="card"><div class="card-h"><h3>Sales by hour</h3></div><canvas id="c-hourly" height="220"></canvas></div>
@@ -37,7 +48,7 @@
     pos: "POS", captain: "Captain", qr: "QR table", online: "Online store", app: "App", swiggy: "Swiggy", zomato: "Zomato", other: "Other" };
   async function load() {
     const days = Number(S.$("#range").value);
-    const end = new Date(), start = new Date();
+    const end = new Date("{{ today }}T12:00:00"), start = new Date("{{ today }}T12:00:00"); // restaurant's "today", not the browser clock
     if (days === 1) { start.setDate(start.getDate() - 1); end.setDate(end.getDate() - 1); } else if (days > 1) start.setDate(start.getDate() - days + 1);
     const iso = (d) => d.toLocaleDateString("en-CA");
     const r = (last = await S.api(`reports/summary?start=${iso(start)}&end=${iso(end)}`));
@@ -55,6 +66,48 @@
       charts.push(new Chart(S.$("#c-hourly"), { type: "bar", data: { labels: hours.map((h) => `${h}:00`), datasets: [{ label: "Sales", data: hours.map((h) => (r.hourly.find((x) => x.hour === h) || {}).sales || 0), backgroundColor: "#14123A", borderRadius: 6 }] }, options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid } } } }));
     }
   }
+  /* ---- Daily item sales ---- */
+  let dayRep = null;
+  const PM = { cash: "Cash", card: "Card", upi: "UPI", wallet: "Wallet", razorpay: "Online", cod: "Cash on delivery", room: "Room", credit: "Credit", loyalty: "Loyalty" };
+  S.$("#di-date").value = "{{ today }}";
+  async function loadDay() {
+    const d = S.$("#di-date").value;
+    const r = (dayRep = await S.api(`reports/items?date=${d}`));
+    S.$("#di-qty").textContent = S.qty ? S.qty(r.total_qty) : r.total_qty;
+    S.$("#di-amt").textContent = S.money(r.total_amount);
+    S.$("#di-orders").textContent = r.orders;
+    S.$("#di-net").textContent = S.money(r.net_sales);
+    S.$("#di-table").innerHTML = r.items.length ? `<div class="table-wrap"><table class="data"><thead><tr><th>#</th><th>Item</th><th>Category</th><th class="right">Qty sold</th><th class="right">Orders</th><th class="right">Amount</th></tr></thead><tbody>
+      ${r.items.map((it, i) => `<tr><td class="muted">${i + 1}</td><td><b>${S.esc(it.name)}</b></td><td class="small muted">${S.esc(it.category)}</td><td class="right"><b>${S.esc(it.qty)}</b></td><td class="right">${it.orders}</td><td class="right">${S.money(it.amount)}</td></tr>`).join("")}
+      <tr style="border-top:2px solid var(--line)"><td></td><td><b>Total (${r.item_count} items)</b></td><td></td><td class="right"><b>${S.esc(r.total_qty)}</b></td><td class="right"><b>${r.orders}</b></td><td class="right"><b>${S.money(r.total_amount)}</b></td></tr>
+      ${Number(r.discount) ? `<tr><td></td><td colspan="4" class="muted">Less discounts</td><td class="right">-${S.money(r.discount)}</td></tr>` : ""}
+      <tr><td></td><td colspan="4"><b>Net sales (billed, incl. charges)</b></td><td class="right"><b>${S.money(r.net_sales)}</b></td></tr>
+      ${r.by_payment.map((p) => `<tr><td></td><td colspan="4" class="small muted">${S.esc(PM[p.method] || p.method)} (${p.n})</td><td class="right small">${S.money(p.amount)}</td></tr>`).join("")}
+      </tbody></table></div>` : '<div class="muted small">No completed orders on this day.</div>';
+    S.icons();
+  }
+  S.$("#di-date").onchange = loadDay;
+  S.$("#di-print").onclick = () => {
+    if (!dayRep) return;
+    const w = window.open("", "_blank");
+    const rows = dayRep.items.map((it) => `<tr><td>${S.esc(it.name)}</td><td style="text-align:right">${S.esc(it.qty)}</td><td style="text-align:right">${S.money(it.amount)}</td></tr>`).join("");
+    w.document.write(`<html><head><title>Item sales ${dayRep.start}</title><style>body{font-family:system-ui,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}h2{margin:0}</style></head><body>
+      <h2>{{ request.restaurant.name|escapejs }}</h2><p>Item-wise sales · ${dayRep.start}</p>
+      <table><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Amount</th></tr>${rows}
+      <tr><th>Total</th><th style="text-align:right">${S.esc(dayRep.total_qty)}</th><th style="text-align:right">${S.money(dayRep.total_amount)}</th></tr>
+      ${Number(dayRep.discount) ? `<tr><td>Less discounts</td><td></td><td style="text-align:right">-${S.money(dayRep.discount)}</td></tr>` : ""}
+      <tr><th>Net sales (${dayRep.orders} orders)</th><th></th><th style="text-align:right">${S.money(dayRep.net_sales)}</th></tr></table>
+      <script>window.print()<\/script></body></html>`);
+    w.document.close();
+  };
+  if (S.$("#di-csv")) S.$("#di-csv").onclick = () => {
+    if (!dayRep) return;
+    const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const lines = [["Item", "Category", "Qty", "Orders", "Amount"]].concat(dayRep.items.map((it) => [it.name, it.category, it.qty, it.orders, it.amount]))
+      .concat([["Total", "", dayRep.total_qty, dayRep.orders, dayRep.total_amount], ["Discounts", "", "", "", dayRep.discount], ["Net sales", "", "", "", dayRep.net_sales]]);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.map((l) => l.map(q).join(",")).join("\n")], { type: "text/csv" })); a.download = `item-sales-${dayRep.start}.csv`; a.click();
+  };
+  loadDay();
   S.$("#range").onchange = load;
   if (S.$("#csv")) S.$("#csv").onclick = () => {
     if (!last) return;

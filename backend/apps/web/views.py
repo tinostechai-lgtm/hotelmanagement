@@ -5,6 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.accounts.models import Membership
@@ -15,7 +16,9 @@ NAV = [
     ("Operate", [
         ("dashboard", "Dashboard", "layout-dashboard", None, None),
         ("pos", "POS & Tables", "monitor-smartphone", "pos", None),
+        ("live", "Live Orders", "radio", "pos", None),
         ("orders", "Orders", "receipt-text", "pos", None),
+        ("bills", "Bills", "file-text", "pos", None),
         ("kitchen", "Kitchen Display", "chef-hat", "kitchen", None),
         ("delivery", "Home Delivery", "bike", "delivery", "delivery"),
     ]),
@@ -156,7 +159,8 @@ def app_page(perm=None, feature=None):
                 if visible:
                     nav.append((section, visible))
             ctx = {"nav": nav, "page": fn.__name__.replace("_page", ""), "memberships": Membership.objects.filter(user=request.user, is_active=True).select_related("restaurant"),
-                   "perms": m.role.permissions, "gst": r.gst_enabled}
+                   "perms": m.role.permissions, "gst": r.gst_enabled,
+                   "today": timezone.localdate().isoformat()}
             if perm and not m.can(perm):
                 return render(request, "app/forbidden.html", ctx, status=403)
             if feature and not r.has_feature(feature):
@@ -181,6 +185,16 @@ def pos(request):
 
 @app_page("pos")
 def orders(request):
+    pass
+
+
+@app_page("pos")
+def live(request):
+    pass
+
+
+@app_page("pos")
+def bills(request):
     pass
 
 

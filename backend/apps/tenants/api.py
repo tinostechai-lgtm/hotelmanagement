@@ -53,6 +53,22 @@ def reports(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def item_sales(request):
+    """Daily item-wise sales report. ?date=YYYY-MM-DD (default today) or ?start=&end=."""
+    from apps.operations import reports as rep
+
+    r = resolve_restaurant(request, request.user)
+    m = getattr(request, "membership", None)
+    if not r or not m or not m.can("reports"):
+        return Response({"detail": "Reports permission required"}, status=403)
+    p = request.query_params
+    start = date.fromisoformat(p.get("date") or p["start"]) if (p.get("date") or p.get("start")) else None
+    end = date.fromisoformat(p.get("date") or p["end"]) if (p.get("date") or p.get("end")) else None
+    return Response(rep.item_sales(r, start, end))
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def insights(request):
     from apps.operations import reports as rep
 

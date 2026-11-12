@@ -32,6 +32,7 @@ router.register("tables", ops.TableViewSet)
 router.register("rooms", ops.RoomViewSet)
 router.register("reservations", ops.ReservationViewSet)
 router.register("orders", ops.OrderViewSet)
+router.register("bills", ops.BillViewSet)
 router.register("kots", ops.KOTViewSet)
 router.register("notifications", ops.NotificationViewSet)
 router.register("shifts", ops.ShiftViewSet)
@@ -65,6 +66,7 @@ urlpatterns = [
     path("bootstrap", tenants.pos_bootstrap),
     path("reports/summary", tenants.reports),
     path("reports/insights", tenants.insights),
+    path("reports/items", tenants.item_sales),
     path("plans", subs.plans),
     path("subscription", subs.current),
     path("subscription/checkout", subs.checkout),

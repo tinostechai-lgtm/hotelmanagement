@@ -49,6 +49,41 @@ def summary(restaurant, start=None, end=None):
     }
 
 
+def item_sales(restaurant, start=None, end=None):
+    """Item-wise sales for a day (or range): quantity and amount of every item sold, plus totals.
+
+    Counts completed orders (paid & closed). Item amounts are before order-level discounts; `net_sales`
+    is what was actually billed (after discounts, plus service/delivery/packing charges)."""
+    start, end = _range(start, end)
+    done = Order.objects.filter(restaurant=restaurant, status="completed", created_at__date__gte=start, created_at__date__lte=end)
+    rows = {}
+    lines = (OrderItem.objects.filter(order__in=done, is_void=False)
+             .select_related("item__category").only("name", "variant_name", "quantity", "unit_price", "addons", "order_id",
+                                                     "item__category__name"))
+    for li in lines:
+        key = li.display_name
+        r = rows.setdefault(key, {"name": key, "category": (li.item.category.name if li.item_id and li.item.category_id else "Other"),
+                                  "qty": Decimal("0"), "amount": Decimal("0"), "orders": set()})
+        r["qty"] += li.quantity
+        r["amount"] += li.line_total
+        r["orders"].add(li.order_id)
+    items = sorted(rows.values(), key=lambda r: (-r["qty"], r["name"]))
+    agg = done.aggregate(sales=Sum("total"), discount=Sum("discount"), n=Count("id"))
+    pays = Payment.objects.filter(restaurant=restaurant, status="success", order__in=done)
+    return {
+        "start": start, "end": end,
+        "items": [{"name": r["name"], "category": r["category"], "qty": r["qty"].normalize(), "amount": r["amount"],
+                   "orders": len(r["orders"])} for r in items],
+        "total_qty": sum((r["qty"] for r in items), Decimal("0")).normalize(),
+        "total_amount": sum((r["amount"] for r in items), Decimal("0")),
+        "item_count": len(items),
+        "orders": agg["n"] or 0,
+        "discount": agg["discount"] or Decimal("0"),
+        "net_sales": agg["sales"] or Decimal("0"),
+        "by_payment": list(pays.values("method").annotate(amount=Sum("amount"), n=Count("id")).order_by("-amount")),
+    }
+
+
 def insights(restaurant):
     """Forecast next 7 days with weekday-weighted moving average, plus
     plain-English recommendations. No external ML service required."""
