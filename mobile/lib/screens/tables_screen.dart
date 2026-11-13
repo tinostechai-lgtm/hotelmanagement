@@ -194,7 +194,10 @@ class _TablesScreenState extends State<TablesScreen> {
   Future<void> _openTable(DiningTable t) async {
     final api = context.read<ApiClient>();
     try {
-      await api.post('/tables/${t.id}/lock', const <String, dynamic>{});
+      final r = await api.post('/tables/${t.id}/lock', const <String, dynamic>{});
+      if (r is Map && r['owner_view'] == true && mounted) {
+        toast(context, 'Opened as owner. ${r['notice']}'); // the waiter keeps the table
+      }
     } on ApiException catch (e) {
       if (e.status != 409 || !mounted) return;
       final canTakeOver = e.body is Map && e.body['can_take_over'] == true;

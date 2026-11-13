@@ -76,15 +76,37 @@ class TableLockTests(Base):
         Table.objects.filter(pk=self.t.pk).update(locked_at=timezone.now() - timedelta(minutes=5))
         self.assertEqual(self.b.post(f"/api/tables/{self.t.id}/lock", {}, format="json").status_code, 200)
 
-    def test_manager_can_take_over(self):
+    def test_owner_can_open_a_running_table_without_taking_it(self):
         o = self.order(self.a, "a-1").json()
+        self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json")  # waiter A is on the table
         res = self.c.post(f"/api/tables/{self.t.id}/lock", {}, format="json")  # self.c = owner
-        self.assertEqual(res.status_code, 409)
-        self.assertTrue(res.json()["can_take_over"])
-        self.assertEqual(self.c.post(f"/api/tables/{self.t.id}/lock", {"take_over": True}, format="json").status_code, 200)
-        self.assertEqual(Order.objects.get(pk=o["id"]).taken_by.username, "9999999999")
-        # captain B still can't take it over
-        self.assertEqual(self.b.post(f"/api/tables/{self.t.id}/lock", {"take_over": True}, format="json").status_code, 409)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()["owner_view"])
+        self.assertIn("Anil", res.json()["notice"])
+        self.assertEqual(self.c.get(f"/api/orders/{o['id']}").status_code, 200)  # owner sees the live order
+        # nothing moved: A still holds the table and owns the order
+        t = Table.objects.get(pk=self.t.pk)
+        self.assertEqual(t.locked_by.first_name, "Anil")
+        self.assertEqual(Order.objects.get(pk=o["id"]).taken_by.first_name, "Anil")
+        self.assertEqual(self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json").status_code, 200)
+        # owner's leaving doesn't release A's hold
+        self.c.post(f"/api/tables/{self.t.id}/unlock", {}, format="json")
+        self.assertEqual(Table.objects.get(pk=self.t.pk).locked_by.first_name, "Anil")
+        # owner may add items to the running order
+        tikka = self.item("Paneer Tikka")
+        self.assertEqual(self.c.post(f"/api/orders/{o['id']}/items", {"items": [{"item_id": tikka.id}]}, format="json").status_code, 200)
+
+    def test_other_staff_including_managers_stay_blocked(self):
+        self.order(self.a, "a-1")
+        self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json")
+        mgr_user = User.objects.create_user(username="7000000009", phone="7000000009", first_name="Mani", password="Pass@1234")
+        Membership.objects.create(user=mgr_user, restaurant=self.r, role=Role.objects.get(restaurant=self.r, name="Manager"))
+        mgr = APIClient()
+        mgr.credentials(HTTP_AUTHORIZATION="Bearer " + mgr.post("/api/auth/login", {"phone": "7000000009", "password": "Pass@1234"}, format="json").json()["access"])
+        self.assertEqual(mgr.post(f"/api/tables/{self.t.id}/lock", {}, format="json").status_code, 409)
+        self.assertEqual(mgr.post(f"/api/tables/{self.t.id}/lock", {"take_over": True}, format="json").status_code, 409)
+        self.assertEqual(self.b.post(f"/api/tables/{self.t.id}/lock", {}, format="json").status_code, 409)
+        self.assertEqual(self.order(self.b, "b-x").status_code, 409)
 
     def test_after_bill_settled_table_is_free_again(self):
         o = self.order(self.a, "a-1").json()

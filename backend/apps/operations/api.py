@@ -26,6 +26,13 @@ def _err(e):
     return Response({"detail": str(e), "code": "table_busy" if code == 409 else "error"}, status=code)
 
 
+def _is_owner(request):
+    """The restaurant's owner may open any running table (view / help) without blocking the waiter."""
+    m = getattr(request, "membership", None)
+    r = getattr(request, "restaurant", None)
+    return bool((r and r.owner_id == request.user.pk) or (m and m.role.is_system and m.role.name == "Owner"))
+
+
 def _device(request):
     """Id of the phone / browser tab making the request (X-Device-Id header; empty for old apps)."""
     return (request.headers.get("X-Device-Id") or "")[:64]
@@ -58,15 +65,13 @@ class TableViewSet(TenantViewSet):
         with transaction.atomic():
             t = Table.objects.select_for_update().get(pk=self.get_object().pk)
             reason = services.table_busy_reason(t, request.user, _device(request))
-            if reason and not (request.data.get("take_over") and request.membership.can("void")):
-                return Response({"detail": reason, "code": "table_busy", "can_take_over": request.membership.can("void")}, status=409)
-            if reason:  # manager takes the table over: the running order is now theirs
-                o = t.active_order
-                if o and o.taken_by_id != request.user.pk:
-                    prev = services._staff_name(o.taken_by) if o.taken_by else "-"
-                    o.taken_by = request.user
-                    o.save(update_fields=["taken_by"])
-                    AuditLog.record(t.restaurant, request.user, "table.take_over", f"Table {t.name}", f"#{o.number} from {prev}")
+            if reason and _is_owner(request):
+                # Owner opens the running table as it is: the waiter keeps it (no take-over, nothing moved).
+                data = TableSerializer(t).data
+                data.update({"owner_view": True, "notice": reason})
+                return Response(data)
+            if reason:
+                return Response({"detail": reason, "code": "table_busy", "can_take_over": False}, status=409)
             t.locked_by, t.locked_at, t.locked_device = request.user, timezone.now(), _device(request)
             t.save(update_fields=["locked_by", "locked_at", "locked_device"])
         return Response(TableSerializer(t).data)
@@ -171,7 +176,7 @@ class OrderViewSet(TenantViewSet):
                 customer_phone=d["customer_phone"], customer_name=d["customer_name"], guests=d["guests"], notes=d["notes"],
                 items=[dict(i) for i in d.get("items", [])], delivery_address=d["delivery_address"],
                 delivery_lat=d.get("delivery_lat"), delivery_lng=d.get("delivery_lng"), client_ref=d["client_ref"],
-                can_override=request.membership.can("void"), device=_device(request),
+                can_override=_is_owner(request), device=_device(request),
                 confirm_duplicate=bool(request.data.get("confirm_duplicate")),
                 payment_mode="cod" if d["order_type"] == "delivery" else "")
             if d["send_kot"]:
@@ -218,7 +223,7 @@ class OrderViewSet(TenantViewSet):
         s.is_valid(raise_exception=True)
         try:
             if order.table_id and order.order_type == "dine_in":
-                services.check_table_access(order.table, request.user, request.membership.can("void"), _device(request))
+                services.check_table_access(order.table, request.user, _is_owner(request), _device(request))
             services.add_items(order, [dict(i) for i in s.validated_data], batch_ref=str(request.data.get("client_ref") or "")[:64],
                                user=request.user, check_duplicate=not request.data.get("confirm_duplicate"))
             if request.data.get("send_kot"):

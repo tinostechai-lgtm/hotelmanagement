@@ -154,7 +154,11 @@
   /* One attendant per table: hold the table while it is open here, release it when leaving. */
   const ME = {{ request.user.id }};
   async function acquireTable(id) {
-    try { await S.api(`tables/${id}/lock`, { body: {}, quiet: true }); return true; }
+    try {
+      const r = await S.api(`tables/${id}/lock`, { body: {}, quiet: true });
+      if (r && r.owner_view) S.toast(`Opened as owner — ${r.notice.replace(/ right now\.$/, "")}. They keep the table.`, "ok");
+      return true;
+    }
     catch (e) {
       if (e.status !== 409) { S.toast(e.message, "err"); return false; }
       if (e.data && e.data.can_take_over && await S.confirm(`${e.message}\n\nTake over this table? The running order will move to you.`, "Take over")) {
