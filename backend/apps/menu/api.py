@@ -7,10 +7,30 @@ from .models import AddonGroup, Category, HSNCode, Item, KitchenStation
 from .serializers import AddonGroupSerializer, CategorySerializer, HSNSerializer, ItemSerializer, StationSerializer
 
 
+def _bulk_delete(viewset, request, label):
+    """POST {ids: [...]} -> delete those rows of this restaurant (audit-logged). Returns {deleted: n}."""
+    from apps.accounts.models import AuditLog
+
+    ids = request.data.get("ids") or []
+    if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        return Response({"detail": "ids must be a list of numbers"}, status=400)
+    rows = list(viewset.get_queryset().filter(pk__in=ids))
+    for r in rows:
+        AuditLog.record(request.restaurant, request.user, f"menu.delete", r.name, f"bulk delete ({label})")
+    n = len(rows)
+    viewset.get_queryset().filter(pk__in=[r.pk for r in rows]).delete()
+    return Response({"deleted": n})
+
+
 class CategoryViewSet(TenantViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     perm = "menu"
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """Delete several categories at once (their items are deleted with them)."""
+        return _bulk_delete(self, request, "category")
 
 
 class ItemViewSet(TenantViewSet):
@@ -31,6 +51,11 @@ class ItemViewSet(TenantViewSet):
 
         AuditLog.record(instance.restaurant, self.request.user, "menu.delete", instance.name, f"₹{instance.price}")
         instance.delete()
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """Delete several items at once: POST {ids: [...]}."""
+        return _bulk_delete(self, request, "item")
 
     def get_queryset(self):
         qs = super().get_queryset()

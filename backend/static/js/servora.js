@@ -140,19 +140,37 @@
   /* ---------- Generic CRUD table ---------- */
   S.crud = function (el, cfg) {
     // cfg: {endpoint, title, columns:[{key,label,render}], fields, defaults, actions:[{label, icon, run(row, reload)}], canCreate}
+    // cfg.bulkDelete: endpoint for POST {ids:[...]} - adds row checkboxes + "Delete selected".
     let rows = [];
+    const selected = new Set();
+    let shown = [];
+    const syncBulk = () => {
+      const b = el.querySelector("[data-bulk-del]");
+      if (!b) return;
+      b.classList.toggle("hidden", !selected.size);
+      b.querySelector("span").textContent = `Delete selected (${selected.size})`;
+      const all = el.querySelector("[data-sel-all]");
+      if (all) all.checked = shown.length > 0 && shown.every((r) => selected.has(r.id));
+    };
     const render = () => {
       const q = (el.querySelector("[data-q]")?.value || "").toLowerCase();
-      const shown = rows.filter((r) => !q || JSON.stringify(r).toLowerCase().includes(q));
-      el.querySelector("[data-body]").innerHTML = shown.length ? `<div class="table-wrap"><table class="data"><thead><tr>${cfg.columns.map((c) => `<th class="${c.cls || ""}">${S.esc(c.label)}</th>`).join("")}<th></th></tr></thead><tbody>${shown
-        .map((r) => `<tr data-id="${r.id}">${cfg.columns.map((c) => `<td class="${c.cls || ""}">${c.render ? c.render(r) : S.esc(r[c.key])}</td>`).join("")}
+      shown = rows.filter((r) => !q || JSON.stringify(r).toLowerCase().includes(q));
+      const sel = (r) => cfg.bulkDelete ? `<td style="width:34px"><input type="checkbox" data-sel="${r.id}" ${selected.has(r.id) ? "checked" : ""} aria-label="Select"></td>` : "";
+      el.querySelector("[data-body]").innerHTML = shown.length ? `<div class="table-wrap"><table class="data"><thead><tr>${cfg.bulkDelete ? `<th style="width:34px"><input type="checkbox" data-sel-all title="Select all shown" aria-label="Select all"></th>` : ""}${cfg.columns.map((c) => `<th class="${c.cls || ""}">${S.esc(c.label)}</th>`).join("")}<th></th></tr></thead><tbody>${shown
+        .map((r) => `<tr data-id="${r.id}">${sel(r)}${cfg.columns.map((c) => `<td class="${c.cls || ""}">${c.render ? c.render(r) : S.esc(r[c.key])}</td>`).join("")}
           <td class="right nowrap">${(cfg.actions || []).map((a, i) => `<button class="btn btn-sm btn-ghost" data-act="${i}" title="${S.esc(a.label)}"><i data-lucide="${a.icon}"></i></button>`).join("")}
           ${cfg.fields ? `<button class="btn btn-sm btn-ghost" data-edit title="Edit"><i data-lucide="pencil"></i></button>` : ""}
           ${cfg.noDelete ? "" : `<button class="btn btn-sm btn-ghost" data-del title="Delete"><i data-lucide="trash-2"></i></button>`}</td></tr>`).join("")}</tbody></table></div>`
         : `<div class="card empty"><i data-lucide="${cfg.emptyIcon || "inbox"}"></i><div>${S.esc(cfg.empty || "Nothing here yet")}</div></div>`;
       S.icons();
+      syncBulk();
     };
-    const load = async () => { rows = await S.list(cfg.endpoint); render(); cfg.onLoad && cfg.onLoad(rows); };
+    const load = async () => {
+      rows = await S.list(cfg.endpoint);
+      const ids = new Set(rows.map((r) => r.id));
+      [...selected].forEach((id) => ids.has(id) || selected.delete(id));
+      render(); cfg.onLoad && cfg.onLoad(rows);
+    };
     const fields = () => (typeof cfg.fields === "function" ? cfg.fields() : cfg.fields);
     const edit = (row) => {
       const f = fields();
@@ -172,8 +190,25 @@
       m.$("form").onsubmit = save;
     };
     el.innerHTML = `<div class="row between wrap" style="margin-bottom:14px"><input type="search" data-q placeholder="Search ${S.esc(cfg.title.toLowerCase())}…" style="max-width:320px">
-      <div class="row">${cfg.toolbar || ""}${cfg.fields && cfg.canCreate !== false ? `<button class="btn btn-primary" data-new><i data-lucide="plus"></i> Add ${S.esc(cfg.title)}</button>` : ""}</div></div><div data-body><div class="skeleton" style="height:120px"></div></div>`;
+      <div class="row">${cfg.bulkDelete ? `<button class="btn btn-danger hidden" data-bulk-del><i data-lucide="trash-2"></i><span>Delete selected</span></button>` : ""}${cfg.toolbar || ""}${cfg.fields && cfg.canCreate !== false ? `<button class="btn btn-primary" data-new><i data-lucide="plus"></i> Add ${S.esc(cfg.title)}</button>` : ""}</div></div><div data-body><div class="skeleton" style="height:120px"></div></div>`;
     el.querySelector("[data-q]").oninput = render;
+    if (cfg.bulkDelete) {
+      el.addEventListener("change", (e) => {
+        const one = e.target.closest("[data-sel]"), all = e.target.closest("[data-sel-all]");
+        if (one) { const id = rows.find((r) => String(r.id) === one.dataset.sel)?.id; one.checked ? selected.add(id) : selected.delete(id); syncBulk(); }
+        if (all) { shown.forEach((r) => (all.checked ? selected.add(r.id) : selected.delete(r.id))); render(); }
+      });
+      el.querySelector("[data-bulk-del]").onclick = async () => {
+        const n = selected.size;
+        if (!n) return;
+        const warn = cfg.bulkWarning ? "\n\n" + cfg.bulkWarning : "";
+        if (!(await S.confirm(`Delete ${n} ${cfg.title.toLowerCase()}${n > 1 ? "s" : ""}? This can't be undone.${warn}`, `Delete ${n}`, true))) return;
+        const r = await S.api(cfg.bulkDelete, { body: { ids: [...selected] } });
+        selected.clear();
+        S.toast(`Deleted ${r.deleted}`, "ok");
+        load();
+      };
+    }
     el.querySelector("[data-new]") && (el.querySelector("[data-new]").onclick = () => edit(null));
     el.addEventListener("click", async (e) => {
       const tr = e.target.closest("tr[data-id]");
@@ -181,7 +216,7 @@
       const row = rows.find((r) => String(r.id) === tr.dataset.id);
       if (e.target.closest("[data-edit]")) edit(row);
       else if (e.target.closest("[data-del]")) {
-        if (await S.confirm(`Delete this ${cfg.title.toLowerCase()}?`, "Delete", true)) {
+        if (await S.confirm(`Delete this ${cfg.title.toLowerCase()}?${cfg.bulkWarning ? "\n\n" + cfg.bulkWarning : ""}`, "Delete", true)) {
           await S.api(cfg.endpoint.split("?")[0] + "/" + row.id, { method: "DELETE" }); S.toast("Deleted"); load();
         }
       } else if (e.target.closest("[data-act]")) cfg.actions[e.target.closest("[data-act]").dataset.act].run(row, load);
