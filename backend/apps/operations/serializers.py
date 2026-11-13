@@ -18,7 +18,7 @@ class TableSerializer(TenantSerializer):
 
     class Meta:
         model = Table
-        exclude = ["restaurant", "locked_by", "locked_at"]
+        exclude = ["restaurant", "locked_by", "locked_at", "locked_device"]
         read_only_fields = ["qr_token", "occupied_since"]
 
     def get_in_use_by(self, t):

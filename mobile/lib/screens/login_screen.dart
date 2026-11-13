@@ -33,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     final auth = context.read<AuthStore>();
     if (auth.phone.isNotEmpty) _phone.text = auth.phone;
-    if (auth.sessionExpired) _error = 'Your session expired. Please sign in again.';
+    if (auth.sessionExpired) _error = auth.logoutReason ?? 'Your session expired. Please sign in again.';
   }
 
   @override

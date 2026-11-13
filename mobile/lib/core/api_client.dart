@@ -87,6 +87,7 @@ class ApiClient {
     final req = http.Request(method, _uri(path, query));
     req.headers['Accept'] = 'application/json';
     req.headers['Content-Type'] = 'application/json; charset=utf-8';
+    req.headers['X-Device-Id'] = config.deviceId;
     if (authed) {
       final token = auth.access;
       if (token != null && token.isNotEmpty) req.headers['Authorization'] = 'Bearer $token';
@@ -111,6 +112,11 @@ class ApiClient {
     }
     _setOnline(true);
 
+    if (res.statusCode == 401 && authed && res.body.contains('signed_in_elsewhere')) {
+      // This crew login was signed in on another phone: sign out here straight away.
+      await auth.logout(expired: true, reason: 'This login is now in use on another phone. Each crew member needs their own login.');
+      throw ApiException(401, 'Signed in on another phone');
+    }
     if (res.statusCode == 401 && authed && retry && (auth.refresh ?? '').isNotEmpty) {
       if (await _refreshToken()) {
         return _send(method, path, body: body, query: query, authed: authed, retry: false);

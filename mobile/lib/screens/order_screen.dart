@@ -409,6 +409,25 @@ class CartPanel extends StatelessWidget {
         if (inSheet) nav.pop();
         nav.maybePop();
       }
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      final dup = e.status == 409 && e.body is Map && e.body['code'] == 'duplicate_items';
+      if (!dup) {
+        toast(context, errorText(e), error: true);
+        return;
+      }
+      // Someone (another crew member / phone) just added these same items to this table.
+      final again = await confirm(context, 'Already added', e.message, ok: 'Add again');
+      if (!again || !context.mounted) return;
+      c.confirmDuplicate = true;
+      try {
+        final msg = await action();
+        if (context.mounted) toast(context, msg);
+      } catch (err) {
+        if (context.mounted) toast(context, errorText(err), error: true);
+      } finally {
+        c.confirmDuplicate = false;
+      }
     } catch (e) {
       if (context.mounted) toast(context, errorText(e), error: true);
     }

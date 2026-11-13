@@ -53,7 +53,23 @@ class TableLockTests(Base):
         self.assertEqual(res.status_code, 409)
         self.assertEqual(OrderItem.objects.filter(order_id=o["id"]).count(), 1)
         # A can keep adding
-        self.assertEqual(self.a.post(f"/api/orders/{o['id']}/items", {"items": [{"item_id": self.coffee.id}]}, format="json").status_code, 200)
+        tikka = self.item("Paneer Tikka")
+        self.assertEqual(self.a.post(f"/api/orders/{o['id']}/items", {"items": [{"item_id": tikka.id}]}, format="json").status_code, 200)
+
+    def test_two_phones_on_one_login_cannot_share_a_table(self):
+        phone1 = {"HTTP_X_DEVICE_ID": "phone-1"}
+        phone2 = {"HTTP_X_DEVICE_ID": "phone-2"}
+        self.assertEqual(self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json", **phone1).status_code, 200)
+        res = self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json", **phone2)
+        self.assertEqual(res.status_code, 409)
+        self.assertIn("another phone", res.json()["detail"])
+        res = self.a.post("/api/orders", {"table": self.t.id, "client_ref": "p2", "items": [{"item_id": self.coffee.id}]}, format="json", **phone2)
+        self.assertEqual(res.status_code, 409)
+        # phone 2 can't release phone 1's hold either
+        self.a.post(f"/api/tables/{self.t.id}/unlock", {}, format="json", **phone2)
+        self.assertEqual(self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json", **phone2).status_code, 409)
+        self.a.post(f"/api/tables/{self.t.id}/unlock", {}, format="json", **phone1)
+        self.assertEqual(self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json", **phone2).status_code, 200)
 
     def test_expired_lock_frees_the_table(self):
         self.a.post(f"/api/tables/{self.t.id}/lock", {}, format="json")

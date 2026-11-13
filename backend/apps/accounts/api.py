@@ -51,7 +51,16 @@ def login(request):
     user = authenticate(request, username=identifier, password=request.data.get("password", ""))
     if not user:
         return Response({"detail": "Incorrect mobile number / email or password"}, status=401)
+    _claim_device(request, user)
     return Response({**tokens(user), "user": user_payload(user)})
+
+
+def _claim_device(request, user):
+    """The phone that signs in last becomes this crew login's only active phone."""
+    device = (request.headers.get("X-Device-Id") or "")[:64]
+    if device and user.active_device != device:
+        user.active_device = device
+        user.save(update_fields=["active_device"])
 
 
 @api_view(["POST"])
@@ -63,6 +72,7 @@ def pin_switch(request):
     m = Membership.objects.filter(restaurant=r, is_active=True, user__pin=request.data.get("pin", "")).exclude(user__pin="").select_related("user").first()
     if not m:
         return Response({"detail": "Wrong PIN"}, status=401)
+    _claim_device(request, m.user)
     return Response({**tokens(m.user), "user": user_payload(m.user)})
 
 

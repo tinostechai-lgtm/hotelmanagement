@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'json.dart';
+
 /// Device-local settings (server URL, printing options).
 class AppConfig extends ChangeNotifier {
   AppConfig(this._prefs) {
@@ -10,7 +12,16 @@ class AppConfig extends ChangeNotifier {
     btPrinterName = _prefs.getString(_kBtName) ?? '';
     fallbackLanPrinter = _prefs.getString(_kLan) ?? '';
     kdsSound = _prefs.getBool(_kSound) ?? true;
+    deviceId = _prefs.getString(_kDevice) ?? '';
+    if (deviceId.isEmpty) {
+      deviceId = 'app-${uuid4()}';
+      _prefs.setString(_kDevice, deviceId);
+    }
   }
+
+  /// Stable id of this phone (sent as X-Device-Id): table holds and crew logins are per phone.
+  late String deviceId;
+  static const _kDevice = 'cfg.device_id';
 
   static const String defaultBaseUrl = 'https://web-rust-six-43.vercel.app';
 

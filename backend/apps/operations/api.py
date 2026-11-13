@@ -20,8 +20,15 @@ from .serializers import (AreaSerializer, BillHistorySerializer, BillSerializer,
 
 
 def _err(e):
+    if isinstance(e, services.DuplicateItems):
+        return Response({"detail": str(e), "code": "duplicate_items"}, status=status.HTTP_409_CONFLICT)
     code = status.HTTP_409_CONFLICT if isinstance(e, services.TableBusy) else status.HTTP_400_BAD_REQUEST
     return Response({"detail": str(e), "code": "table_busy" if code == 409 else "error"}, status=code)
+
+
+def _device(request):
+    """Id of the phone / browser tab making the request (X-Device-Id header; empty for old apps)."""
+    return (request.headers.get("X-Device-Id") or "")[:64]
 
 
 class AreaViewSet(TenantViewSet):
@@ -50,7 +57,7 @@ class TableViewSet(TenantViewSet):
         """Hold the table while it is open on this device (call again every ~30 s to keep it)."""
         with transaction.atomic():
             t = Table.objects.select_for_update().get(pk=self.get_object().pk)
-            reason = services.table_busy_reason(t, request.user)
+            reason = services.table_busy_reason(t, request.user, _device(request))
             if reason and not (request.data.get("take_over") and request.membership.can("void")):
                 return Response({"detail": reason, "code": "table_busy", "can_take_over": request.membership.can("void")}, status=409)
             if reason:  # manager takes the table over: the running order is now theirs
@@ -60,13 +67,16 @@ class TableViewSet(TenantViewSet):
                     o.taken_by = request.user
                     o.save(update_fields=["taken_by"])
                     AuditLog.record(t.restaurant, request.user, "table.take_over", f"Table {t.name}", f"#{o.number} from {prev}")
-            t.locked_by, t.locked_at = request.user, timezone.now()
-            t.save(update_fields=["locked_by", "locked_at"])
+            t.locked_by, t.locked_at, t.locked_device = request.user, timezone.now(), _device(request)
+            t.save(update_fields=["locked_by", "locked_at", "locked_device"])
         return Response(TableSerializer(t).data)
 
     @action(detail=True, methods=["post"])
     def unlock(self, request, pk=None):
-        Table.objects.filter(pk=self.get_object().pk, locked_by=request.user).update(locked_by=None, locked_at=None)
+        qs = Table.objects.filter(pk=self.get_object().pk, locked_by=request.user)
+        if _device(request):
+            qs = qs.filter(locked_device__in=[_device(request), ""])  # don't release another phone's hold
+        qs.update(locked_by=None, locked_at=None, locked_device="")
         return Response({"ok": True})
 
     def get_permissions(self):
@@ -161,7 +171,8 @@ class OrderViewSet(TenantViewSet):
                 customer_phone=d["customer_phone"], customer_name=d["customer_name"], guests=d["guests"], notes=d["notes"],
                 items=[dict(i) for i in d.get("items", [])], delivery_address=d["delivery_address"],
                 delivery_lat=d.get("delivery_lat"), delivery_lng=d.get("delivery_lng"), client_ref=d["client_ref"],
-                can_override=request.membership.can("void"),
+                can_override=request.membership.can("void"), device=_device(request),
+                confirm_duplicate=bool(request.data.get("confirm_duplicate")),
                 payment_mode="cod" if d["order_type"] == "delivery" else "")
             if d["send_kot"]:
                 services.send_kot(order)
@@ -207,8 +218,9 @@ class OrderViewSet(TenantViewSet):
         s.is_valid(raise_exception=True)
         try:
             if order.table_id and order.order_type == "dine_in":
-                services.check_table_access(order.table, request.user, request.membership.can("void"))
-            services.add_items(order, [dict(i) for i in s.validated_data], batch_ref=str(request.data.get("client_ref") or "")[:64])
+                services.check_table_access(order.table, request.user, request.membership.can("void"), _device(request))
+            services.add_items(order, [dict(i) for i in s.validated_data], batch_ref=str(request.data.get("client_ref") or "")[:64],
+                               user=request.user, check_duplicate=not request.data.get("confirm_duplicate"))
             if request.data.get("send_kot"):
                 services.send_kot(order)
         except services.OrderError as e:

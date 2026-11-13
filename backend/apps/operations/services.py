@@ -4,6 +4,7 @@ Every interface (web POS, Flutter app, QR ordering, online store, aggregator
 webhooks) goes through these functions so behaviour is identical everywhere.
 """
 from collections import defaultdict
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -23,30 +24,54 @@ class TableBusy(OrderError):
     """Another attendant is serving this table (HTTP 409)."""
 
 
+class DuplicateItems(OrderError):
+    """The same items were just added to this order by someone else (HTTP 409; resend with confirm_duplicate)."""
+
+
+DUPLICATE_WINDOW_SECONDS = 180
+
+
+def batch_signature(items):
+    """Order-independent fingerprint of a batch of items (item, qty, variant, add-ons, notes)."""
+    import hashlib
+    import json
+
+    norm = sorted(
+        (int(s.get("item_id") or 0), str(Decimal(str(s.get("quantity", 1))).normalize()), int(s.get("variant_id") or 0),
+         sorted(int(a) for a in (s.get("addon_ids") or [])), (s.get("notes") or "").strip().lower())
+        for s in items if Decimal(str(s.get("quantity", 1))) > 0
+    )
+    return hashlib.sha1(json.dumps(norm).encode()).hexdigest()
+
+
 def _staff_name(user):
     return str(user).strip() or "another attendant"
 
 
-def table_busy_reason(table, user):
-    """Why `user` may not take orders on `table` right now, or None if they may.
+def table_busy_reason(table, user, device=""):
+    """Why `user` (on `device`) may not take orders on `table` right now, or None if they may.
 
-    Attendant A holds a table while it is open on their screen and while its running order is theirs;
-    attendant B is blocked until A is done. Customer QR orders (no user) are never blocked."""
+    Attendant A holds a table while it is open on their phone/tab and while its running order is theirs;
+    attendant B is blocked until A is done. The hold is per device, so two phones sharing one login can't
+    both work the same table. Customer QR orders (no user) are never blocked."""
     if user is None or table is None:
         return None
     holder = table.live_lock
     if holder is not None and holder.pk != user.pk:
         return f"Table {table.name} is being served by {_staff_name(holder)} right now."
+    if holder is not None and device and table.locked_device and table.locked_device != device:
+        return (f"Table {table.name} is open on another phone or tab (signed in as {_staff_name(holder)}). "
+                f"Close it there first, or wait a minute.")
     o = table.active_order
     if o and o.taken_by_id and o.taken_by_id != user.pk:
         return f"Table {table.name} already has an order taken by {_staff_name(o.taken_by)}. Ask them or a manager."
     return None
 
 
-def check_table_access(table, user, can_override=False):
+def check_table_access(table, user, can_override=False, device=""):
     if can_override:
         return
-    reason = table_busy_reason(table, user)
+    reason = table_busy_reason(table, user, device)
     if reason:
         raise TableBusy(reason)
 
@@ -78,7 +103,8 @@ def _already_applied(restaurant, ref):
 def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, room=None, user=None,
                  customer_phone="", customer_name="", guests=1, notes="", items=None, status=None,
                  delivery_address="", delivery_lat=None, delivery_lng=None, coupon_code="", payment_mode="",
-                 external_id="", customer_email="", client_ref="", can_override=False):
+                 external_id="", customer_email="", client_ref="", can_override=False, device="",
+                 confirm_duplicate=False):
     if table is not None:
         # One request at a time per table: two devices (or a double tap) can't both see "no open order"
         # and each start one.
@@ -87,12 +113,13 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
     if dup:
         return dup  # re-sent request (retry, offline replay, double click): don't add anything again
     if table is not None and order_type == "dine_in" and source in ("pos", "captain"):
-        check_table_access(table, user, can_override)  # one attendant per table
+        check_table_access(table, user, can_override, device)  # one attendant (and one device) per table
     if table is not None and order_type == "dine_in":
         existing = table.active_order
         if existing and source in ("pos", "captain", "qr"):
             if items:
-                add_items(existing, items, batch_ref=client_ref)
+                add_items(existing, items, batch_ref=client_ref, user=user,
+                          check_duplicate=source in ("pos", "captain") and not confirm_duplicate)
             return existing
     customer = get_or_create_customer(restaurant, customer_phone, customer_name, customer_email)
     if status is None:
@@ -112,7 +139,7 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
         table.occupied_since = table.occupied_since or timezone.now()
         table.save(update_fields=["status", "occupied_since"])
     if items:
-        add_items(order, items, batch_ref=client_ref)
+        add_items(order, items, batch_ref=client_ref, user=user)
     else:
         order.recalc()
     if source not in ("pos", "captain") and payment_mode != "online":
@@ -127,7 +154,7 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
 
 
 @transaction.atomic
-def add_items(order, items, batch_ref=""):
+def add_items(order, items, batch_ref="", user=None, check_duplicate=False):
     """items: [{item_id, quantity, variant_id?, addon_ids?, notes?, seat?, price?}]
 
     batch_ref: idempotency key of the request. Re-sending the same batch adds nothing."""
@@ -136,6 +163,18 @@ def add_items(order, items, batch_ref=""):
         order.status = Order.objects.select_for_update().only("status").get(pk=order.pk).status
     if batch_ref and order.items.filter(batch_ref=batch_ref).exists():
         return []
+    sig = batch_signature(items) if items else ""
+    if check_duplicate and sig:
+        # Two crew entering the same table's order: the very same items again within a few minutes.
+        since = timezone.now() - timedelta(seconds=DUPLICATE_WINDOW_SECONDS)
+        prev = (order.items.filter(batch_sig=sig, is_void=False, created_at__gte=since)
+                .exclude(batch_ref=batch_ref or "\x00").select_related("added_by").order_by("-created_at").first())
+        if prev:
+            who = _staff_name(prev.added_by) if prev.added_by_id else "someone"
+            mins = int((timezone.now() - prev.created_at).total_seconds() // 60)
+            ago = "just now" if mins < 1 else f"{mins} min ago"
+            raise DuplicateItems(f"These items were already added to this order by {who} ({ago}). "
+                                 f"If the guest really ordered them again, choose 'Add again'.")
     if order.status in ("completed", "cancelled"):
         raise OrderError("Order is closed")
     restaurant = order.restaurant
@@ -163,7 +202,8 @@ def add_items(order, items, batch_ref=""):
                   for a in Addon.objects.filter(pk__in=spec.get("addon_ids") or [], group__restaurant=restaurant, is_available=True)]
         li = OrderItem.objects.create(order=order, item=item, name=item.name, variant_name=variant_name, addons=addons,
                                       quantity=qty, unit_price=price, tax_percent=restaurant.tax_rate_for(item),
-                                      notes=spec.get("notes", "")[:160], seat=spec.get("seat"), batch_ref=batch_ref[:64])
+                                      notes=spec.get("notes", "")[:160], seat=spec.get("seat"), batch_ref=batch_ref[:64],
+                                      batch_sig=sig, added_by=user)
         if item.track_stock:
             item.stock_qty -= int(qty)
             if item.stock_qty <= 0:

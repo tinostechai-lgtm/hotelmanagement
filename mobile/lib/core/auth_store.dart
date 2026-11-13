@@ -90,7 +90,11 @@ class AuthStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> logout({bool expired = false}) async {
+  /// Why the user was signed out (shown on the login screen), if not a plain expiry.
+  String? logoutReason;
+
+  Future<void> logout({bool expired = false, String? reason}) async {
+    logoutReason = reason;
     access = null;
     refresh = null;
     user = null;

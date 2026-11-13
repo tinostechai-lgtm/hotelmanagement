@@ -18,6 +18,14 @@
   S.$$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   S.icons = () => window.lucide && lucide.createIcons();
 
+  // Stable id of this browser (table holds are per device, so two screens can't work one table).
+  S.deviceId = () => {
+    try {
+      let id = localStorage.getItem("sv_device");
+      if (!id) { id = "web-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2)); localStorage.setItem("sv_device", id); }
+      return id;
+    } catch (e) { return ""; }
+  };
   S.api = async function (path, opts = {}) {
     const o = { method: opts.method || (opts.body ? "POST" : "GET"), headers: { Accept: "application/json" }, credentials: "same-origin" };
     if (opts.body !== undefined) {
@@ -25,13 +33,14 @@
       o.body = JSON.stringify(opts.body);
     }
     if (o.method !== "GET") o.headers["X-CSRFToken"] = S.csrf();
+    o.headers["X-Device-Id"] = S.deviceId();
     const res = await fetch("/api/" + path.replace(/^\//, ""), o);
     let data = null;
     try { data = res.status === 204 ? null : await res.json(); } catch (e) { data = null; }
     if (!res.ok) {
       let msg = (data && (data.detail || Object.entries(data).map(([k, v]) => `${k}: ${[].concat(v).join(" ")}`).join(" · "))) || `Error ${res.status}`;
       if (!opts.quiet) S.toast(msg, "err");
-      const err = new Error(msg); err.status = res.status; err.data = data; throw err;
+      const err = new Error(msg); err.status = res.status; err.data = data; err.shown = !opts.quiet; throw err;
     }
     return data;
   };

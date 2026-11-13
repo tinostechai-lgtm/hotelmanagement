@@ -323,9 +323,17 @@
   async function save(sendKot) {
     if (st.saving) return false;
     st.saving = true;
-    try { return await _save(sendKot); } finally { st.saving = false; }
+    try { return await _save(sendKot); }
+    catch (e) {
+      // The same items were just added to this table by someone else: ask before adding them again.
+      if (e.status === 409 && e.data && e.data.code === "duplicate_items" && await S.confirm(e.message, "Add again")) {
+        try { return await _save(sendKot, true); } catch (_) { return false; }
+      }
+      if (!(e.status === 409 && e.data && e.data.code === "duplicate_items") && !e.shown) S.toast(e.message, "err");
+      return false;
+    } finally { st.saving = false; }
   }
-  async function _save(sendKot) {
+  async function _save(sendKot, confirmDup = false) {
     const items = st.draft.map(({ item_id, quantity, variant_id, addon_ids, notes }) => ({ item_id, quantity, variant_id, addon_ids, notes }));
     // Same items re-sent (e.g. after a timeout) keep the same id; a changed cart gets a new one.
     const sig = JSON.stringify(items);
@@ -335,10 +343,10 @@
       if (!items.length) { S.toast("Add at least one item", "err"); return false; }
       if (st.ctx.type === "delivery" && (!phone || !$("#c-address").value.trim())) { S.toast("Customer mobile & address are needed for delivery", "err"); return false; }
       st.order = await S.api("orders", { body: { order_type: st.ctx.type, table: st.ctx.table?.id, room: st.ctx.room?.id, guests: st.ctx.guests,
-        customer_phone: phone, customer_name: name, delivery_address: $("#c-address").value, items, send_kot: sendKot, client_ref: st.batchRef } });
+        customer_phone: phone, customer_name: name, delivery_address: $("#c-address").value, items, send_kot: sendKot, client_ref: st.batchRef, confirm_duplicate: confirmDup }, quiet: true });
     } else {
       if (phone !== (st.order.customer_phone || "") || name !== (st.order.customer_name || "")) st.order = await S.api(`orders/${st.order.id}`, { method: "PATCH", body: { customer_phone: phone, customer_name: name, delivery_address: $("#c-address").value } });
-      if (items.length) st.order = await S.api(`orders/${st.order.id}/items`, { body: { items, send_kot: sendKot, client_ref: st.batchRef } });
+      if (items.length) st.order = await S.api(`orders/${st.order.id}/items`, { body: { items, send_kot: sendKot, client_ref: st.batchRef, confirm_duplicate: confirmDup }, quiet: true });
       else if (sendKot) st.order = await S.api(`orders/${st.order.id}/kot`, { body: {} });
     }
     st.draft = []; st.batchRef = null; renderCart(); history.replaceState(null, "", `?order=${st.order.id}`);

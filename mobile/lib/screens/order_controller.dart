@@ -135,6 +135,9 @@ class OrderController extends ChangeNotifier {
     }
   }
 
+  /// Set after staff confirm "Add again" for items the server says were just added by someone else.
+  bool confirmDuplicate = false;
+
   // Idempotency key for the current batch of new items. Re-sending the same items (after a timeout,
   // a double tap or an offline replay) reuses it, so the server never adds them twice; a changed cart
   // gets a new key.
@@ -152,7 +155,7 @@ class OrderController extends ChangeNotifier {
 
   Map<String, dynamic> _itemsBody() {
     final specs = cart.toSpecs();
-    return {'items': specs, 'send_kot': true, 'client_ref': _refFor(specs)};
+    return {'items': specs, 'send_kot': true, 'client_ref': _refFor(specs), if (confirmDuplicate) 'confirm_duplicate': true};
   }
 
   Map<String, dynamic> _createBody({required bool sendKot}) => {
@@ -166,6 +169,7 @@ class OrderController extends ChangeNotifier {
         'items': cart.toSpecs(),
         'send_kot': sendKot,
         'client_ref': _refFor(cart.toSpecs()),
+        if (confirmDuplicate) 'confirm_duplicate': true,
       };
 
   Future<void> _queueOffline(Map<String, dynamic> body, {List<Map<String, dynamic>> payments = const [], bool complete = false}) async {

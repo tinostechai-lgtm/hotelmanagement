@@ -47,6 +47,8 @@ class Table(TenantModel):
     # Who has this table open on their POS / app right now (renewed while the screen is open).
     locked_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     locked_at = models.DateTimeField(null=True, blank=True)
+    # Which phone / browser tab holds the table (two devices on one shared login are still kept apart).
+    locked_device = models.CharField(max_length=64, blank=True)
 
     LOCK_SECONDS = 90
 
@@ -339,6 +341,9 @@ class OrderItem(models.Model):
     seat = models.PositiveSmallIntegerField(null=True, blank=True)
     batch_ref = models.CharField(max_length=64, blank=True, db_index=True,
                                  help_text="Idempotency key of the request that added this line (blocks duplicate re-sends)")
+    batch_sig = models.CharField(max_length=40, blank=True, db_index=True,
+                                 help_text="Fingerprint of the items in the request that added this line (spots double entry)")
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.NEW)
     kot = models.ForeignKey("KOT", null=True, blank=True, on_delete=models.SET_NULL, related_name="lines")
     is_void = models.BooleanField(default=False)

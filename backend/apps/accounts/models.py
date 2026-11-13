@@ -53,6 +53,16 @@ class User(AbstractUser):
 
     phone = models.CharField(max_length=20, blank=True)
     pin = models.CharField(max_length=6, blank=True, help_text="Quick 4–6 digit PIN for POS switching")
+    # Crew logins work on one phone at a time: the phone that signed in last (owners/managers are exempt).
+    active_device = models.CharField(max_length=64, blank=True)
+
+    @property
+    def is_crew(self):
+        """Staff without manager rights: one login per person, one phone per login."""
+        if self.is_superuser:
+            return False
+        ms = list(self.memberships.filter(is_active=True).select_related("role"))
+        return bool(ms) and not any(m.can("staff") or m.can("settings") for m in ms)
 
     objects = PhoneUserManager()
 
