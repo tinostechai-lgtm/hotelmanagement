@@ -83,9 +83,16 @@ class Item(TenantModel):
     def effective_tax(self):
         return self.hsn.gst_percent if self.hsn_id else self.tax_percent
 
+    def save(self, *args, **kwargs):
+        # Items stay available permanently; stock counting never marks them sold out.
+        self.is_available = True
+        self.track_stock = False
+        super().save(*args, **kwargs)
+
     @property
     def in_stock(self):
-        return self.is_available and (not self.track_stock or self.stock_qty > 0)
+        """Every item is always available (no manual sold-out switch, no automatic stock count)."""
+        return True
 
     def kitchen_station(self):
         return self.station or self.category.station

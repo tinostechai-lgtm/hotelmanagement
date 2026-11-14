@@ -137,7 +137,7 @@
       const o = t.active_order;
       const status = o ? (o.billed ? "billed" : "occupied") : t.status;
       return `<button class="tbl st-${status}" data-table="${t.id}">
-        <div class="row between"><span class="nm">${S.esc(t.name)}</span><span class="small muted"><i data-lucide="users" style="width:14px"></i> ${o ? o.guests : t.seats}</span></div>
+        <div class="row between"><span class="nm">${S.esc(t.name)}</span><span class="small muted"><i data-lucide="armchair" style="width:14px"></i> ${t.seats}</span></div>
         <span class="stt">${status === "occupied" ? "Running" : status}</span>
         ${(() => { const who = (t.in_use_by && t.in_use_by.id !== ME) ? t.in_use_by.name : (o && o.taken_by && o.taken_by.id !== ME ? o.taken_by.name : "");
            return who ? `<div class="small" style="color:var(--warning);font-weight:700"><i data-lucide="lock" style="width:13px;vertical-align:-2px"></i> ${S.esc(who)}</div>` : ""; })()}
@@ -200,10 +200,9 @@
   /* ---------------- Order screen ---------------- */
   function showOrder() { $("#floor").classList.add("hidden"); $("#order").classList.remove("hidden"); renderCats(); renderItems(); renderCart(); holdTable(); setTimeout(() => $("#search").focus(), 50); }
   function newOrder(type, table = null, room = null) {
-    st.order = null; st.draft = []; st.ctx = { type, table, room, guests: 2 };
+    st.order = null; st.draft = []; st.ctx = { type, table, room, guests: 1 };
     $("#c-phone").value = ""; $("#c-name").value = ""; $("#c-address").value = "";
     showOrder();
-    if (type === "dine_in") S.prompt(`Table ${table.name}`, [{ name: "guests", label: "Number of guests", type: "number", default: table.seats }], "Start").then((v) => { if (v) st.ctx.guests = Number(v.guests) || 1; renderCart(); });
   }
   async function openOrder(id) {
     st.order = await S.api(`orders/${id}`); st.draft = [];
@@ -229,26 +228,17 @@
   }
   function renderItems() {
     const list = filtered();
-    $("#items").innerHTML = list.map((i) => `<button class="it ${i.available ? "" : "off"}" data-item="${i.id}" title="${i.available ? "Long-press to mark unavailable" : "Unavailable — long-press to enable"}">
+    $("#items").innerHTML = list.map((i) => `<button class="it" data-item="${i.id}">
       ${i.short_code ? `<span class="code">${S.esc(i.short_code)}</span>` : ""}
       <div class="row" style="gap:6px"><span class="diet ${i.diet}"></span>${i.bestseller ? '<span class="badge b-primary" style="padding:1px 6px">★</span>' : ""}</div>
       <div class="n">${S.esc(i.name)}</div><div class="p">${S.money(i.price)}${i.variants.length ? '<span class="muted small"> +</span>' : ""}</div></button>`).join("")
       || '<div class="empty" style="grid-column:1/-1">No items match.</div>';
   }
   $("#search").oninput = renderItems;
-  $("#search").onkeydown = (e) => { if (e.key === "Enter") { const f = filtered().filter((i) => i.available); if (f.length) { addItem(f[0]); $("#search").value = ""; renderItems(); } } };
+  $("#search").onkeydown = (e) => { if (e.key === "Enter") { const f = filtered(); if (f.length) { addItem(f[0]); $("#search").value = ""; renderItems(); } } };
 
-  let pressTimer = null, longPressed = false;
-  $("#items").addEventListener("pointerdown", (e) => {
-    const b = e.target.closest("[data-item]"); if (!b) return; longPressed = false;
-    pressTimer = setTimeout(async () => {
-      longPressed = true; const it = st.items[b.dataset.item];
-      const r = await S.api(`items/${it.id}/toggle`, { body: { available: !it.available } });
-      it.available = r.is_available; renderItems(); S.toast(`${it.name} is now ${r.is_available ? "available" : "unavailable"}`);
-    }, 650);
-  });
-  ["pointerup", "pointerleave"].forEach((ev) => $("#items").addEventListener(ev, () => clearTimeout(pressTimer)));
-  $("#items").onclick = (e) => { const b = e.target.closest("[data-item]"); if (!b || longPressed) return; const it = st.items[b.dataset.item]; if (!it.available) return S.toast(`${it.name} is unavailable`, "err"); addItem(it); };
+  const longPressed = false; // availability toggle removed: every item is always available
+  $("#items").onclick = (e) => { const b = e.target.closest("[data-item]"); if (!b || longPressed) return; const it = st.items[b.dataset.item]; addItem(it); };
 
   function addItem(it) {
     if (it.variants.length || it.addon_groups.length || it.is_weighted) return customize(it);
@@ -281,7 +271,7 @@
     const label = c.table ? `Table ${c.table.name}` : c.room ? `Room ${c.room.number}` : { takeaway: "Takeaway", delivery: "Home delivery", dine_in: "Dine-in", room_service: "Room service" }[c.type];
     $("#o-label").textContent = o ? `${label} · #${o.number}` : label;
     $("#pos-title").textContent = o ? `Order #${o.number}` : "New order";
-    $("#o-meta").innerHTML = o ? `${S.esc(o.status_display)} · ${S.esc(o.source_display)} · ${o.guests} guests · ${S.time(o.created_at)} ${o.is_paid ? '<span class="badge b-success">Paid</span>' : ""}` : `${c.guests || 1} guests`;
+    $("#o-meta").innerHTML = o ? `${S.esc(o.status_display)} · ${S.esc(o.source_display)} · ${S.time(o.created_at)} ${o.is_paid ? '<span class="badge b-success">Paid</span>' : ""}` : "New order";
     $("#c-address").classList.toggle("hidden", c.type !== "delivery");
     const lines = (o ? o.items : []).map((li) => `<div class="line ${li.is_void ? "void" : ""}" data-line="${li.id}">
         <div class="grow"><div class="nm">${S.esc(li.display_name)}</div>
@@ -446,7 +436,6 @@
     const o = st.order;
     const m = S.modal({ title: `Order #${o.number}`, body: `<div class="grid g2">
       <button class="btn" data-x="move"><i data-lucide="arrow-right-left"></i>Move / merge table</button>
-      <button class="btn" data-x="guests"><i data-lucide="users"></i>Change guests</button>
       <button class="btn" data-x="note"><i data-lucide="sticky-note"></i>Order note</button>
       <button class="btn" data-x="print"><i data-lucide="printer"></i>Reprint bill</button>
       <button class="btn" data-x="drawer"><i data-lucide="archive"></i>Open cash drawer</button>
@@ -458,8 +447,8 @@
         const ts = await S.list("tables");
         const v = await S.prompt("Move to table", [{ name: "table", label: "Table (occupied tables will be merged)", type: "select", required: true, options: ts.filter((t) => t.id !== o.table).map((t) => [t.id, `${t.name}${t.active_order ? " (running — merge)" : ""}`]) }], "Move");
         if (v) { st.order = await S.api(`orders/${o.id}/move`, { body: v }); S.toast("Moved", "ok"); back(); }
-      } else if (x === "guests" || x === "note") {
-        const v = await S.prompt(x === "guests" ? "Guests" : "Order note", [x === "guests" ? { name: "guests", label: "Guests", type: "number", default: o.guests } : { name: "notes", label: "Note for kitchen", default: o.notes }]);
+      } else if (x === "note") {
+        const v = await S.prompt("Order note", [{ name: "notes", label: "Note for kitchen", default: o.notes }]);
         if (v) { st.order = await S.api(`orders/${o.id}`, { method: "PATCH", body: v }); renderCart(); }
       } else if (x === "print") previewBill();
       else if (x === "drawer") { await S.api("devices/open-drawer", { body: {} }); S.toast("Drawer opened"); }

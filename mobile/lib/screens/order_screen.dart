@@ -109,10 +109,6 @@ class _OrderView extends StatelessWidget {
 
 Future<void> addItemToCart(BuildContext context, MenuItem item) async {
   final c = context.read<OrderController>();
-  if (!item.available) {
-    toast(context, '${item.name} is marked sold out. Long-press to make it available.', error: true);
-    return;
-  }
   HapticFeedback.selectionClick();
   if (item.hasOptions) {
     final line = await pickItemOptions(context, item, seat: c.seat);
@@ -171,25 +167,6 @@ class _MenuPanelState extends State<MenuPanel> {
   void dispose() {
     _search.dispose();
     super.dispose();
-  }
-
-  Future<void> _toggleAvailability(MenuItem item) async {
-    final api = context.read<ApiClient>();
-    final data = context.read<PosData>();
-    final makeAvailable = !item.available;
-    final ok = await confirm(
-      context,
-      makeAvailable ? 'Back in stock?' : 'Mark sold out?',
-      makeAvailable ? '${item.name} will be orderable again everywhere.' : '${item.name} will be hidden from POS, QR and online menus.',
-      ok: makeAvailable ? 'Available' : 'Sold out',
-    );
-    if (!ok) return;
-    try {
-      final res = await api.post('/items/${item.id}/toggle', {'available': makeAvailable});
-      data.setItemAvailable(item.id, res is Map && res['is_available'] is bool ? res['is_available'] as bool : makeAvailable);
-    } catch (e) {
-      if (mounted) toast(context, errorText(e), error: true);
-    }
   }
 
   @override
@@ -277,7 +254,7 @@ class _MenuPanelState extends State<MenuPanel> {
                   item: items[i],
                   qty: inCart[items[i].id] ?? 0,
                   onTap: () => addItemToCart(context, items[i]),
-                  onLongPress: () => _toggleAvailability(items[i]),
+                  onLongPress: () => addItemToCart(context, items[i]),
                 ),
               ),
       ),
@@ -302,7 +279,7 @@ class _ItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final soldOut = !item.available;
+    const soldOut = false; // items are always available
     final selected = qty > 0;
     final k = item.name.isEmpty ? 0 : item.name.codeUnitAt(0) % _tints.length;
     return AnimatedContainer(

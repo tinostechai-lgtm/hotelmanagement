@@ -186,10 +186,6 @@ def add_items(order, items, batch_ref="", user=None, check_duplicate=False):
         qty = Decimal(str(spec.get("quantity", 1)))
         if qty <= 0:
             continue
-        if not item.in_stock:
-            raise OrderError(f"{item.name} is currently unavailable")
-        if item.track_stock and item.stock_qty < qty:
-            raise OrderError(f"Only {item.stock_qty} left of {item.name}")
         price = item.delivery_price if (order.order_type == "delivery" and item.delivery_price) else item.price
         variant_name = ""
         if spec.get("variant_id"):
@@ -204,11 +200,6 @@ def add_items(order, items, batch_ref="", user=None, check_duplicate=False):
                                       quantity=qty, unit_price=price, tax_percent=restaurant.tax_rate_for(item),
                                       notes=spec.get("notes", "")[:160], seat=spec.get("seat"), batch_ref=batch_ref[:64],
                                       batch_sig=sig, added_by=user)
-        if item.track_stock:
-            item.stock_qty -= int(qty)
-            if item.stock_qty <= 0:
-                item.is_available = False
-            item.save(update_fields=["stock_qty", "is_available"])
         created.append(li)
     order.recalc()
     return created

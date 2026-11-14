@@ -73,9 +73,10 @@ class ItemViewSet(TenantViewSet):
     def toggle(self, request, pk=None):
         """Real-time availability (86 / un-86 an item). Allowed for POS staff too."""
         item = self.get_object()
-        item.is_available = not item.is_available if "available" not in request.data else bool(request.data["available"])
-        item.save(update_fields=["is_available"])
-        return Response({"id": item.id, "is_available": item.is_available})
+        # Availability switch removed: items are always available (older apps calling this get "available").
+        if not item.is_available:
+            item.save()
+        return Response({"id": item.id, "is_available": True})
 
     def get_permissions(self):
         if self.action == "toggle":

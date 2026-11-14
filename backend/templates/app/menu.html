@@ -26,7 +26,7 @@
       { key: "category_name", label: "Category" },
       { key: "price", label: "Price", render: (i) => S.money(i.price) + (i.delivery_price ? `<div class="tiny muted">Online ${S.money(i.delivery_price)}</div>` : "") },
 {% if gst %}      { key: "effective_tax", label: "GST", render: (i) => i.effective_tax + "%" },
-{% endif %}      { key: "is_available", label: "Available", render: (i) => `<label class="check"><input type="checkbox" data-toggle="${i.id}" ${i.is_available ? "checked" : ""}> ${i.track_stock ? `<span class="small muted">${i.stock_qty} left</span>` : ""}</label>` }],
+{% endif %}    ],
     fields: () => [
       { name: "name", label: "Item name", required: true },
       { name: "category", label: "Category", type: "select", required: true, half: true, options: cats.map((c) => [c.id, c.name]) },
@@ -42,12 +42,9 @@
       { name: "variants_text", label: "Variants (e.g. Half:180, Full:300)", help: "Leave empty if the item has a single price" },
       { name: "description", label: "Description", type: "textarea" },
       { name: "image_url", label: "Image URL", type: "url" },
-      { name: "is_available", label: "Available now", type: "checkbox", default: true },
       { name: "available_online", label: "Show on online store", type: "checkbox", default: true },
       { name: "is_bestseller", label: "Bestseller tag", type: "checkbox" },
-      { name: "is_weighted", label: "Sold by weight (kg) — uses weighing scale", type: "checkbox" },
-      { name: "track_stock", label: "Limited quantity today", type: "checkbox" },
-      { name: "stock_qty", label: "Quantity available", type: "number", half: true }],
+      { name: "is_weighted", label: "Sold by weight (kg) — uses weighing scale", type: "checkbox" }],
     beforeSave: (b) => { b.variants = parsePairs(b.variants_text); delete b.variants_text; return b; },
   });
   // Edit items with variants shown as text.
@@ -57,10 +54,6 @@
     const it = items.find((x) => x.id == e.target.closest("tr").dataset.id);
     itemsCrud.edit({ ...it, variants_text: it.variants.map((v) => `${v.name}:${Number(v.price)}`).join(", ") });
   }, true);
-  S.$("#items").addEventListener("change", async (e) => {
-    const t = e.target.closest("[data-toggle]");
-    if (t) { await S.api(`items/${t.dataset.toggle}/toggle`, { body: { available: t.checked } }); S.toast(t.checked ? "Item available" : "Item marked unavailable"); }
-  });
   S.$("#items").addEventListener("click", (e) => {
     if (!e.target.closest("#bulk")) return;
     const m = S.modal({ title: "Import items from CSV", body: '<p class="small muted">One item per line: <code>name,category,price,diet,short_code{% if gst %},gst{% endif %}</code>. Missing categories are created.</p><textarea id="csv" style="min-height:180px" placeholder="Masala Dosa,South Indian,90,veg,MD,5"></textarea>',
