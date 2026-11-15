@@ -47,10 +47,16 @@ class _OrderView extends StatelessWidget {
     if (c.tableLost != null) {
       final msg = c.tableLost!;
       c.tableLost = null;
+      final unsent = !c.cart.isEmpty;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
-        toast(context, msg, error: true);
-        Navigator.of(context).maybePop();
+        toast(context, unsent ? '$msg Items not yet sent were not saved.' : msg, error: true);
+        // Close this order screen (and any sheet open on top of it), not some other screen.
+        final route = ModalRoute.of(context);
+        final nav = Navigator.of(context);
+        if (route == null || !route.isActive) return;
+        nav.popUntil((r) => r == route);
+        if (route.isCurrent) nav.pop();
       });
     }
     return Scaffold(
@@ -67,7 +73,13 @@ class _OrderView extends StatelessWidget {
             onPressed: () => _scan(context),
           ),
           if (c.order != null)
-            IconButton(tooltip: 'Refresh', icon: const Icon(Icons.refresh), onPressed: c.refresh),
+            IconButton(
+                tooltip: 'Refresh',
+                icon: const Icon(Icons.refresh),
+                onPressed: () async {
+                  final err = await c.refresh();
+                  if (err != null && context.mounted) toast(context, err, error: true);
+                }),
         ],
       ),
       body: Column(children: [
@@ -646,7 +658,8 @@ class _SentLine extends StatelessWidget {
       ),
     );
     final text = reason.text.trim();
-    reason.dispose();
+    // Dispose after the dialog's closing animation, which still draws the text field.
+    Future.delayed(const Duration(milliseconds: 500), reason.dispose);
     if (ok != true) return;
     try {
       await controller.voidLine(line, text);
@@ -706,7 +719,7 @@ class _CartLineTile extends StatelessWidget {
         ],
       ),
     );
-    ctl.dispose();
+    Future.delayed(const Duration(milliseconds: 500), ctl.dispose);
     if (r != null) cart.setNotes(line, r);
   }
 

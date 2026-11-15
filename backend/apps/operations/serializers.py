@@ -99,7 +99,7 @@ class BillSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     kots = serializers.SerializerMethodField()
-    bills = BillSerializer(many=True, read_only=True)
+    bills = serializers.SerializerMethodField()
     payments = PaymentSerializer(many=True, read_only=True)
     label = serializers.CharField(read_only=True)
     balance = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -108,6 +108,10 @@ class OrderSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     source_display = serializers.CharField(source="get_source_display", read_only=True)
     type_display = serializers.CharField(source="get_order_type_display", read_only=True)
+
+    def get_bills(self, o):
+        # Oldest first, so split bills read "Split 1/2, Split 2/2".
+        return BillSerializer(sorted(o.bills.all(), key=lambda b: b.created_at), many=True).data
     next_statuses = serializers.SerializerMethodField()
     delivery = serializers.SerializerMethodField()
     tax_breakup = serializers.SerializerMethodField()

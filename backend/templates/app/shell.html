@@ -35,13 +35,13 @@
     <header class="topbar">
       <button class="btn btn-ghost icon-btn menu-toggle" data-menu-toggle aria-label="Menu"><i data-lucide="menu"></i></button>
       <h1 class="grow">{% block heading %}{% endblock %}</h1>
-      {% block topbar_actions %}{% endblock %}
+      <div class="topbar-actions">{% block topbar_actions %}{% endblock %}</div>
       <a class="btn btn-ghost icon-btn" href="/s/{{ restaurant.slug }}/" target="_blank" title="Open online store"><i data-lucide="store"></i></a>
       <button class="btn btn-ghost icon-btn" id="bell" title="Notifications" style="position:relative"><i data-lucide="bell"></i><span id="bell-dot" class="hidden" style="position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--primary)"></span></button>
       <button class="btn btn-ghost icon-btn" data-theme-toggle title="Light / dark"><i data-lucide="moon"></i></button>
       <div class="row" style="gap:8px">
         <div style="width:36px;height:36px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:700">{{ request.user.first_name|default:request.user.username|first|upper }}</div>
-        <div class="small" style="line-height:1.2"><b>{{ request.user.first_name|default:request.user.username }}</b><div class="muted tiny">{{ membership.role.name }}</div></div>
+        <div class="small hide-sm" style="line-height:1.2"><b>{{ request.user.first_name|default:request.user.username }}</b><div class="muted tiny">{{ membership.role.name }}</div></div>
       </div>
       <a class="btn btn-ghost icon-btn" href="{% url 'web:logout' %}" title="Log out"><i data-lucide="log-out"></i></a>
     </header>

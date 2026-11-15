@@ -199,7 +199,11 @@ class _TablesScreenState extends State<TablesScreen> {
         toast(context, 'Opened as owner. ${r['notice']}'); // the waiter keeps the table
       }
     } on ApiException catch (e) {
-      if (e.status != 409 || !mounted) return;
+      if (!mounted) return;
+      if (e.status != 409) {
+        toast(context, e.message, error: true);
+        return;
+      }
       final canTakeOver = e.body is Map && e.body['can_take_over'] == true;
       if (!canTakeOver) {
         toast(context, e.message, error: true);

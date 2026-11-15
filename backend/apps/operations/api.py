@@ -85,9 +85,24 @@ class TableViewSet(TenantViewSet):
         return Response({"ok": True})
 
     def get_permissions(self):
-        if self.action in ("status", "lock", "unlock"):
+        if self.action in ("lock", "unlock"):
             return self._member_perms()
+        if self.action == "status":
+            return self._pos_or_tables_perms()
         return super().get_permissions()
+
+    def _pos_or_tables_perms(self):
+        """Changing a table's status needs the POS or Tables permission (not Kitchen / Rider)."""
+        from rest_framework.permissions import BasePermission
+
+        class PosOrTables(BasePermission):
+            message = "You don't have permission to change table status"
+
+            def has_permission(self, request, view):
+                m = getattr(request, "membership", None)
+                return bool(m and (m.can("pos") or m.can("tables")))
+
+        return [*self._member_perms(), PosOrTables()]
 
     def _member_perms(self):
         from rest_framework.permissions import IsAuthenticated
@@ -237,6 +252,8 @@ class OrderViewSet(TenantViewSet):
         order = self.get_object()
         li = get_object_or_404(OrderItem, order=order, pk=line_id)
         try:
+            if order.table_id and order.order_type == "dine_in":
+                services.check_table_access(order.table, request.user, _is_owner(request), _device(request))
             if request.data.get("void"):
                 if li.status != "new" and not request.membership.can("void"):
                     return Response({"detail": "Only managers can void items sent to kitchen"}, status=403)
@@ -269,6 +286,11 @@ class OrderViewSet(TenantViewSet):
                 AuditLog.record(order.restaurant, request.user, "order.cancel", f"#{order.number}",
                                 f"₹{order.total} — {request.data.get('reason', '')}")
             elif new == "completed":
+                if not order.is_paid and order.total > 0 and not request.membership.can("void"):
+                    return _err("Collect the payment before closing this order")
+                if not order.is_paid and order.total > 0:
+                    AuditLog.record(order.restaurant, request.user, "order.close_unpaid", f"#{order.number}",
+                                    f"₹{order.total} closed with ₹{order.paid_amount} paid — {request.data.get('reason', '')}")
                 services.settle_order(order, request.user)
             else:
                 order.set_status(new, request.user)
@@ -340,7 +362,12 @@ class OrderViewSet(TenantViewSet):
     def move(self, request, pk=None):
         order = self.get_object()
         table = get_object_or_404(Table, restaurant=request.restaurant, pk=request.data.get("table"))
-        target = services.move_table(order, table)
+        try:
+            for t in {order.table, table} - {None}:
+                services.check_table_access(t, request.user, _is_owner(request), _device(request))
+            target = services.move_table(order, table, request.user)
+        except services.OrderError as e:
+            return _err(e)
         return self._ok(target)
 
     @action(detail=True, methods=["post"], url_path="print")

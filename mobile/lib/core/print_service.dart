@@ -51,10 +51,15 @@ class PrintService extends ChangeNotifier {
     try {
       final rows = listOf(await _api.get('/print-jobs', query: {'status': 'queued'}));
       lastPoll = DateTime.now();
-      final jobs = rows.map((e) => PrintJob.fromJson(asMap(e))).where(canHandle).toList()
+      // Only fresh jobs: old stuck jobs would each wait for a printer timeout and block new bills.
+      final cutoff = DateTime.now().subtract(const Duration(minutes: 15));
+      final jobs = rows
+          .map((e) => PrintJob.fromJson(asMap(e)))
+          .where((j) => canHandle(j) && (j.createdAt ?? DateTime.now()).toLocal().isAfter(cutoff))
+          .toList()
         ..sort((a, b) => a.id.compareTo(b.id));
-      for (final job in jobs) {
-        await printAndAck(job);
+      for (final job in jobs.take(10)) {
+        await printAndAck(job).timeout(const Duration(seconds: 25));
       }
     } catch (e) {
       lastError = errorText(e);
@@ -114,7 +119,7 @@ class PrintService extends ChangeNotifier {
   }
 
   static List<int> bytesFor(PrintJob job) {
-    if (job.escposB64.isNotEmpty) return base64Decode(job.escposB64);
+    if (job.escposB64.isNotEmpty) return base64Decode(job.escposB64).toList(); // the plugin needs a plain List<int>
     return textToEscPos(job.text);
   }
 
@@ -141,12 +146,21 @@ class PrintService extends ChangeNotifier {
 
   static Future<void> sendToBluetooth(String mac, List<int> bytes) async {
     if (mac.isEmpty) throw Exception('No Bluetooth printer selected');
-    final connected = await PrintBluetoothThermal.connectionStatus;
+    // Android 12+: without "Nearby devices" permission the plugin never answers.
+    final allowed = await PrintBluetoothThermal.isPermissionBluetoothGranted
+        .timeout(const Duration(seconds: 5), onTimeout: () => false);
+    if (!allowed) {
+      throw Exception('Allow "Nearby devices" (Bluetooth) for Servora in phone Settings, then try again');
+    }
+    final connected = await PrintBluetoothThermal.connectionStatus
+        .timeout(const Duration(seconds: 5), onTimeout: () => false);
     if (!connected) {
-      final ok = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+      final ok = await PrintBluetoothThermal.connect(macPrinterAddress: mac)
+          .timeout(const Duration(seconds: 12), onTimeout: () => false);
       if (!ok) throw Exception('Could not connect to Bluetooth printer');
     }
-    final ok = await PrintBluetoothThermal.writeBytes(bytes);
+    final ok = await PrintBluetoothThermal.writeBytes(bytes)
+        .timeout(const Duration(seconds: 15), onTimeout: () => false);
     if (!ok) throw Exception('Bluetooth printer did not accept data');
   }
 

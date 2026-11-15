@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../brand/theme.dart';
 import '../core/api_client.dart';
 import '../core/format.dart';
-import '../core/json.dart';
 import '../core/rider_service.dart';
 import '../models/ops.dart';
 import '../widgets/common.dart';
@@ -52,9 +51,11 @@ class _RiderScreenState extends State<RiderScreen> {
   Future<void> _navigate(DeliveryTask t) async {
     final dest = t.lat != null && t.lng != null ? '${t.lat},${t.lng}' : t.address;
     final uri = Uri.https('www.google.com', '/maps/dir/', {'api': '1', 'destination': dest, 'travelmode': 'driving'});
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
-      toast(context, 'Could not open Maps', error: true);
-    }
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!opened && mounted) toast(context, 'Could not open Maps', error: true);
   }
 
   Future<void> _deliver(DeliveryTask t) async {
@@ -82,7 +83,7 @@ class _RiderScreenState extends State<RiderScreen> {
       ),
     );
     final reason = ctl.text.trim();
-    ctl.dispose();
+    Future.delayed(const Duration(milliseconds: 500), ctl.dispose);
     if (ok == true) await _run(() => rider.act('fail', t, reason: reason), 'Marked as failed');
   }
 
@@ -92,7 +93,7 @@ class _RiderScreenState extends State<RiderScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rider'),
-        actions: [IconButton(onPressed: r.refresh, icon: const Icon(Icons.refresh))],
+        actions: [IconButton(onPressed: () => r.refresh(), icon: const Icon(Icons.refresh))],
       ),
       body: Column(children: [
         const OfflineBanner(),
@@ -130,7 +131,7 @@ class _RiderScreenState extends State<RiderScreen> {
                         for (final t in r.tasks)
                           _RiderTaskCard(
                             task: t,
-                            onCall: () => launchUrl(Uri(scheme: 'tel', path: t.customerPhone)),
+                            onCall: () => launchUrl(Uri(scheme: 'tel', path: t.customerPhone)).catchError((_) => false),
                             onNavigate: () => _navigate(t),
                             onAccept: () => _run(() => r.act('accept', t), 'Accepted'),
                             onPickup: () => _run(() => r.act('pickup', t), 'Picked up – drive safe!'),
@@ -344,7 +345,7 @@ class _DeliverSheetState extends State<_DeliverSheet> {
           onPressed: _otp.text.length == 4
               ? () => Navigator.pop(context, <String, dynamic>{
                     'otp': _otp.text,
-                    if (_due > 0) 'cod': asDouble(_cod.text, _due),
+                    if (_due > 0) 'cod': double.tryParse(_cod.text.trim()) ?? 0,
                   })
               : null,
         ),

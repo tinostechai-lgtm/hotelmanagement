@@ -222,7 +222,7 @@ class _TaskCard extends StatelessWidget {
             if (t.customerPhone.isNotEmpty)
               IconButton(
                 tooltip: 'Call customer',
-                onPressed: () => launchUrl(Uri(scheme: 'tel', path: t.customerPhone)),
+                onPressed: () => launchUrl(Uri(scheme: 'tel', path: t.customerPhone)).catchError((_) => false),
                 icon: const Icon(Icons.call_outlined),
               ),
           ]),

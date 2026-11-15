@@ -420,6 +420,12 @@ class KOT(TenantModel):
             order.set_status("preparing")
         if kots.exists() and all(k.status in ("ready", "served") for k in kots) and order.status in ("accepted", "preparing"):
             order.set_status("ready")
+        # A prepaid takeaway / counter order closes once the kitchen hands it over.
+        order.refresh_from_db(fields=["status", "is_paid"])
+        if order.is_paid and order.status in ("ready", "served") and order.order_type != "delivery":
+            from .services import settle_order
+
+            settle_order(order)
 
 
 class Bill(TenantModel):

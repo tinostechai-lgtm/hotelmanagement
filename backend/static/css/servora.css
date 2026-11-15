@@ -227,3 +227,14 @@ table.data tr:hover td { background: color-mix(in srgb, var(--surface-2) 50%, tr
 .page-loader { position: fixed; inset: 0; background: var(--ink); display: grid; place-items: center; z-index: 999; transition: opacity .4s; }
 .page-loader.done { opacity: 0; pointer-events: none; }
 .page-loader svg { width: 96px; height: 96px; }
+
+/* Phone topbar: page actions get their own row, nothing overlaps or scrolls sideways. */
+.topbar-actions { display: contents; }
+.btn svg { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .topbar { flex-wrap: wrap; gap: 8px; }
+  .topbar h1 { font-size: 17px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar-actions { display: flex; order: 10; flex-basis: 100%; gap: 6px; flex-wrap: wrap; }
+  .topbar-actions:empty { display: none; }
+  .hide-sm { display: none !important; }
+}

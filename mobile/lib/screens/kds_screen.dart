@@ -101,9 +101,13 @@ class _KdsScreenState extends State<KdsScreen> {
     Future<void>.delayed(const Duration(milliseconds: 250), HapticFeedback.heavyImpact);
   }
 
+  final Set<int> _inFlight = {};
+
   Future<void> _advance(Kot k) async {
+    if (_inFlight.contains(k.id)) return; // a quick double tap must not skip a step
     final next = _nextKotStatus[k.status];
     if (next == null) return;
+    _inFlight.add(k.id);
     final api = context.read<ApiClient>();
     final previous = k.status;
     HapticFeedback.selectionClick();
@@ -120,6 +124,8 @@ class _KdsScreenState extends State<KdsScreen> {
         if (!_kots.contains(k)) _kots.add(k);
       });
       toast(context, errorText(e), error: true);
+    } finally {
+      _inFlight.remove(k.id);
     }
   }
 

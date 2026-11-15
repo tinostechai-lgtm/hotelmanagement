@@ -50,8 +50,15 @@ class _BillsScreenState extends State<BillsScreen> {
     setState(() => _error = null);
     final q = _q.text.trim();
     try {
-      final d = await context.read<ApiClient>().get('/bills', query: q.isNotEmpty ? {'q': q} : {'date': Fmt.isoDate(_day)});
-      final rows = (d is Map ? listOf(d['results']) : listOf(d)).map(asMap).toList();
+      final api = context.read<ApiClient>();
+      final query = q.isNotEmpty ? {'q': q} : {'date': Fmt.isoDate(_day)};
+      final rows = <Map<String, dynamic>>[];
+      // A busy day can have more than one page (100 bills each).
+      for (var page = 1; page <= 20; page++) {
+        final d = await api.get('/bills', query: {...query, 'page': '$page'});
+        rows.addAll((d is Map ? listOf(d['results']) : listOf(d)).map(asMap));
+        if (d is! Map || d['next'] == null) break;
+      }
       if (mounted) setState(() => _bills = rows);
     } catch (e) {
       if (mounted) setState(() => _error = errorText(e));
@@ -204,8 +211,8 @@ class _BillSheetState extends State<BillSheet> {
     try {
       final r = asMap(await context.read<ApiClient>().post('/bills/${widget.bill['id']}/print'));
       if (!mounted) return;
-      await context.read<PrintService>().poll(); // prints straight away when this phone drives the printer
-      if (!mounted) return;
+      final printer = context.read<PrintService>();
+      if (printer.running) unawaited(printer.poll()); // prints straight away when this phone drives the printer
       toast(context, asInt(r['queued']) > 0 ? 'Sent to the bill printer' : 'No printer connected - set one up under Printers',
           error: asInt(r['queued']) == 0);
     } catch (e) {

@@ -76,6 +76,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final ok = await showPinSwitch(context);
         if (ok && mounted) {
           toast(context, 'Switched to ${auth.userName}');
+          if (!auth.hasRestaurant) {
+            // The new person works at a different outlet: let them pick it.
+            Navigator.of(context).pushAndRemoveUntil(fadeRoute(const RestaurantPickerScreen()), (_) => false);
+            return;
+          }
           await context.read<PosData>().load(silent: true);
         }
       case 'outlet':

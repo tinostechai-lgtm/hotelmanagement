@@ -58,10 +58,14 @@ class PosData extends ChangeNotifier {
     } catch (e) {
       final raw = _prefs.getString(_cacheKey());
       if (raw != null) {
-        final cached = asMap(jsonDecode(raw));
-        _apply(asMap(cached['data']));
-        fromCache = true;
-        fetchedAt = asDate(cached['at']) ?? DateTime.now();
+        try {
+          final cached = asMap(jsonDecode(raw));
+          _apply(asMap(cached['data']));
+          fromCache = true;
+          fetchedAt = asDate(cached['at']) ?? DateTime.now();
+        } catch (_) {
+          await _prefs.remove(_cacheKey()); // damaged saved copy: drop it instead of crashing
+        }
       }
       error = errorText(e);
     } finally {

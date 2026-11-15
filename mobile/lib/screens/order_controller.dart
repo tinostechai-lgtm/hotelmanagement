@@ -56,9 +56,11 @@ class OrderController extends ChangeNotifier {
     }
     final id = order?.id;
     if (id == null || busy || loading) return;
+    final rev = _rev;
     try {
       final fresh = await api.get('/orders/$id');
-      if (!_disposed && !busy) {
+      // Skip if the order changed while we were fetching (e.g. items just sent) - this copy is older.
+      if (!_disposed && !busy && rev == _rev) {
         _setOrder(fresh);
         notifyListeners();
       }
@@ -120,7 +122,10 @@ class OrderController extends ChangeNotifier {
     }
   }
 
+  int _rev = 0;
+
   void _setOrder(dynamic json) {
+    _rev++;
     order = Order.fromJson(asMap(json));
   }
 
@@ -197,6 +202,7 @@ class OrderController extends ChangeNotifier {
   /// Sends new lines to the kitchen (creating the order if needed).
   /// Returns a message for the user.
   Future<String> sendKot() => _run(() async {
+        savedOffline = false;
         final invalid = validateCustomer();
         if (invalid != null) return invalid;
         final current = order;
@@ -266,6 +272,7 @@ class OrderController extends ChangeNotifier {
     final invalid = validateCustomer();
     if (invalid != null) return invalid;
     if (order == null && cart.isEmpty) return 'Add items first';
+    savedOffline = false;
     if (!await ensureSynced()) {
       return savedOffline ? 'Saved offline – bill will be available after sync' : 'Could not create the order';
     }
@@ -276,11 +283,17 @@ class OrderController extends ChangeNotifier {
     });
   }
 
-  Future<void> refresh() async {
+  /// Reloads the order. Returns an error message, or null when it worked.
+  Future<String?> refresh() async {
     final o = order;
-    if (o == null) return;
-    _setOrder(await api.get('/orders/${o.id}'));
-    notifyListeners();
+    if (o == null) return null;
+    try {
+      _setOrder(await api.get('/orders/${o.id}'));
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return errorText(e);
+    }
   }
 
   Future<void> applyDiscount({double? percent, double? amount, String? coupon, String reason = ''}) => _run(() async {

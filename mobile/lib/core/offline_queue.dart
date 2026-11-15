@@ -20,6 +20,7 @@ class PendingOrder {
     this.serverId,
     this.paid = false,
     this.error,
+    this.restaurantId,
   });
 
   factory PendingOrder.fromJson(Map<String, dynamic> j) => PendingOrder(
@@ -33,6 +34,7 @@ class PendingOrder {
         serverId: asIntOrNull(j['server_id']),
         paid: asBool(j['paid']),
         error: j['error']?.toString(),
+        restaurantId: asIntOrNull(j['restaurant_id']),
       );
 
   final String clientRef;
@@ -54,7 +56,11 @@ class PendingOrder {
   bool paid;
   String? error;
 
+  /// Outlet the order belongs to; it only syncs while that outlet is selected.
+  int? restaurantId;
+
   Map<String, dynamic> toJson() => {
+        'restaurant_id': restaurantId,
         'client_ref': clientRef,
         'body': body,
         'label': label,
@@ -105,6 +111,7 @@ class OfflineQueue extends ChangeNotifier {
   }
 
   Future<void> enqueue(PendingOrder order) async {
+    order.restaurantId ??= _api.auth.restaurantId;
     items.add(order);
     await _save();
     notifyListeners();
@@ -123,7 +130,10 @@ class OfflineQueue extends ChangeNotifier {
     notifyListeners();
     var done = 0;
     try {
+      final outlet = _api.auth.restaurantId;
       for (final p in List<PendingOrder>.from(items)) {
+        // Never post an order to a different outlet than the one it was taken for.
+        if (p.restaurantId != null && p.restaurantId != outlet) continue;
         try {
           if (p.serverId == null) {
             final order = asMap(await _api.post('/orders', p.body));
@@ -131,7 +141,12 @@ class OfflineQueue extends ChangeNotifier {
             await _save();
           }
           if (p.payments.isNotEmpty && !p.paid) {
-            await _api.post('/orders/${p.serverId}/pay', {'payments': p.payments});
+            try {
+              await _api.post('/orders/${p.serverId}/pay', {'payments': p.payments});
+            } on ApiException catch (e) {
+              // An earlier try went through but the reply was lost.
+              if (!e.message.contains('already fully paid')) rethrow;
+            }
             p.paid = true;
             await _save();
           }

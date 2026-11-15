@@ -47,7 +47,7 @@ class _ScannerPageState extends State<_ScannerPage> {
           IconButton(
             tooltip: 'Torch',
             icon: const Icon(Icons.flash_on),
-            onPressed: () => _controller.toggleTorch(),
+            onPressed: () => _controller.toggleTorch().catchError((_) {}),
           ),
         ],
       ),

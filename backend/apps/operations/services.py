@@ -8,6 +8,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from apps.crm.models import Coupon, Customer
@@ -64,7 +65,7 @@ def table_busy_reason(table, user, device=""):
                 f"Close it there first, or wait a minute.")
     o = table.active_order
     if o and o.taken_by_id and o.taken_by_id != user.pk:
-        return f"Table {table.name} already has an order taken by {_staff_name(o.taken_by)}. Ask them or a manager."
+        return f"Table {table.name} already has an order taken by {_staff_name(o.taken_by)}. Ask them or the owner."
     return None
 
 
@@ -118,8 +119,13 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
         existing = table.active_order
         if existing and source in ("pos", "captain", "qr"):
             if items:
-                add_items(existing, items, batch_ref=client_ref, user=user,
-                          check_duplicate=source in ("pos", "captain") and not confirm_duplicate)
+                added = add_items(existing, items, batch_ref=client_ref, user=user,
+                                  check_duplicate=source in ("pos", "captain") and not confirm_duplicate)
+                if source == "qr" and added:
+                    Notification.objects.create(restaurant=restaurant, kind="new_order",
+                                                title=f"{existing.label}: guest added items",
+                                                body=", ".join(li.display_name for li in added)[:200],
+                                                link=f"/app/orders/{existing.pk}/")
             return existing
     customer = get_or_create_customer(restaurant, customer_phone, customer_name, customer_email)
     if status is None:
@@ -132,8 +138,6 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
         payment_mode=payment_mode, external_id=external_id, client_ref=client_ref,
         accepted_at=timezone.now() if status == "accepted" else None,
     )
-    if coupon_code:
-        apply_coupon(order, coupon_code, save=False)
     if table is not None:
         table.status = Table.Status.OCCUPIED
         table.occupied_since = table.occupied_since or timezone.now()
@@ -142,6 +146,8 @@ def create_order(restaurant, *, order_type="dine_in", source="pos", table=None, 
         add_items(order, items, batch_ref=client_ref, user=user)
     else:
         order.recalc()
+    if coupon_code:
+        apply_coupon(order, coupon_code)  # after the items, so a minimum order value can be met
     if source not in ("pos", "captain") and payment_mode != "online":
         Notification.objects.create(restaurant=restaurant, kind="new_order",
                                     title=f"New {order.get_source_display()} order #{order.number}",
@@ -205,13 +211,23 @@ def add_items(order, items, batch_ref="", user=None, check_duplicate=False):
     return created
 
 
+def _ensure_open(order):
+    if order.status in ("completed", "cancelled"):
+        raise OrderError("This order is closed — it can't be changed")
+
+
 def update_item(order_item, quantity=None, notes=None):
+    _ensure_open(order_item.order)
+    if order_item.is_void:
+        raise OrderError("This item was already removed")
     if quantity is not None:
         q = Decimal(str(quantity))
         if q <= 0:
             return void_item(order_item, "Removed")
         if order_item.status != "new" and q < order_item.quantity:
             raise OrderError("Item already sent to kitchen — void it instead")
+        if order_item.status != "new" and q > order_item.quantity:
+            raise OrderError("Item already sent to kitchen — add it again as a new item")
         order_item.quantity = q
     if notes is not None:
         order_item.notes = notes
@@ -221,6 +237,9 @@ def update_item(order_item, quantity=None, notes=None):
 
 
 def void_item(order_item, reason=""):
+    _ensure_open(order_item.order)
+    if order_item.is_void:
+        return order_item
     order_item.is_void = True
     order_item.void_reason = reason
     order_item.save()
@@ -273,6 +292,11 @@ def apply_coupon(order, code, save=True):
 
 
 def apply_discount(order, amount=None, percent=None, reason=""):
+    _ensure_open(order)
+    if percent is not None and not (0 <= Decimal(str(percent)) <= 100):
+        raise OrderError("Discount % must be between 0 and 100")
+    if amount is not None and Decimal(str(amount)) < 0:
+        raise OrderError("Discount can't be negative")
     order.coupon = None
     order.recalc(save=False)
     if percent is not None:
@@ -299,9 +323,10 @@ def generate_bill(order, customer_gstin=""):
     order.recalc()
     if not order.live_items().exists():
         raise OrderError("Cannot bill an empty order")
-    bill = order.bills.exclude(status="void").first()
-    if bill and bill.status != "unpaid" and order.bills.exclude(status="void").count() > 1:
-        return bill
+    live = order.bills.exclude(status="void")
+    if live.count() > 1:
+        return live.exclude(status="paid").order_by("created_at").first() or live.first()  # split bills stay as split
+    bill = live.first()
     if bill is None:
         bill = Bill(restaurant=order.restaurant, order=order, number=_new_bill_number(order.restaurant))
     bill.subtotal, bill.discount, bill.service_charge = order.subtotal, order.discount, order.service_charge
@@ -379,6 +404,15 @@ def split_bill(order, mode="equal", parts=2, groups=None):
                 restaurant=r, order=order, number=_new_bill_number(r), label=f"Split {idx}/{len(groups)}",
                 subtotal=money(sub), discount=money(disc), service_charge=money(svc), tax=money(tax),
                 round_off=money(total - gross), total=money(total), lines=_bill_lines(lines)))
+        if bills:
+            # Delivery fee, packaging and tip go on the last bill, and the split bills always add up to the order total.
+            last = bills[-1]
+            last.extra_charges = order.delivery_fee + order.packaging_charge + order.tip
+            gap = order.total - sum((b.total for b in bills), Decimal("0"))
+            last.total = money(last.total + gap)
+            last.round_off = money(last.total - (last.subtotal - last.discount + last.service_charge
+                                                 + (Decimal("0") if r.includes_tax else last.tax) + last.extra_charges))
+            last.save()
     else:
         raise OrderError("Unknown split mode")
     if order.table_id:
@@ -392,8 +426,26 @@ def add_payment(order, method, amount, bill=None, reference="", user=None, tende
     amount = money(Decimal(str(amount)))
     if amount <= 0:
         raise OrderError("Amount must be positive")
+    if status == "success":
+        # Guard against a double tap / retry on a slow network recording the same payment twice.
+        locked = type(order).objects.select_for_update().get(pk=order.pk)
+        if locked.status == "cancelled":
+            raise OrderError("This order was cancelled")
+        already = sum((x.amount for x in locked.payments.filter(status="success")), Decimal("0"))
+        if locked.total > 0 and already >= locked.total:
+            raise OrderError("This bill is already fully paid")
+        due = locked.total - already
+        if amount > due + Decimal("0.01"):
+            if method == "cash":
+                tendered = tendered or amount  # change is given back; only the bill amount is recorded
+                amount = money(due)
+            else:
+                raise OrderError(f"Amount is more than the balance due (₹{money(due)})")
     if bill is None:
-        bill = order.bills.exclude(status__in=["void", "paid"]).first() or generate_bill(order)
+        if order.bills.exclude(status="void").count() <= 1:
+            bill = generate_bill(order)  # bring the bill up to date with items added since it was printed
+        else:
+            bill = order.bills.exclude(status__in=["void", "paid"]).order_by("created_at").first() or generate_bill(order)
     if method == "room" and not order.room_id:
         raise OrderError("Room posting needs a room on the order")
     if method == "loyalty":
@@ -423,7 +475,7 @@ def _after_payment(order, bill):
         return
     # Dine-in bills are paid at the end of the meal; prepaid takeaway / online
     # orders stay open until the kitchen marks them ready.
-    if order.status in ("served", "ready", "delivered") or (order.order_type == "dine_in" and order.source in ("pos", "captain")):
+    if order.status in ("served", "ready", "delivered") or (order.order_type == "dine_in" and order.source in ("pos", "captain", "qr")):
         settle_order(order)
 
 
@@ -469,7 +521,7 @@ def settle_order(order, user=None):
     if order.customer:
         order.customer.record_visit(order.total)
     if order.coupon_id:
-        Coupon.objects.filter(pk=order.coupon_id).update(used_count=order.coupon.used_count + 1)
+        Coupon.objects.filter(pk=order.coupon_id).update(used_count=F("used_count") + 1)
     order.items.filter(is_void=False).update(status="served")
     order.kots.exclude(status="cancelled").update(status="served")
     if order.status not in ("completed",):
@@ -482,6 +534,15 @@ def settle_order(order, user=None):
 def cancel_order(order, reason, user=None):
     if order.status in ("completed", "cancelled"):
         raise OrderError("Order already closed")
+    paid = order.payments.filter(status="success")
+    if paid.exists():
+        # Money was taken: record it as refunded so cash-in-hand and reports stay correct.
+        total = sum((p.amount for p in paid), Decimal("0"))
+        paid.update(status="refunded")
+        order.bills.exclude(status="void").update(status="void")
+        order.paid_amount, order.is_paid = Decimal("0"), False
+        order.save(update_fields=["paid_amount", "is_paid"])
+        reason = f"{reason} (₹{money(total)} refunded)".strip()
     for li in order.items.filter(is_void=False):
         if li.item and li.item.track_stock:
             li.item.stock_qty += int(li.quantity)
@@ -497,17 +558,24 @@ def cancel_order(order, reason, user=None):
     return order
 
 
-def move_table(order, new_table):
+@transaction.atomic
+def move_table(order, new_table, user=None):
+    if order.status not in Order.OPEN_STATUSES:
+        raise OrderError("Only a running order can be moved")
     old = order.table
     if new_table.active_order and new_table.active_order != order:
         # merge into the target table's order
         target = new_table.active_order
+        if order.payments.filter(status="success").exists() or target.payments.filter(status="success").exists():
+            raise OrderError("One of these orders already has a payment — settle it before merging tables")
         order.items.update(order=target)
         order.kots.update(order=target)
+        for o in (order, target):
+            o.bills.exclude(status="void").update(status="void")  # old totals; a fresh bill is made at billing
         target.recalc()
-        order.status = "cancelled"
-        order.cancel_reason = f"Merged into #{target.number}"
-        order.save()
+        if order.status == "served":
+            order.status = "accepted"  # served -> cancelled isn't a normal step; same as cancel_order
+        order.set_status("cancelled", user, f"Merged into #{target.number}")
         result = target
     else:
         order.table = new_table

@@ -3,9 +3,9 @@
 {% block heading %}<span id="pos-title">POS & Tables</span>{% endblock %}
 {% block topbar_actions %}
 <div class="row" style="gap:6px">
-  <button class="btn btn-sm" data-new="takeaway"><i data-lucide="shopping-bag"></i><span class="hide-sm">Takeaway</span></button>
-  <button class="btn btn-sm" data-new="delivery"><i data-lucide="bike"></i><span class="hide-sm">Delivery</span></button>
-  <button class="btn btn-sm hidden" data-new="room_service" id="btn-room"><i data-lucide="bed-double"></i><span class="hide-sm">Room</span></button>
+  <button class="btn btn-sm" data-new="takeaway"><i data-lucide="shopping-bag"></i><span>Takeaway</span></button>
+  <button class="btn btn-sm" data-new="delivery"><i data-lucide="bike"></i><span>Delivery</span></button>
+  <button class="btn btn-sm hidden" data-new="room_service" id="btn-room"><i data-lucide="bed-double"></i><span>Room</span></button>
 </div>
 {% endblock %}
 {% block head %}
@@ -196,6 +196,17 @@
       v && newOrder("room_service", null, st.boot.rooms.find((r) => r.id == v.room));
     } else newOrder(b.dataset.new);
   }));
+  // Starting a takeaway / delivery while on an order: don't silently lose unsaved items, and free the table.
+  S.$$("[data-new]").forEach((b) => {
+    const start = b.onclick;
+    b.onclick = async () => {
+      if (!$("#order").classList.contains("hidden")) {
+        if (st.draft.length && !(await S.confirm("Discard items not yet saved?", "Discard", true))) return;
+        releaseTable();
+      }
+      return start();
+    };
+  });
 
   /* ---------------- Order screen ---------------- */
   function showOrder() { $("#floor").classList.add("hidden"); $("#order").classList.remove("hidden"); renderCats(); renderItems(); renderCart(); holdTable(); setTimeout(() => $("#search").focus(), 50); }
@@ -356,7 +367,8 @@
   $("#a-pay").onclick = async () => {
     if (st.draft.length && !(await save(true).catch(() => false))) return;
     if (!st.order) return S.toast("Add items first", "err");
-    if (!st.order.bills.some((b) => b.status !== "void")) st.order = await S.api(`orders/${st.order.id}/bill`, { body: { print: false } });
+    // Bring the bill up to date (items may have been added since it was printed); split bills stay as they are.
+    if (st.order.bills.filter((b) => b.status !== "void").length <= 1 && !st.order.is_paid) st.order = await S.api(`orders/${st.order.id}/bill`, { body: { print: false } });
     payDialog();
   };
   $("#m-items").onclick = () => $("#order").classList.remove("show-cart");
@@ -369,9 +381,22 @@
     }).catch(() => {});
   }
 
-  function payDialog() {
+  async function payDialog() {
     const o = st.order;
     const bills = o.bills.filter((b) => b.status !== "void" && b.status !== "paid");
+    if (!bills.length) {
+      if (o.is_paid) {
+        // Nothing left to pay: offer to close the order.
+        if (["completed", "cancelled"].includes(o.status)) return S.toast("This order is fully paid", "ok");
+        if (await S.confirm(`#${o.number} is fully paid. Close the order now?`, "Close order")) {
+          st.order = await S.api(`orders/${o.id}/status`, { body: { status: "completed" } });
+          S.toast("Order closed", "ok"); back();
+        }
+        return;
+      }
+      st.order = await S.api(`orders/${o.id}/bill`, { body: { print: false } });
+      return payDialog();
+    }
     const methods = st.boot.payment_methods.filter((m) => m.code !== "room" || o.room);
     let bill = bills[0], method = "cash", entries = [];
     const m = S.modal({ title: `Settle #${o.number}`, wide: true, body: `
