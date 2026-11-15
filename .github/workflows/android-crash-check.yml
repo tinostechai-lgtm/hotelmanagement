@@ -1,0 +1,75 @@
+name: Android crash check
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/android-crash-check.yml"
+      - "mobile/integration_test/**"
+
+# Runs the app on an Android emulator and collects any crash (Java exception, native signal, ANR).
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.35.7"
+          cache: true
+      - name: Enable KVM
+        working-directory: .
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Prepare project (same as the release build)
+        run: |
+          flutter create . --platforms=android --org com.servora --project-name servora
+          flutter pub get
+          python3 tool/patch_android_signing.py
+          echo "dev.steenbakker.mobile_scanner.useUnbundled=true" >> android/gradle.properties
+      - name: Build release APK for the emulator (x86_64)
+        run: flutter build apk --release --target-platform android-x64
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          working-directory: mobile
+          script: |
+            mkdir -p build/crash
+            adb install -r build/app/outputs/flutter-apk/app-release.apk
+            adb logcat -c
+            adb shell am start -n com.servora.servora/.MainActivity
+            sleep 15
+            adb exec-out screencap -p > build/crash/release-start.png
+            adb shell monkey -p com.servora.servora --pct-syskeys 0 --throttle 120 -v 2500 > build/crash/monkey.txt 2>&1 || true
+            sleep 3
+            adb exec-out screencap -p > build/crash/release-after-monkey.png
+            adb logcat -d > build/crash/logcat-release.txt || true
+            adb uninstall com.servora.servora || true
+            adb logcat -c
+            flutter drive --driver=test_driver/integration_test.dart --target=integration_test/screens_test.dart -d emulator-5554 > build/crash/drive.txt 2>&1 || echo "DRIVE FAILED" >> build/crash/drive.txt
+            adb logcat -d > build/crash/logcat-drive.txt || true
+            grep -nE "FATAL EXCEPTION|Fatal signal|ANR in|Process com.servora.servora .*has died|CRASH|Unhandled Exception|E/flutter" build/crash/logcat-release.txt build/crash/logcat-drive.txt build/crash/monkey.txt | head -200 > build/crash/summary.txt || true
+            echo "---- crash summary ----"; cat build/crash/summary.txt; echo "---- end ----"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-crash-check
+          path: |
+            mobile/build/crash/
+            mobile/build/screenshots/
