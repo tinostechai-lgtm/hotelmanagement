@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +20,13 @@ final GlobalKey<NavigatorState> rootNavigator = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Never let a stray error take the app down: log it and keep running.
+  FlutterError.onError = (details) => FlutterError.presentError(details);
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught error: $error\n$stack');
+    return true;
+  };
+  ErrorWidget.builder = (details) => const _FriendlyError();
   SystemChrome.setSystemUIOverlayStyle(lightStatusBar);
   final prefs = await SharedPreferences.getInstance();
 
@@ -104,6 +113,38 @@ class _ServoraAppState extends State<ServoraApp> {
         );
       },
       home: const SplashScreen(),
+    );
+  }
+}
+
+
+/// Shown in place of a screen that failed to build (instead of a grey screen).
+class _FriendlyError extends StatelessWidget {
+  const _FriendlyError();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Brand.background,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.refresh_rounded, size: 48, color: Brand.orangeDeep),
+            const SizedBox(height: 12),
+            const Text('Something went wrong on this screen',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Brand.ink)),
+            const SizedBox(height: 6),
+            const Text('Go back and open it again. Your orders are safe.',
+                textAlign: TextAlign.center, style: TextStyle(color: Brand.muted)),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => rootNavigator.currentState?.maybePop(),
+              child: const Text('Go back'),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 }
