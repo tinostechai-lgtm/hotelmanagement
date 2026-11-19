@@ -77,6 +77,7 @@ window.SV = { restaurant: {{ restaurant.id }}, slug: "{{ restaurant.slug }}", pe
     m.$("[data-read]").onclick = async () => { await S.api("notifications/read-all", { body: {} }); m.close(); S.$("#bell-dot").classList.add("hidden"); };
   };
   S.startBrowserPrinting();
+  S.printer.startStation();
 })();
 </script>
 {% block page_scripts %}{% endblock %}

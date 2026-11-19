@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../brand/theme.dart';
 import '../core/api_client.dart';
+import '../core/config.dart';
 import '../core/format.dart';
 import '../core/json.dart';
 import '../core/pos_data.dart';
@@ -211,10 +212,18 @@ class _BillSheetState extends State<BillSheet> {
     try {
       final r = asMap(await context.read<ApiClient>().post('/bills/${widget.bill['id']}/print'));
       if (!mounted) return;
-      final printer = context.read<PrintService>();
-      if (printer.running) unawaited(printer.poll()); // prints straight away when this phone drives the printer
-      toast(context, asInt(r['queued']) > 0 ? 'Sent to the bill printer' : 'No printer connected - set one up under Printers',
-          error: asInt(r['queued']) == 0);
+      // Print straight away on this phone's bill printer.
+      final res = await context.read<PrintService>().printNow(asIntOrNull(widget.bill['order_id']), 'bill');
+      if (!mounted) return;
+      if (res.printed > 0) {
+        toast(context, 'Bill printed');
+      } else if (res.error != null) {
+        toast(context, 'Printer problem: ${res.error}', error: true);
+      } else if (!context.read<AppConfig>().hasMainPrinter) {
+        toast(context, 'Choose this phone\'s printer under Menu > Printers to print here', error: true);
+      } else {
+        toast(context, asInt(r['queued']) > 0 ? 'Sent to the bill printer' : 'No printer connected', error: asInt(r['queued']) == 0);
+      }
     } catch (e) {
       if (mounted) toast(context, errorText(e), error: true);
     } finally {

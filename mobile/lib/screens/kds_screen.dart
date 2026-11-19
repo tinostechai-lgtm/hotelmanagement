@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../brand/theme.dart';
 import '../core/api_client.dart';
+import '../core/print_service.dart';
 import '../core/config.dart';
 import '../core/format.dart';
 import '../core/json.dart';
@@ -155,7 +156,9 @@ class _KdsScreenState extends State<KdsScreen> {
     try {
       if (action == 'reprint') {
         await api.post('/kots/${k.id}/reprint', {});
-        if (mounted) toast(context, 'Sent to printer');
+        if (!mounted) return;
+        final r = await context.read<PrintService>().printNow(k.orderId, 'kot');
+        if (mounted) toast(context, r.printed > 0 ? 'KOT printed' : (r.error ?? 'Sent to printer'), error: r.error != null);
       } else {
         await api.post('/kots/${k.id}/status', {'status': action});
         await _load();

@@ -14,11 +14,29 @@ class DeviceSerializer(TenantSerializer):
     is_online = serializers.BooleanField(read_only=True)
     kind_display = serializers.CharField(source="get_kind_display", read_only=True)
     connection_display = serializers.CharField(source="get_connection_display", read_only=True)
+    text_size = serializers.ChoiceField(choices=["normal", "large", "xlarge"], required=False, write_only=True)
 
     class Meta:
         model = Device
         exclude = ["restaurant"]
         read_only_fields = ["agent_key", "last_seen"]
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        data["text_size"] = services.device_size(obj)
+        return data
+
+    def _with_size(self, validated, instance=None):
+        size = validated.pop("text_size", None)
+        if size:
+            validated["config"] = {**((instance.config if instance else None) or {}), **(validated.get("config") or {}), "text_size": size}
+        return validated
+
+    def create(self, validated):
+        return super().create(self._with_size(validated))
+
+    def update(self, instance, validated):
+        return super().update(instance, self._with_size(validated, instance))
 
 
 class PrintJobSerializer(serializers.ModelSerializer):
@@ -88,10 +106,23 @@ class PrintJobViewSet(TenantViewSet):
             qs = qs.filter(status__in=p["status"].split(","))
         if p.get("device"):
             qs = qs.filter(device_id=p["device"])
+        if p.get("order"):
+            qs = qs.filter(order_id=p["order"])
+        if p.get("kind"):
+            qs = qs.filter(kind__in=p["kind"].split(","))
+        if p.get("since"):  # seconds: only jobs made in the last N seconds
+            from datetime import timedelta
+
+            try:
+                qs = qs.filter(created_at__gte=timezone.now() - timedelta(seconds=int(p["since"])))
+            except ValueError:
+                pass
         if p.get("unrouted"):
             from django.db.models import Q
 
             qs = qs.filter(Q(device__isnull=True) | Q(device__connection="browser"))
+        if self.action != "list":
+            return qs  # one job by id (ack / claim / render / retry): never limited to the latest 100
         return qs.order_by("-created_at")[:100] if not p.get("status") else qs
 
     def create(self, request, *args, **kwargs):
@@ -105,6 +136,36 @@ class PrintJobViewSet(TenantViewSet):
         job.attempts += 1
         job.save()
         return Response({"ok": True})
+
+    @action(detail=True, methods=["post"])
+    def claim(self, request, pk=None):
+        """A phone takes a job before printing it, so two phones never print the same KOT / bill."""
+        job = self.get_object()
+        taken = PrintJob.objects.filter(pk=job.pk, status="queued").update(status="sent")
+        if not taken:
+            return Response({"detail": "Already printed by another device", "code": "taken"}, status=409)
+        return Response({"ok": True})
+
+    @action(detail=True, methods=["get"])
+    def render(self, request, pk=None):
+        """The job laid out for a given printer: ?width=58|80&size=normal|large|xlarge (&columns=N for browsers)."""
+        from .escpos import clean_size, clean_width
+
+        job = self.get_object()
+        p = request.query_params
+        width = clean_width(p.get("width")) if p.get("width") else None
+        size = clean_size(p.get("size")) if p.get("size") else None
+        columns = None
+        if p.get("columns"):
+            try:
+                columns = min(64, max(16, int(p["columns"])))
+            except ValueError:
+                columns = None
+        r = services.render_source(job, width, size, columns)
+        if r is None:
+            return Response({"text": job.text, "escpos_b64": job.escpos_b64, "lines": [{"t": t} for t in job.text.splitlines()],
+                             "columns": None})
+        return Response({"text": r.plain, "escpos_b64": r.b64, "lines": r.styled, "columns": r.w})
 
     @action(detail=True, methods=["post"])
     def retry(self, request, pk=None):

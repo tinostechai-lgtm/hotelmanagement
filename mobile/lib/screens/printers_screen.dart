@@ -11,6 +11,8 @@ import '../core/print_service.dart';
 import '../models/ops.dart';
 import '../widgets/common.dart';
 
+/// Printer setup for this phone: which printer prints bills and KOTs, paper width
+/// and text size. Pressing KOT / Bill / Print then prints straight away.
 class PrintersScreen extends StatefulWidget {
   const PrintersScreen({super.key});
 
@@ -22,29 +24,22 @@ class _PrintersScreenState extends State<PrintersScreen> {
   List<PrintJob> _jobs = [];
   bool _loading = true;
   String? _error;
-  late final TextEditingController _lan;
 
   @override
   void initState() {
     super.initState();
-    _lan = TextEditingController(text: context.read<AppConfig>().fallbackLanPrinter);
     _load();
-  }
-
-  @override
-  void dispose() {
-    _lan.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
     final api = context.read<ApiClient>();
     setState(() => _loading = true);
     try {
-      final rows = listOf(await api.get('/print-jobs'));
+      final rows = listOf(await api.get('/print-jobs', query: {'since': '86400'}));
       if (mounted) {
         setState(() {
-          _jobs = rows.map((e) => PrintJob.fromJson(asMap(e))).toList();
+          _jobs = rows.map((e) => PrintJob.fromJson(asMap(e))).toList()..sort((a, b) => b.id.compareTo(a.id));
+          _jobs = _jobs.take(30).toList();
           _error = null;
         });
       }
@@ -55,70 +50,130 @@ class _PrintersScreenState extends State<PrintersScreen> {
     }
   }
 
-  Future<void> _pickBluetooth() async {
+  /// Bottom sheet: Bluetooth printer from the paired list, Wi-Fi printer IP, or none.
+  Future<void> _choose({required bool kot}) async {
     final config = context.read<AppConfig>();
-    List<BluetoothInfo> devices;
+    List<BluetoothInfo> paired = const [];
+    String? btError;
     try {
-      devices = await PrintBluetoothThermal.pairedBluetooths;
+      paired = await PrintBluetoothThermal.pairedBluetooths.timeout(const Duration(seconds: 6), onTimeout: () => const []);
     } catch (e) {
-      if (mounted) toast(context, 'Bluetooth unavailable: $e', error: true);
-      return;
+      btError = 'Bluetooth is off or not allowed';
     }
     if (!mounted) return;
-    final picked = await showSheet<BluetoothInfo>(
+    final lan = TextEditingController(text: kot ? config.kotLan : config.fallbackLanPrinter);
+    final picked = await showSheet<String>(
       context,
       (ctx) => SheetFrame(
-        title: 'Paired printers',
+        title: kot ? 'Kitchen (KOT) printer' : 'Bill printer',
         child: ListView(shrinkWrap: true, padding: const EdgeInsets.only(bottom: 16), children: [
-          if (devices.isEmpty)
-            const ListTile(
-              leading: Icon(Icons.bluetooth_disabled),
-              title: Text('No paired devices'),
-              subtitle: Text('Pair the printer in Android Bluetooth settings first (PIN is often 0000 or 1234).'),
+          if (kot)
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('Same printer as bills'),
+              subtitle: const Text('One printer for everything'),
+              onTap: () => Navigator.pop(ctx, 'same'),
             ),
-          for (final d in devices)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Text('Bluetooth printers paired with this phone', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+          if (paired.isEmpty)
+            ListTile(
+              leading: const Icon(Icons.bluetooth_disabled),
+              title: Text(btError ?? 'No paired printers'),
+              subtitle: const Text('Turn the printer on, then pair it in the phone\'s Bluetooth settings (PIN is often 0000 or 1234).'),
+            ),
+          for (final d in paired)
             ListTile(
               leading: const Icon(Icons.print),
               title: Text(d.name),
               subtitle: Text(d.macAdress),
-              onTap: () => Navigator.pop(ctx, d),
+              onTap: () => Navigator.pop(ctx, 'bt:${d.macAdress}|${d.name}'),
             ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: TextField(
+              controller: lan,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'Wi-Fi / LAN printer IP',
+                hintText: '192.168.1.50:9100',
+                prefixIcon: Icon(Icons.wifi),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: FilledButton(
+              onPressed: () => Navigator.pop(ctx, lan.text.trim().isEmpty ? null : 'lan:${lan.text.trim()}'),
+              child: const Text('Use this Wi-Fi printer'),
+            ),
+          ),
         ]),
       ),
     );
-    if (picked != null) await config.setBluetoothPrinter(picked.macAdress, picked.name);
+    Future.delayed(const Duration(milliseconds: 500), lan.dispose);
+    if (picked == null) return;
+    if (kot) {
+      if (picked == 'same') {
+        await config.setKotPrinter();
+      } else if (picked.startsWith('bt:')) {
+        final p = picked.substring(3).split('|');
+        await config.setKotPrinter(mac: p.first, name: p.length > 1 ? p[1] : '');
+      } else {
+        await config.setKotPrinter(lan: picked.substring(4));
+      }
+    } else {
+      if (picked.startsWith('bt:')) {
+        final p = picked.substring(3).split('|');
+        await config.setBluetoothPrinter(p.first, p.length > 1 ? p[1] : '');
+        await config.setFallbackLanPrinter('');
+      } else {
+        await config.setBluetoothPrinter('', '');
+        await config.setFallbackLanPrinter(picked.substring(4));
+      }
+    }
+    if (mounted) context.read<PrintService>().refreshState();
   }
 
-  Future<void> _test() async {
+  Future<void> _test(String kind) async {
     final printer = context.read<PrintService>();
-    await context.read<AppConfig>().setFallbackLanPrinter(_lan.text);
     try {
-      await printer.testPrint();
+      await printer.testPrint(kind);
       if (mounted) toast(context, 'Test page sent');
     } catch (e) {
-      if (mounted) toast(context, 'Print failed: $e', error: true);
+      if (mounted) toast(context, 'Print failed: ${e.toString().replaceFirst('Exception: ', '')}', error: true);
     }
   }
 
   Future<void> _printHere(PrintJob job) async {
     final printer = context.read<PrintService>();
     try {
-      await printer.printAndAck(job);
+      final r = await printer.printAgain(job);
       await _load();
-      if (mounted) toast(context, printer.lastError ?? 'Printed');
+      if (mounted) toast(context, r.error ?? (r.printed > 0 ? 'Printed' : 'No printer set up for this'), error: r.printed == 0);
     } catch (e) {
       if (mounted) toast(context, errorText(e), error: true);
     }
   }
 
-  Future<void> _retry(PrintJob job) async {
-    try {
-      await context.read<ApiClient>().post('/print-jobs/${job.id}/retry', {});
-      await _load();
-    } catch (e) {
-      if (mounted) toast(context, errorText(e), error: true);
-    }
+  String _describe(AppConfig c, {required bool kot}) {
+    if (kot && !c.hasKotPrinter) return c.hasMainPrinter ? 'Same printer as bills' : 'Not set';
+    final mac = kot ? c.kotBtMac : c.btPrinterMac;
+    final name = kot ? c.kotBtName : c.btPrinterName;
+    final lan = kot ? c.kotLan : c.fallbackLanPrinter;
+    if (mac.isNotEmpty) return 'Bluetooth · ${name.isEmpty ? mac : name}';
+    if (lan.isNotEmpty) return 'Wi-Fi · $lan';
+    return 'Not set - tap to choose';
   }
+
+  Widget _card(List<Widget> children) => Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: Brand.line)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -129,62 +184,108 @@ class _PrintersScreenState extends State<PrintersScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(padding: const EdgeInsets.all(16), children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Brand.line),
+          _card([
+            ListTile(
+              leading: const Icon(Icons.receipt_long),
+              title: const Text('Bill printer', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(_describe(config, kot: false)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _choose(kot: false),
             ),
-            child: Column(children: [
-              SwitchListTile.adaptive(
-                value: config.printFromDevice,
-                onChanged: config.setPrintFromDevice,
-                title: const Text('Print from this device', style: TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text(printer.running
-                    ? 'Polling every few seconds · ${printer.printedCount} printed'
-                        '${printer.lastError != null ? '\nLast error: ${printer.lastError}' : ''}'
-                    : 'Send KOTs and bills from Servora to LAN / Bluetooth printers via this phone or tablet.'),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.soup_kitchen_outlined),
+              title: const Text('KOT (kitchen) printer', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(_describe(config, kot: true)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _choose(kot: true),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              child: Wrap(spacing: 8, runSpacing: 8, children: [
+                OutlinedButton.icon(
+                    onPressed: config.hasMainPrinter ? () => _test('bill') : null,
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('Test bill printer')),
+                OutlinedButton.icon(
+                    onPressed: config.targetFor('kot') != null ? () => _test('kot') : null,
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('Test KOT printer')),
+              ]),
+            ),
+          ]),
+          _card([
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Text('Paper width', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SegmentedButton<int>(
+                segments: const [
+                  ButtonSegment(value: 58, label: Text('58 mm (2 inch)')),
+                  ButtonSegment(value: 80, label: Text('80 mm (3 inch)')),
+                ],
+                selected: {config.paperWidth},
+                onSelectionChanged: (v) => config.setPrintOptions(paper: v.first),
               ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.bluetooth),
-                title: const Text('Bluetooth printer'),
-                subtitle: Text(config.btPrinterMac.isEmpty ? 'Not selected' : '${config.btPrinterName} (${config.btPrinterMac})'),
-                trailing: config.btPrinterMac.isEmpty
-                    ? const Icon(Icons.chevron_right)
-                    : IconButton(
-                        tooltip: 'Forget',
-                        icon: const Icon(Icons.close),
-                        onPressed: () => config.setBluetoothPrinter('', ''),
-                      ),
-                onTap: _pickBluetooth,
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 6),
+              child: Text('Text size on paper', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'normal', label: Text('Normal')),
+                  ButtonSegment(value: 'large', label: Text('Large')),
+                  ButtonSegment(value: 'xlarge', label: Text('Extra large')),
+                ],
+                selected: {config.textSize},
+                onSelectionChanged: (v) => config.setPrintOptions(size: v.first),
               ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _lan,
-                  keyboardType: TextInputType.url,
-                  onSubmitted: config.setFallbackLanPrinter,
-                  decoration: const InputDecoration(
-                    labelText: 'Default LAN printer (ip:port)',
-                    hintText: '192.168.1.50:9100',
-                    helperText: 'Used for jobs whose device has no address. Network devices use their own IP.',
-                    prefixIcon: Icon(Icons.lan_outlined),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: OutlinedButton.icon(onPressed: _test, icon: const Icon(Icons.print_outlined), label: const Text('Print test page')),
-              ),
-            ]),
-          ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
+              child: Text('Large makes letters twice as tall - easiest to read. Print a test page after changing.',
+                  style: TextStyle(color: Brand.muted, fontSize: 13)),
+            ),
+          ]),
+          _card([
+            SwitchListTile.adaptive(
+              value: config.autoPrint,
+              onChanged: (v) => config.setPrintOptions(auto: v),
+              title: const Text('Print straight away', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('Pressing KOT, Bill or Print prints on the printers above - no extra steps.'),
+            ),
+            const Divider(height: 1),
+            SwitchListTile.adaptive(
+              value: config.printKotHere,
+              onChanged: (v) => config.setPrintOptions(kot: v),
+              title: const Text('Print KOTs from this phone'),
+            ),
+            SwitchListTile.adaptive(
+              value: config.printBillHere,
+              onChanged: (v) => config.setPrintOptions(bill: v),
+              title: const Text('Print bills from this phone'),
+            ),
+            const Divider(height: 1),
+            SwitchListTile.adaptive(
+              value: config.printFromDevice,
+              onChanged: config.setPrintFromDevice,
+              title: const Text('Also print orders from other phones'),
+              subtitle: Text(printer.running
+                  ? 'On · ${printer.printedCount} printed'
+                      '${printer.lastError != null ? '\nLast problem: ${printer.lastError}' : ''}'
+                  : 'Turn on for the counter phone / tablet connected to the printer, so waiters\' KOTs print here too.'),
+            ),
+          ]),
           const SectionTitle('Recent print jobs'),
           if (_loading && _jobs.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
           if (_error != null) Text(_error!, style: const TextStyle(color: Brand.danger)),
           if (!_loading && _jobs.isEmpty && _error == null)
-            const EmptyState(icon: Icons.print_disabled_outlined, title: 'No print jobs yet'),
+            const EmptyState(icon: Icons.print_disabled_outlined, title: 'No print jobs today'),
           for (final j in _jobs)
             Card(
               elevation: 0,
@@ -202,14 +303,12 @@ class _PrintersScreenState extends State<PrintersScreen> {
                 ),
                 title: Text(j.title.isEmpty ? Fmt.titleCase(j.kind) : j.title, style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text([
-                  j.deviceName ?? 'No printer routed',
-                  if (j.connection != null) Fmt.titleCase(j.connection!),
-                  Fmt.time(j.createdAt),
+                  if (j.createdAt != null) Fmt.time(j.createdAt!),
                   if (j.error.isNotEmpty) j.error,
                 ].join(' · ')),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                   Pill(
-                    j.status.toUpperCase(),
+                    switch (j.status) { 'done' => 'PRINTED', 'failed' => 'FAILED', 'sent' => 'PRINTING', _ => 'WAITING' },
                     color: switch (j.status) {
                       'done' => Brand.success,
                       'failed' => Brand.danger,
@@ -217,24 +316,8 @@ class _PrintersScreenState extends State<PrintersScreen> {
                       _ => Brand.warning,
                     },
                   ),
-                  PopupMenuButton<String>(
-                    onSelected: (v) => v == 'here' ? _printHere(j) : _retry(j),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'here', child: Text('Print on this device')),
-                      PopupMenuItem(value: 'retry', child: Text('Re-queue')),
-                    ],
-                  ),
+                  IconButton(tooltip: 'Print here', icon: const Icon(Icons.print), onPressed: () => _printHere(j)),
                 ]),
-                onTap: () => showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: Text(j.title.isEmpty ? 'Preview' : j.title),
-                    content: SingleChildScrollView(
-                      child: Text(j.text, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
-                    ),
-                    actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
-                  ),
-                ),
               ),
             ),
         ]),

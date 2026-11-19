@@ -166,6 +166,7 @@ class Kot {
     required this.source,
     required this.createdAt,
     required this.lines,
+    this.orderId,
   });
 
   factory Kot.fromJson(Map<String, dynamic> j) => Kot(
@@ -181,9 +182,11 @@ class Kot {
         source: asStr(j['source']),
         createdAt: asDate(j['created_at']) ?? DateTime.now(),
         lines: (j['lines'] is List ? j['lines'] as List : const []).map((e) => KotLine.fromJson(asMap(e))).toList(),
+        orderId: asIntOrNull(j['order']),
       );
 
   final int id;
+  final int? orderId;
   final int number;
   String status;
   final int? stationId;

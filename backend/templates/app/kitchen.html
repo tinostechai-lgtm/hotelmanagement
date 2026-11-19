@@ -53,7 +53,7 @@
         return `<div class="kot ${cls}"><div class="kot-h"><div><b>KOT ${k.number}</b> · ${S.esc(k.order_label)}<div class="tiny" style="opacity:.85">#${S.esc(k.order_number)} · ${S.esc(k.station_name || "Kitchen")} · ${S.esc(k.source)}</div></div><b>${S.ago(k.created_at)}</b></div>
           <ul>${k.lines.filter((l) => !l.is_void).map((l) => `<li><span class="q">${S.qty(l.quantity)}×</span>${S.esc(l.display_name)}${l.addons.length ? `<small>+ ${l.addons.map((a) => S.esc(a.name)).join(", ")}</small>` : ""}${l.notes ? `<small>⚠ ${S.esc(l.notes)}</small>` : ""}</li>`).join("")}</ul>
           ${k.order_notes ? `<div class="small" style="padding:0 14px;color:var(--warning)">Note: ${S.esc(k.order_notes)}</div>` : ""}
-          <div class="kot-f row"><button class="btn ${s === "preparing" ? "btn-success" : "btn-primary"} btn-block" data-kot="${k.id}" data-to="${next[s][0]}">${next[s][1]}</button><button class="btn icon-btn" data-reprint="${k.id}" title="Reprint"><i data-lucide="printer"></i></button></div></div>`;
+          <div class="kot-f row"><button class="btn ${s === "preparing" ? "btn-success" : "btn-primary"} btn-block" data-kot="${k.id}" data-to="${next[s][0]}">${next[s][1]}</button><button class="btn icon-btn" data-reprint="${k.id}" data-order="${k.order}" title="Reprint"><i data-lucide="printer"></i></button></div></div>`;
       }).join("") || '<div class="muted small">—</div>';
     });
     S.icons();
@@ -62,7 +62,7 @@
     const b = e.target.closest("[data-kot]");
     if (b) { b.disabled = true; await S.api(`kots/${b.dataset.kot}/status`, { body: { status: b.dataset.to } }); load(); }
     const r = e.target.closest("[data-reprint]");
-    if (r) { await S.api(`kots/${r.dataset.reprint}/reprint`, { body: {} }); S.toast("Sent to printer"); }
+    if (r) { await S.api(`kots/${r.dataset.reprint}/reprint`, { body: {} }); S.toast(await S.printer.printOrder(r.dataset.order, "kot") ? "KOT printed" : "Sent to printer"); }
   });
   S.poll(load, 5000);
 })();

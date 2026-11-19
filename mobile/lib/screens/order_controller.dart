@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../core/api_client.dart';
+import '../core/print_service.dart';
 import '../core/json.dart';
 import '../core/offline_queue.dart';
 import '../models/cart.dart';
@@ -23,7 +24,7 @@ class OrderTarget {
 
 /// State + server actions for one order (existing or about to be created).
 class OrderController extends ChangeNotifier {
-  OrderController({required this.api, required this.queue, required this.target}) {
+  OrderController({required this.api, required this.queue, required this.target, this.printer}) {
     cart.addListener(notifyListeners);
     _ticker = Timer.periodic(const Duration(seconds: 10), (_) => _tick());
   }
@@ -69,6 +70,20 @@ class OrderController extends ChangeNotifier {
 
   final ApiClient api;
   final OfflineQueue queue;
+
+  /// Prints KOTs / bills straight away on this phone's printer (null in tests).
+  final PrintService? printer;
+
+  /// Prints the fresh [kind] tickets of the order on this phone and builds the message to show.
+  Future<String> _printed(String kind, String sent) async {
+    final p = printer;
+    final id = order?.id;
+    if (p == null || id == null) return sent;
+    final r = await p.printNow(id, kind);
+    if (r.error != null) return '$sent - printer problem: ${r.error}';
+    if (r.printed > 0) return kind == 'kot' ? 'KOT printed' : 'Bill printed';
+    return sent;
+  }
   final OrderTarget target;
   final Cart cart = Cart();
 
@@ -216,16 +231,16 @@ class OrderController extends ChangeNotifier {
             return 'Offline – order saved on this device and will sync automatically';
           }
           cart.clear();
-          return 'KOT sent to kitchen';
+          return _printed('kot', 'KOT sent to kitchen');
         }
         if (cart.isEmpty) {
           if (!current.hasUnsentItems) return 'Nothing new to send';
           _setOrder(await api.post('/orders/${current.id}/kot', {'print': true}));
-          return 'KOT sent to kitchen';
+          return _printed('kot', 'KOT sent to kitchen');
         }
         _setOrder(await api.post('/orders/${current.id}/items', _itemsBody()));
         cart.clear();
-        return 'KOT sent to kitchen';
+        return _printed('kot', 'KOT sent to kitchen');
       });
 
   /// Makes sure everything in the cart is on the server. Returns false if
@@ -251,6 +266,7 @@ class OrderController extends ChangeNotifier {
           return false;
         }
         cart.clear();
+        await _printed('kot', ''); // the new items went to the kitchen: print their KOT here too
         return true;
       });
 
@@ -279,7 +295,7 @@ class OrderController extends ChangeNotifier {
     return _run(() async {
       await _syncCustomer();
       _setOrder(await api.post('/orders/${order!.id}/bill', {'print': true}));
-      return 'Bill generated and sent to printer';
+      return _printed('bill', 'Bill sent to the printer');
     });
   }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../brand/theme.dart';
 import '../core/api_client.dart';
+import '../core/print_service.dart';
 import '../core/format.dart';
 import '../core/offline_queue.dart';
 import '../core/pos_data.dart';
@@ -31,6 +32,7 @@ class OrderScreen extends StatelessWidget {
         api: ctx.read<ApiClient>(),
         queue: ctx.read<OfflineQueue>(),
         target: target,
+        printer: ctx.read<PrintService>(),
       )..load(),
       child: const _OrderView(),
     );

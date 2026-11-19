@@ -65,9 +65,20 @@
   }
   function show(b) {
     const md = S.modal({ title: `Bill ${b.number}`, wide: false, body: receipt(b),
-      footer: `<a class="btn" href="/app/pos/?order=${b.order_id}">Open order</a><button class="btn" data-send><i data-lucide="printer"></i>Send to printer</button><button class="btn btn-primary" data-print><i data-lucide="printer"></i>Print</button>` });
-    md.$("[data-print]").onclick = () => { const p = S.$("#print-area"); p.innerHTML = receipt(b); p.style.display = "block"; window.print(); p.style.display = "none"; };
-    md.$("[data-send]").onclick = async () => { const r = await S.api(`bills/${b.id}/print`, { body: {} }); S.toast(r.queued ? "Sent to the bill printer" : "No printer connected — use Print instead", r.queued ? "ok" : "err"); };
+      footer: `<a class="btn" href="/app/pos/?order=${b.order_id}">Open order</a><button class="btn" data-cfg><i data-lucide="settings"></i>Printer settings</button><button class="btn btn-primary" data-print><i data-lucide="printer"></i>Print</button>` });
+    // One tap: print right away on this screen's printer (or send it to the bill printer / phone that prints bills).
+    md.$("[data-print]").onclick = async () => {
+      const r = await S.api(`bills/${b.id}/print`, { body: {} }).catch(() => null);
+      if (!r) return;
+      if (await S.printer.printOrder(b.order_id, "bill")) return S.toast("Bill printed", "ok");
+      if (S.printer.cfg().auto && S.printer.cfg().bill) {
+        // Nothing queued here (e.g. no printer set up yet): print the receipt directly.
+        const lines = r.preview.split("\n");
+        return S.printer.dialog([{ lines: lines.map((t) => ({ t })), cols: Math.max(32, ...lines.map((t) => t.length)) }]);
+      }
+      S.toast("Sent to the bill printer", "ok");
+    };
+    md.$("[data-cfg]").onclick = () => S.printer.settings();
   }
   S.$("#list").onclick = (e) => { const t = e.target.closest("[data-i]"); if (t) show(rows[Number(t.dataset.i)]); };
   S.$("#d").onchange = load; S.$("#st").onchange = load;

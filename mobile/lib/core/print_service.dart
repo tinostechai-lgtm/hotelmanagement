@@ -10,9 +10,22 @@ import 'api_client.dart';
 import 'config.dart';
 import 'json.dart';
 
-/// "Print from this device": polls queued print jobs and sends the raw
-/// ESC/POS bytes to LAN printers (TCP 9100) or a paired Bluetooth printer,
-/// then acknowledges each job.
+/// Result of a direct print.
+class PrintResult {
+  const PrintResult(this.printed, [this.error]);
+  final int printed;
+  final String? error;
+}
+
+/// Direct printing from this phone / tablet.
+///
+/// * Pressing KOT / Bill / Print prints straight away on this phone's own printer
+///   ([printNow]) - no waiting, no share / copy step.
+/// * Optionally ("Print orders from other phones") it also prints KOTs and bills
+///   sent from other phones while the app is open ([poll]).
+///
+/// Every job is claimed on the server before printing, so two phones never print
+/// the same ticket, and it is laid out for this phone's printer (paper width, text size).
 class PrintService extends ChangeNotifier {
   PrintService(this._config, this._api) {
     _config.addListener(_apply);
@@ -29,9 +42,9 @@ class PrintService extends ChangeNotifier {
 
   bool get running => _timer != null;
 
-  /// Starts / stops polling to match the "Print from this device" toggle.
+  /// Starts / stops printing for other phones to match the toggle.
   void _apply() {
-    final want = _config.printFromDevice && _api.auth.isLoggedIn && _api.auth.restaurantId != null;
+    final want = _config.printFromDevice && _config.hasMainPrinter && _api.auth.isLoggedIn && _api.auth.restaurantId != null;
     if (want && _timer == null) {
       _timer = Timer.periodic(const Duration(seconds: 4), (_) => poll());
       poll();
@@ -45,22 +58,37 @@ class PrintService extends ChangeNotifier {
 
   void refreshState() => _apply();
 
+  bool _wants(String kind) =>
+      _config.targetFor(kind) != null && (kind == 'kot' ? _config.printKotHere : kind == 'bill' ? _config.printBillHere : true);
+
+  /// Prints the fresh KOT / bill of [orderId] on this phone's printer right away.
+  /// Returns how many tickets were printed (0 when this phone doesn't print that kind).
+  Future<PrintResult> printNow(int? orderId, String kind) async {
+    if (orderId == null || !_config.autoPrint || !_wants(kind)) return const PrintResult(0);
+    try {
+      final rows = listOf(await _api.get('/print-jobs',
+          query: {'status': 'queued', 'order': '$orderId', 'kind': kind, 'since': '180'}));
+      final jobs = rows.map((e) => PrintJob.fromJson(asMap(e))).toList()..sort((a, b) => a.id.compareTo(b.id));
+      return await _printJobs(jobs);
+    } catch (e) {
+      lastError = errorText(e);
+      notifyListeners();
+      return PrintResult(0, lastError);
+    }
+  }
+
+  /// Prints tickets sent from other phones (only while "Print orders from other phones" is on).
   Future<void> poll() async {
     if (_busy) return;
+    final kinds = [if (_wants('kot')) 'kot', if (_wants('bill')) 'bill'];
+    if (kinds.isEmpty) return;
     _busy = true;
     try {
-      final rows = listOf(await _api.get('/print-jobs', query: {'status': 'queued'}));
+      final rows = listOf(await _api.get('/print-jobs',
+          query: {'status': 'queued', 'kind': kinds.join(','), 'since': '600'}));
       lastPoll = DateTime.now();
-      // Only fresh jobs: old stuck jobs would each wait for a printer timeout and block new bills.
-      final cutoff = DateTime.now().subtract(const Duration(minutes: 15));
-      final jobs = rows
-          .map((e) => PrintJob.fromJson(asMap(e)))
-          .where((j) => canHandle(j) && (j.createdAt ?? DateTime.now()).toLocal().isAfter(cutoff))
-          .toList()
-        ..sort((a, b) => a.id.compareTo(b.id));
-      for (final job in jobs.take(10)) {
-        await printAndAck(job).timeout(const Duration(seconds: 25));
-      }
+      final jobs = rows.map((e) => PrintJob.fromJson(asMap(e))).toList()..sort((a, b) => a.id.compareTo(b.id));
+      await _printJobs(jobs.take(10).toList()).timeout(const Duration(seconds: 90));
     } catch (e) {
       lastError = errorText(e);
     } finally {
@@ -69,64 +97,58 @@ class PrintService extends ChangeNotifier {
     }
   }
 
-  /// Jobs this device can reach. USB / serial / cloud devices are left to the
-  /// desktop hardware agent.
-  bool canHandle(PrintJob job) {
-    switch (job.connection) {
-      case 'network':
-        return (job.address ?? '').isNotEmpty || _config.fallbackLanPrinter.isNotEmpty;
-      case 'bluetooth':
-        return (job.address ?? '').isNotEmpty || _config.btPrinterMac.isNotEmpty;
-      case 'browser':
-      case null:
-        return _config.btPrinterMac.isNotEmpty || _config.fallbackLanPrinter.isNotEmpty;
-      default:
-        return false;
-    }
+  /// Prints one job from the list again on this phone (re-queues it first if it was done / failed).
+  Future<PrintResult> printAgain(PrintJob job) async {
+    if (job.status != 'queued') await _api.post('/print-jobs/${job.id}/retry', const <String, dynamic>{});
+    return _printJobs([job]);
   }
 
-  Future<void> printAndAck(PrintJob job) async {
-    try {
-      await printJob(job);
-      printedCount++;
-      lastError = null;
-      await _api.post('/print-jobs/${job.id}/ack', {'ok': true});
-    } on NetworkException {
-      rethrow;
-    } catch (e) {
-      lastError = '#${job.id}: $e';
-      await _api.post('/print-jobs/${job.id}/ack', {'ok': false, 'error': e.toString()});
+  Future<PrintResult> _printJobs(List<PrintJob> jobs) async {
+    var printed = 0;
+    String? error;
+    for (final job in jobs) {
+      final target = _config.targetFor(job.kind);
+      if (target == null) continue;
+      try {
+        await _api.post('/print-jobs/${job.id}/claim', const <String, dynamic>{});
+      } on ApiException {
+        continue; // another phone is printing it
+      }
+      try {
+        final r = asMap(await _api.get('/print-jobs/${job.id}/render',
+            query: {'width': '${_config.paperWidth}', 'size': _config.textSize}));
+        final b64 = asStr(r['escpos_b64'], job.escposB64);
+        final bytes = b64.isNotEmpty ? base64Decode(b64).toList() : textToEscPos(job.text, _config.textSize);
+        await sendTo(target, bytes).timeout(const Duration(seconds: 30));
+        printed++;
+        printedCount++;
+        lastError = null;
+        await _api.post('/print-jobs/${job.id}/ack', {'ok': true});
+      } on NetworkException {
+        rethrow;
+      } catch (e) {
+        error = e is TimeoutException ? 'Printer did not respond' : e.toString().replaceFirst('Exception: ', '');
+        lastError = error;
+        try {
+          await _api.post('/print-jobs/${job.id}/ack', {'ok': false, 'error': error});
+        } catch (_) {}
+      }
     }
+    if (printed > 0 || error != null) notifyListeners();
+    return PrintResult(printed, error);
   }
 
-  Future<void> printJob(PrintJob job) async {
-    final bytes = bytesFor(job);
-    final address = (job.address ?? '').trim();
-    switch (job.connection) {
-      case 'network':
-        await sendToLan(address.isNotEmpty ? address : _config.fallbackLanPrinter, bytes);
-        return;
-      case 'bluetooth':
-        await sendToBluetooth(address.isNotEmpty ? address : _config.btPrinterMac, bytes);
-        return;
-      default:
-        if (_config.btPrinterMac.isNotEmpty) {
-          await sendToBluetooth(_config.btPrinterMac, bytes);
-        } else {
-          await sendToLan(_config.fallbackLanPrinter, bytes);
-        }
-    }
-  }
-
-  static List<int> bytesFor(PrintJob job) {
-    if (job.escposB64.isNotEmpty) return base64Decode(job.escposB64).toList(); // the plugin needs a plain List<int>
-    return textToEscPos(job.text);
+  /// Sends bytes to 'bt:<mac>' or 'lan:<ip:port>'.
+  Future<void> sendTo(String target, List<int> bytes) {
+    if (target.startsWith('bt:')) return sendToBluetooth(target.substring(3), bytes);
+    return sendToLan(target.substring(4), bytes);
   }
 
   /// Fallback rendering when the server sent only plain text.
-  static List<int> textToEscPos(String text) {
+  static List<int> textToEscPos(String text, [String size = 'normal']) {
     final ascii = text.codeUnits.map((c) => c == 0x20B9 ? 0x52 : (c < 128 ? c : 0x3F)).toList(); // ₹ -> R
-    return <int>[0x1B, 0x40, ...ascii, 0x0A, 0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00];
+    final mode = size == 'xlarge' ? 0x11 : (size == 'large' ? 0x01 : 0x00);
+    return <int>[0x1B, 0x40, 0x1D, 0x21, mode, ...ascii, 0x0A, 0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00];
   }
 
   static Future<void> sendToLan(String address, List<int> bytes) async {
@@ -144,6 +166,8 @@ class PrintService extends ChangeNotifier {
     }
   }
 
+  static String _connectedMac = '';
+
   static Future<void> sendToBluetooth(String mac, List<int> bytes) async {
     if (mac.isEmpty) throw Exception('No Bluetooth printer selected');
     // Android 12+: without "Nearby devices" permission the plugin never answers.
@@ -152,33 +176,45 @@ class PrintService extends ChangeNotifier {
     if (!allowed) {
       throw Exception('Allow "Nearby devices" (Bluetooth) for Servora in phone Settings, then try again');
     }
-    final connected = await PrintBluetoothThermal.connectionStatus
+    var connected = await PrintBluetoothThermal.connectionStatus
         .timeout(const Duration(seconds: 5), onTimeout: () => false);
+    if (connected && _connectedMac != mac) {
+      // Connected to the other printer (separate KOT / bill printers): switch.
+      await PrintBluetoothThermal.disconnect.timeout(const Duration(seconds: 5), onTimeout: () => false);
+      connected = false;
+    }
     if (!connected) {
       final ok = await PrintBluetoothThermal.connect(macPrinterAddress: mac)
           .timeout(const Duration(seconds: 12), onTimeout: () => false);
-      if (!ok) throw Exception('Could not connect to Bluetooth printer');
+      if (!ok) throw Exception('Could not connect to the Bluetooth printer - is it on and nearby?');
+      _connectedMac = mac;
     }
     final ok = await PrintBluetoothThermal.writeBytes(bytes)
         .timeout(const Duration(seconds: 15), onTimeout: () => false);
-    if (!ok) throw Exception('Bluetooth printer did not accept data');
+    if (!ok) {
+      _connectedMac = '';
+      throw Exception('Bluetooth printer did not accept data');
+    }
   }
 
-  Future<void> testPrint() async {
-    final job = PrintJob(
-      id: 0,
-      kind: 'test',
-      title: 'Test',
-      text: '      SERVORA\n  Test print OK\n${DateTime.now()}\n',
-      escposB64: '',
-      status: 'queued',
-      error: '',
-      deviceName: null,
-      connection: null,
-      address: null,
-      createdAt: DateTime.now(),
-    );
-    await printJob(job);
+  /// Test page for 'kot' or 'bill' printer, at the chosen paper width and text size.
+  Future<void> testPrint([String kind = 'bill']) async {
+    final target = _config.targetFor(kind);
+    if (target == null) throw Exception('Choose a printer first');
+    final cols = _config.paperWidth <= 58 ? 32 : 48;
+    final w = _config.textSize == 'xlarge' ? cols ~/ 2 : cols;
+    String row(String l, String r) => l.padRight(w - r.length) + r;
+    final text = [
+      'SERVORA',
+      kind == 'kot' ? 'KOT printer test' : 'Bill printer test',
+      '-' * w,
+      row('2 x Masala Dosa', 'Rs.180'),
+      row('1 x Filter Coffee', 'Rs.40'),
+      '-' * w,
+      'Paper ${_config.paperWidth} mm, ${_config.textSize} text',
+      DateTime.now().toString().substring(0, 16),
+    ].join('\n');
+    await sendTo(target, textToEscPos(text, _config.textSize));
   }
 
   @override

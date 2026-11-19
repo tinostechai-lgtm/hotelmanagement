@@ -316,6 +316,136 @@
     }, 4000);
   };
 
+  /* ---------- Direct printing from this browser ----------
+     Pressing KOT / Bill / Print prints straight away on this screen's printer:
+       via "dialog"   – a receipt-sized page goes to the system print dialog (any printer / Android print service)
+       via usb|serial|bluetooth – raw ESC/POS straight to the thermal printer, no dialog at all (Chrome / Edge)
+     Settings are per browser (Printer settings button in POS / Bills). */
+  const PCFG_KEY = "sv_printer";
+  const PDEF = { auto: true, via: "dialog", width: 80, size: "large", kot: true, bill: true, station: false };
+  // Characters per line for browser printing: fewer columns = bigger letters.
+  const BCOLS = { 80: { normal: 42, large: 32, xlarge: 24 }, 58: { normal: 32, large: 24, xlarge: 18 } };
+  S.printer = {
+    cfg() {
+      try { return Object.assign({}, PDEF, JSON.parse(localStorage.getItem(PCFG_KEY) || "{}")); } catch (e) { return Object.assign({}, PDEF); }
+    },
+    save(c) { try { localStorage.setItem(PCFG_KEY, JSON.stringify(c)); } catch (e) { /* private mode */ } },
+    // Print this order's fresh KOT / bill jobs. Returns how many were printed here.
+    async printOrder(orderId, kind) {
+      const c = S.printer.cfg();
+      if (!c.auto || !c[kind] || !orderId) return 0;
+      let jobs = [];
+      try { jobs = await S.list(`print-jobs?status=queued&order=${orderId}&kind=${kind}&since=180`); } catch (e) { return 0; }
+      return S.printer.printJobs(jobs.sort((a, b) => a.id - b.id));
+    },
+    async printJobs(jobs) {
+      const c = S.printer.cfg();
+      const docs = [];
+      for (const j of jobs) {
+        // Claim first so two screens never print the same ticket.
+        try { await S.api(`print-jobs/${j.id}/claim`, { body: {}, quiet: true }); } catch (e) { continue; }
+        try {
+          if (c.via === "dialog") {
+            const cols = (BCOLS[c.width] || BCOLS[80])[c.size] || 32;
+            const r = await S.api(`print-jobs/${j.id}/render?width=${c.width}&size=${c.size}&columns=${cols}`, { quiet: true });
+            docs.push({ job: j, lines: r.lines, cols: r.columns || cols });
+          } else {
+            const r = await S.api(`print-jobs/${j.id}/render?width=${c.width}&size=${c.size}`, { quiet: true });
+            await S.hw.print(r.escpos_b64, c.via);
+            await S.api(`print-jobs/${j.id}/ack`, { body: { ok: true }, quiet: true });
+            docs.push(null);
+          }
+        } catch (e) {
+          S.api(`print-jobs/${j.id}/ack`, { body: { ok: false, error: String(e.message || e).slice(0, 180) }, quiet: true }).catch(() => {});
+          S.toast("Printer: " + (e.message || e), "err");
+        }
+      }
+      const pages = docs.filter(Boolean);
+      if (pages.length) {
+        S.printer.dialog(pages);
+        pages.forEach((d) => S.api(`print-jobs/${d.job.id}/ack`, { body: { ok: true }, quiet: true }).catch(() => {}));
+      }
+      return docs.length;
+    },
+    // Receipt-sized page(s) with readable letters, printed via the system dialog.
+    dialog(pages) {
+      const c = S.printer.cfg();
+      const paper = Number(c.width) === 58 ? 58 : 80, content = paper === 58 ? 48 : 72;
+      const html = pages.map((p) => {
+        const fs = content / (p.cols * 0.6); // mm: the widest line exactly fills the paper
+        return `<section style="font-size:${fs.toFixed(2)}mm">` + p.lines.map((l) =>
+          `<div class="l${l.b ? " b" : ""}${l.big ? " big" : ""}" style="text-align:${l.a || "left"}">${S.esc(l.t || "") || "&nbsp;"}</div>`).join("") + "</section>";
+      }).join("");
+      const f = document.createElement("iframe");
+      f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+      document.body.appendChild(f);
+      f.contentDocument.open();
+      f.contentDocument.write(`<!doctype html><html><head><meta charset="utf-8"><title>Print</title><style>
+        @page { size: ${paper}mm auto; margin: 0; }
+        html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+        body { width: ${content}mm; padding: 2mm ${(paper - content) / 2}mm 6mm; font-family: "Courier New", Courier, monospace; font-weight: 600; }
+        section { page-break-after: always; break-after: page; }
+        section:last-child { page-break-after: auto; break-after: auto; }
+        .l { white-space: pre; line-height: 1.25; overflow: hidden; }
+        .b { font-weight: 800; }
+        .big { font-size: 1.6em; font-weight: 800; white-space: pre-wrap; }
+      </style></head><body>${html}</body></html>`);
+      f.contentDocument.close();
+      const go = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { S.toast("Could not open printing", "err"); } setTimeout(() => f.remove(), 60000); };
+      setTimeout(go, 150);
+    },
+    // Settings dialog for this browser.
+    settings() {
+      const c = S.printer.cfg();
+      const opt = (v, cur, label) => `<option value="${v}" ${String(v) === String(cur) ? "selected" : ""}>${label}</option>`;
+      const m = S.modal({ title: "Printer settings (this screen)", body: `
+        <label class="row" style="gap:8px;margin-bottom:10px"><input type="checkbox" id="pc-auto" ${c.auto ? "checked" : ""}> <b>Print straight away when I press KOT / Bill / Print</b></label>
+        <div class="grid g2">
+          <div class="field"><label>Print KOTs here</label><select id="pc-kot">${opt(1, c.kot ? 1 : 0, "Yes")}${opt(0, c.kot ? 1 : 0, "No")}</select></div>
+          <div class="field"><label>Print bills here</label><select id="pc-bill">${opt(1, c.bill ? 1 : 0, "Yes")}${opt(0, c.bill ? 1 : 0, "No")}</select></div>
+          <div class="field"><label>Paper width</label><select id="pc-width">${opt(80, c.width, "80 mm (3 inch)")}${opt(58, c.width, "58 mm (2 inch)")}</select></div>
+          <div class="field"><label>Text size</label><select id="pc-size">${opt("normal", c.size, "Normal")}${opt("large", c.size, "Large (recommended)")}${opt("xlarge", c.size, "Extra large")}</select></div>
+        </div>
+        <div class="field"><label>Printer connection</label><select id="pc-via">
+          ${opt("dialog", c.via, "Printer chosen in the print window (any printer)")}${opt("usb", c.via, "USB thermal printer - prints with no window (Chrome / Edge)")}
+          ${opt("bluetooth", c.via, "Bluetooth thermal printer - no window (Chrome)")}${opt("serial", c.via, "Serial / COM thermal printer - no window (Chrome / Edge)")}</select>
+          <div class="help">Tip: in Chrome on a PC, start it with <code>--kiosk-printing</code> so the print window is skipped too.</div></div>
+        <label class="row" style="gap:8px"><input type="checkbox" id="pc-station" ${c.station ? "checked" : ""}> Also print KOTs / bills sent from other phones (keep this page open)</label>`,
+        footer: `<button class="btn" id="pc-test"><i data-lucide="printer"></i>Test print</button><button class="btn btn-primary" id="pc-save">Save</button>` });
+      const read = () => ({ auto: m.$("#pc-auto").checked, kot: m.$("#pc-kot").value === "1", bill: m.$("#pc-bill").value === "1",
+        width: Number(m.$("#pc-width").value), size: m.$("#pc-size").value, via: m.$("#pc-via").value, station: m.$("#pc-station").checked });
+      m.$("#pc-save").onclick = () => { S.printer.save(read()); m.close(); S.toast("Printer settings saved", "ok"); S.printer.startStation(); };
+      m.$("#pc-test").onclick = async () => {
+        const c2 = read(); S.printer.save(c2);
+        const cols = (BCOLS[c2.width] || BCOLS[80])[c2.size];
+        const lines = [{ t: "SERVORA", b: true, big: true, a: "center" }, { t: "Test print OK", a: "center" }, { t: "-".repeat(cols) },
+          { t: "2 x Masala Dosa".padEnd(cols - 8) + "Rs.180".padStart(8) }, { t: "1 x Filter Coffee".padEnd(cols - 8) + "Rs.40".padStart(8) },
+          { t: "-".repeat(cols) }, { t: `Paper ${c2.width} mm - ${c2.size} text`, a: "center" }];
+        if (c2.via === "dialog") return S.printer.dialog([{ lines, cols }]);
+        const esc = "\x1b@\x1d!" + (c2.size === "xlarge" ? "\x11" : c2.size === "large" ? "\x01" : "\x00") +
+          "SERVORA\nTest print OK\n" + `Paper ${c2.width} mm - ${c2.size} text\n\n\n\n` + "\x1dVA\x03";
+        try { await S.hw.print(btoa(esc), c2.via); S.toast("Test page sent", "ok"); } catch (e) { S.toast("Printer: " + (e.message || e), "err"); }
+      };
+    },
+    // "Print station": print tickets sent from other phones while this page is open.
+    _station: null,
+    startStation() {
+      const c = S.printer.cfg();
+      if (S.printer._station) { S.printer._station(); S.printer._station = null; }
+      if (!c.auto || !c.station) return;
+      const kinds = [c.kot && "kot", c.bill && "bill"].filter(Boolean).join(",");
+      if (!kinds) return;
+      let busy = false;
+      const tick = async () => {
+        if (busy) return; busy = true;
+        try { const jobs = await S.list(`print-jobs?status=queued&kind=${kinds}&since=600`); if (jobs.length) await S.printer.printJobs(jobs.sort((a, b) => a.id - b.id)); }
+        catch (e) { /* offline: try again */ } finally { busy = false; }
+      };
+      const t = setInterval(tick, 5000); tick();
+      S.printer._station = () => clearInterval(t);
+    },
+  };
+
   /* ---------- Razorpay ---------- */
   S.razorpay = function (opts, onSuccess) {
     const finish = (resp) => onSuccess(resp);

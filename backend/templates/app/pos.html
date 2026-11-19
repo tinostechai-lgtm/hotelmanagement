@@ -6,6 +6,7 @@
   <button class="btn btn-sm" data-new="takeaway"><i data-lucide="shopping-bag"></i><span>Takeaway</span></button>
   <button class="btn btn-sm" data-new="delivery"><i data-lucide="bike"></i><span>Delivery</span></button>
   <button class="btn btn-sm hidden" data-new="room_service" id="btn-room"><i data-lucide="bed-double"></i><span>Room</span></button>
+  <button class="btn btn-sm" id="printer-cfg" title="Printer settings"><i data-lucide="printer"></i><span class="hide-sm">Printer</span></button>
 </div>
 {% endblock %}
 {% block head %}
@@ -357,12 +358,20 @@
     st.draft = []; st.batchRef = null; renderCart(); history.replaceState(null, "", `?order=${st.order.id}`);
     return true;
   }
-  $("#a-kot").onclick = async () => { if (await save(true).catch(() => false)) { S.toast("KOT sent to kitchen", "ok"); if (st.ctx.type === "dine_in") back(); } };
+  $("#a-kot").onclick = async () => {
+    if (!(await save(true).catch(() => false))) return;
+    const id = st.order.id;
+    const printed = await S.printer.printOrder(id, "kot"); // straight to this screen's KOT printer
+    S.toast(printed ? "KOT printed" : "KOT sent to kitchen", "ok");
+    if (st.ctx.type === "dine_in") back();
+  };
   $("#a-bill").onclick = async () => {
     if (st.draft.length && !(await save(true).catch(() => false))) return;
     if (!st.order) return S.toast("Add items first", "err");
-    st.order = await S.api(`orders/${st.order.id}/bill`, { body: {} });
-    renderCart(); S.toast("Bill generated & sent to printer", "ok"); previewBill();
+    st.order = await S.api(`orders/${st.order.id}/bill`, { body: {} }); // also queues the bill for the printer
+    renderCart();
+    if (await S.printer.printOrder(st.order.id, "bill")) S.toast("Bill printed", "ok");
+    else showBillPreview();
   };
   $("#a-pay").onclick = async () => {
     if (st.draft.length && !(await save(true).catch(() => false))) return;
@@ -374,12 +383,24 @@
   $("#m-items").onclick = () => $("#order").classList.remove("show-cart");
   $("#m-cart").onclick = () => $("#order").classList.add("show-cart");
 
-  function previewBill() {
-    S.api(`orders/${st.order.id}/print`, { body: {}, quiet: true }).then((r) => {
-      if (r.preview) S.modal({ title: "Bill preview", body: `<pre class="mono" style="font-size:12px;background:var(--surface-2);padding:14px;border-radius:12px;overflow:auto">${S.esc(r.preview)}</pre>`,
-        footer: `<button class="btn" onclick="window.print()"><i data-lucide="printer"></i>Browser print</button><button class="btn btn-primary" data-close>Done</button>` });
-    }).catch(() => {});
+  // Print (or reprint) the bill straight away; the preview only shows when this screen doesn't print bills.
+  async function previewBill() {
+    try { await S.api(`orders/${st.order.id}/print`, { body: {} }); } catch (e) { return; }
+    if (await S.printer.printOrder(st.order.id, "bill")) S.toast("Bill printed", "ok");
+    else showBillPreview();
   }
+  async function showBillPreview() {
+    const live = (st.order.bills || []).filter((b) => b.status !== "void");
+    if (!live.length) return;
+    const r = await S.api(`bills/${live[live.length - 1].id}/print`, { body: { to_printer: false }, quiet: true }).catch(() => null);
+    if (!r || !r.preview) return;
+    const m = S.modal({ title: "Bill sent to the printer", body: `<pre class="mono" style="font-size:12px;background:var(--surface-2);padding:14px;border-radius:12px;overflow:auto">${S.esc(r.preview)}</pre>`,
+      footer: `<button class="btn" id="bp-print"><i data-lucide="printer"></i>Print here</button><button class="btn" id="bp-cfg">Printer settings</button><button class="btn btn-primary" data-close>Done</button>` });
+    const lines = r.preview.split("\n");
+    m.$("#bp-print").onclick = () => S.printer.dialog([{ lines: lines.map((t) => ({ t })), cols: Math.max(32, ...lines.map((t) => t.length)) }]);
+    m.$("#bp-cfg").onclick = () => { m.close(); S.printer.settings(); };
+  }
+  $("#printer-cfg").onclick = () => S.printer.settings();
 
   async function payDialog() {
     const o = st.order;

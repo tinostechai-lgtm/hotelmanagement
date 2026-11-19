@@ -73,6 +73,9 @@ class PrintJob(TenantModel):
     text = models.TextField(help_text="Plain-text rendering (for preview & fallback)")
     escpos_b64 = models.TextField(blank=True, help_text="Raw ESC/POS bytes, base64")
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.QUEUED)
+    # What was printed, so a phone can re-render it for its own printer (paper width / text size).
+    order = models.ForeignKey("operations.Order", null=True, blank=True, on_delete=models.SET_NULL, related_name="print_jobs")
+    source = models.CharField(max_length=24, blank=True, help_text="kot:<id> or bill:<id>")
     attempts = models.PositiveSmallIntegerField(default=0)
     error = models.CharField(max_length=200, blank=True)
 
