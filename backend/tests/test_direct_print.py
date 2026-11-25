@@ -23,7 +23,9 @@ class DirectPrintTests(Base):
         self.assertTrue(jobs)
         j = jobs[0]
         self.assertTrue(j["source"].startswith("kot:"))
-        self.assertEqual(self.c.post(f"/api/print-jobs/{j['id']}/claim", {}, format="json").status_code, 200)
+        first = self.c.post(f"/api/print-jobs/{j['id']}/claim?width=58&size=large", {}, format="json")
+        self.assertEqual(first.status_code, 200)
+        self.assertIn(b"\x1d!\x01", base64.b64decode(first.json()["escpos_b64"]))  # rendered for this printer in one call
         self.assertEqual(self.c.post(f"/api/print-jobs/{j['id']}/claim", {}, format="json").status_code, 409)  # 2nd phone
         r58 = self.c.get(f"/api/print-jobs/{j['id']}/render?width=58&size=large").json()
         self.assertEqual(r58["columns"], 32)

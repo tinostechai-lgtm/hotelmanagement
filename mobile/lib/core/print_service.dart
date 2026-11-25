@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/ops.dart';
 import 'api_client.dart';
@@ -46,12 +47,16 @@ class PrintService extends ChangeNotifier {
   void _apply() {
     final want = _config.printFromDevice && _config.hasMainPrinter && _api.auth.isLoggedIn && _api.auth.restaurantId != null;
     if (want && _timer == null) {
-      _timer = Timer.periodic(const Duration(seconds: 4), (_) => poll());
+      // Printer phone: check for new KOTs / bills every 2 seconds and keep the screen on
+      // so Android doesn't pause the app.
+      _timer = Timer.periodic(const Duration(seconds: 2), (_) => poll());
       poll();
+      WakelockPlus.enable().catchError((_) {});
       notifyListeners();
     } else if (!want && _timer != null) {
       _timer?.cancel();
       _timer = null;
+      WakelockPlus.disable().catchError((_) {});
       notifyListeners();
     }
   }
@@ -85,7 +90,7 @@ class PrintService extends ChangeNotifier {
     _busy = true;
     try {
       final rows = listOf(await _api.get('/print-jobs',
-          query: {'status': 'queued', 'kind': kinds.join(','), 'since': '600'}));
+          query: {'status': 'queued', 'kind': kinds.join(','), 'since': '300'}));
       lastPoll = DateTime.now();
       final jobs = rows.map((e) => PrintJob.fromJson(asMap(e))).toList()..sort((a, b) => a.id.compareTo(b.id));
       await _printJobs(jobs.take(10).toList()).timeout(const Duration(seconds: 90));
@@ -109,21 +114,22 @@ class PrintService extends ChangeNotifier {
     for (final job in jobs) {
       final target = _config.targetFor(job.kind);
       if (target == null) continue;
+      Map<String, dynamic> r;
       try {
-        await _api.post('/print-jobs/${job.id}/claim', const <String, dynamic>{});
+        // Claim it (so no other phone prints it) and get it laid out for this printer - one call.
+        r = asMap(await _api.post(
+            '/print-jobs/${job.id}/claim?width=${_config.paperWidth}&size=${_config.textSize}', const <String, dynamic>{}));
       } on ApiException {
         continue; // another phone is printing it
       }
       try {
-        final r = asMap(await _api.get('/print-jobs/${job.id}/render',
-            query: {'width': '${_config.paperWidth}', 'size': _config.textSize}));
         final b64 = asStr(r['escpos_b64'], job.escposB64);
         final bytes = b64.isNotEmpty ? base64Decode(b64).toList() : textToEscPos(job.text, _config.textSize);
         await sendTo(target, bytes).timeout(const Duration(seconds: 30));
         printed++;
         printedCount++;
         lastError = null;
-        await _api.post('/print-jobs/${job.id}/ack', {'ok': true});
+        unawaited(_api.post('/print-jobs/${job.id}/ack', {'ok': true}).catchError((_) => null));
       } on NetworkException {
         rethrow;
       } catch (e) {
@@ -138,10 +144,17 @@ class PrintService extends ChangeNotifier {
     return PrintResult(printed, error);
   }
 
-  /// Sends bytes to 'bt:<mac>' or 'lan:<ip:port>'.
+  static Future<void> _line = Future<void>.value();
+
+  /// Sends bytes to 'bt:<mac>' or 'lan:<ip:port>'. One ticket at a time, so a KOT pressed on this
+  /// phone and one arriving from another phone never get mixed on the paper.
   Future<void> sendTo(String target, List<int> bytes) {
-    if (target.startsWith('bt:')) return sendToBluetooth(target.substring(3), bytes);
-    return sendToLan(target.substring(4), bytes);
+    final done = _line.catchError((_) {}).then((_) {
+      if (target.startsWith('bt:')) return sendToBluetooth(target.substring(3), bytes);
+      return sendToLan(target.substring(4), bytes);
+    });
+    _line = done.catchError((_) {});
+    return done;
   }
 
   /// Fallback rendering when the server sent only plain text.

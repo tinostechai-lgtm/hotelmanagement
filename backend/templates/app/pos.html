@@ -362,7 +362,7 @@
     if (!(await save(true).catch(() => false))) return;
     const id = st.order.id;
     const printed = await S.printer.printOrder(id, "kot"); // straight to this screen's KOT printer
-    S.toast(printed ? "KOT printed" : "KOT sent to kitchen", "ok");
+    S.toast(printed ? "KOT printed" : "KOT sent to the kitchen printer", "ok");
     if (st.ctx.type === "dine_in") back();
   };
   $("#a-bill").onclick = async () => {

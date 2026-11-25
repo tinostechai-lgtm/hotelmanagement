@@ -7,7 +7,8 @@ import 'json.dart';
 class AppConfig extends ChangeNotifier {
   AppConfig(this._prefs) {
     baseUrl = _prefs.getString(_kBaseUrl) ?? defaultBaseUrl;
-    printFromDevice = _prefs.getBool(_kPrint) ?? false;
+    // The phone with a printer prints every KOT / bill (from any phone or the website) by default.
+    printFromDevice = _prefs.getBool(_kStation) ?? true;
     btPrinterMac = _prefs.getString(_kBtMac) ?? '';
     btPrinterName = _prefs.getString(_kBtName) ?? '';
     fallbackLanPrinter = _prefs.getString(_kLan) ?? '';
@@ -47,7 +48,7 @@ class AppConfig extends ChangeNotifier {
     ['Store', '9000000507'],
   ];
   static const _kBaseUrl = 'cfg.base_url';
-  static const _kPrint = 'cfg.print_from_device';
+  static const _kStation = 'cfg.print_station';
   static const _kBtMac = 'cfg.bt_mac';
   static const _kBtName = 'cfg.bt_name';
   static const _kLan = 'cfg.lan_printer';
@@ -131,7 +132,7 @@ class AppConfig extends ChangeNotifier {
 
   Future<void> setPrintFromDevice(bool v) async {
     printFromDevice = v;
-    await _prefs.setBool(_kPrint, v);
+    await _prefs.setBool(_kStation, v);
     notifyListeners();
   }
 

@@ -71,12 +71,12 @@
       const r = await S.api(`bills/${b.id}/print`, { body: {} }).catch(() => null);
       if (!r) return;
       if (await S.printer.printOrder(b.order_id, "bill")) return S.toast("Bill printed", "ok");
-      if (S.printer.cfg().auto && S.printer.cfg().bill) {
+      if (S.printer.cfg().auto && S.printer.cfg().bill && S.printer.cfg().via === "dialog") {
         // Nothing queued here (e.g. no printer set up yet): print the receipt directly.
         const lines = r.preview.split("\n");
         return S.printer.dialog([{ lines: lines.map((t) => ({ t })), cols: Math.max(32, ...lines.map((t) => t.length)) }]);
       }
-      S.toast("Sent to the bill printer", "ok");
+      S.toast(r.queued ? "Printing on the bill printer…" : "No printer set up - open Printer settings", r.queued ? "ok" : "err");
     };
     md.$("[data-cfg]").onclick = () => S.printer.settings();
   }

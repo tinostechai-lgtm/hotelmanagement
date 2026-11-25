@@ -144,7 +144,16 @@ class PrintJobViewSet(TenantViewSet):
         taken = PrintJob.objects.filter(pk=job.pk, status="queued").update(status="sent")
         if not taken:
             return Response({"detail": "Already printed by another device", "code": "taken"}, status=409)
-        return Response({"ok": True})
+        # Optional ?width=&size=: return the ticket laid out for this printer in the same call (one round trip).
+        p = request.query_params
+        if p.get("width") or p.get("size"):
+            from .escpos import clean_size, clean_width
+
+            r = services.render_source(job, clean_width(p.get("width")) if p.get("width") else None,
+                                       clean_size(p.get("size")) if p.get("size") else None)
+            if r is not None:
+                return Response({"ok": True, "escpos_b64": r.b64, "text": r.plain})
+        return Response({"ok": True, "escpos_b64": job.escpos_b64, "text": job.text})
 
     @action(detail=True, methods=["get"])
     def render(self, request, pk=None):

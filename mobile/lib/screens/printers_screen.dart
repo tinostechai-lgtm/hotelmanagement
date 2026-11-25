@@ -274,11 +274,13 @@ class _PrintersScreenState extends State<PrintersScreen> {
             SwitchListTile.adaptive(
               value: config.printFromDevice,
               onChanged: config.setPrintFromDevice,
-              title: const Text('Also print orders from other phones'),
+              title: const Text('Print KOTs & bills from all phones and the website', style: TextStyle(fontWeight: FontWeight.w800)),
               subtitle: Text(printer.running
-                  ? 'On · ${printer.printedCount} printed'
+                  ? 'This is the printer phone · ${printer.printedCount} printed · keep Servora open'
                       '${printer.lastError != null ? '\nLast problem: ${printer.lastError}' : ''}'
-                  : 'Turn on for the counter phone / tablet connected to the printer, so waiters\' KOTs print here too.'),
+                  : config.hasMainPrinter
+                      ? 'Off - only KOTs / bills made on this phone print here.'
+                      : 'Choose a printer above first.'),
             ),
           ]),
           const SectionTitle('Recent print jobs'),

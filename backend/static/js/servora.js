@@ -321,8 +321,9 @@
        via "dialog"   – a receipt-sized page goes to the system print dialog (any printer / Android print service)
        via usb|serial|bluetooth – raw ESC/POS straight to the thermal printer, no dialog at all (Chrome / Edge)
      Settings are per browser (Printer settings button in POS / Bills). */
-  const PCFG_KEY = "sv_printer";
-  const PDEF = { auto: true, via: "dialog", width: 80, size: "large", kot: true, bill: true, station: false };
+  const PCFG_KEY = "sv_printer2";
+  // Default: tickets go to the printer phone (Servora app with the Bluetooth / Wi-Fi printer) - no print window, no share.
+  const PDEF = { auto: true, via: "phone", width: 80, size: "large", kot: true, bill: true, station: false };
   // Characters per line for browser printing: fewer columns = bigger letters.
   const BCOLS = { 80: { normal: 42, large: 32, xlarge: 24 }, 58: { normal: 32, large: 24, xlarge: 18 } };
   S.printer = {
@@ -333,7 +334,7 @@
     // Print this order's fresh KOT / bill jobs. Returns how many were printed here.
     async printOrder(orderId, kind) {
       const c = S.printer.cfg();
-      if (!c.auto || !c[kind] || !orderId) return 0;
+      if (!c.auto || !c[kind] || !orderId || c.via === "phone") return 0; // the printer phone prints it within ~2 s
       let jobs = [];
       try { jobs = await S.list(`print-jobs?status=queued&order=${orderId}&kind=${kind}&since=180`); } catch (e) { return 0; }
       return S.printer.printJobs(jobs.sort((a, b) => a.id - b.id));
@@ -407,6 +408,7 @@
           <div class="field"><label>Text size</label><select id="pc-size">${opt("normal", c.size, "Normal")}${opt("large", c.size, "Large (recommended)")}${opt("xlarge", c.size, "Extra large")}</select></div>
         </div>
         <div class="field"><label>Printer connection</label><select id="pc-via">
+          ${opt("phone", c.via, "Printer connected to the Servora app phone (recommended)")}
           ${opt("dialog", c.via, "Printer chosen in the print window (any printer)")}${opt("usb", c.via, "USB thermal printer - prints with no window (Chrome / Edge)")}
           ${opt("bluetooth", c.via, "Bluetooth thermal printer - no window (Chrome)")}${opt("serial", c.via, "Serial / COM thermal printer - no window (Chrome / Edge)")}</select>
           <div class="help">Tip: in Chrome on a PC, start it with <code>--kiosk-printing</code> so the print window is skipped too.</div></div>
@@ -421,6 +423,7 @@
         const lines = [{ t: "SERVORA", b: true, big: true, a: "center" }, { t: "Test print OK", a: "center" }, { t: "-".repeat(cols) },
           { t: "2 x Masala Dosa".padEnd(cols - 8) + "Rs.180".padStart(8) }, { t: "1 x Filter Coffee".padEnd(cols - 8) + "Rs.40".padStart(8) },
           { t: "-".repeat(cols) }, { t: `Paper ${c2.width} mm - ${c2.size} text`, a: "center" }];
+        if (c2.via === "phone") return S.toast("Use 'Test bill printer' in the Servora app on the printer phone", "");
         if (c2.via === "dialog") return S.printer.dialog([{ lines, cols }]);
         const esc = "\x1b@\x1d!" + (c2.size === "xlarge" ? "\x11" : c2.size === "large" ? "\x01" : "\x00") +
           "SERVORA\nTest print OK\n" + `Paper ${c2.width} mm - ${c2.size} text\n\n\n\n` + "\x1dVA\x03";
@@ -432,7 +435,7 @@
     startStation() {
       const c = S.printer.cfg();
       if (S.printer._station) { S.printer._station(); S.printer._station = null; }
-      if (!c.auto || !c.station) return;
+      if (!c.auto || !c.station || c.via === "phone") return;
       const kinds = [c.kot && "kot", c.bill && "bill"].filter(Boolean).join(",");
       if (!kinds) return;
       let busy = false;
