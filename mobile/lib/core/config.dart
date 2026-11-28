@@ -92,8 +92,10 @@ class AppConfig extends ChangeNotifier {
 
   /// Printer for a job kind: 'bt:<mac>' or 'lan:<ip:port>', or null when this phone has none.
   String? targetFor(String kind) {
-    if (kind == 'kot' && hasKotPrinter) return kotBtMac.isNotEmpty ? 'bt:$kotBtMac' : 'lan:$kotLan';
-    if (btPrinterMac.isNotEmpty) return 'bt:$btPrinterMac';
+    // A Bluetooth printer is stored as its address ('bt:' classic) or 'ble:<address>' (Bluetooth Low Energy).
+    String bt(String mac) => mac.startsWith('ble:') ? mac : 'bt:$mac';
+    if (kind == 'kot' && hasKotPrinter) return kotBtMac.isNotEmpty ? bt(kotBtMac) : 'lan:$kotLan';
+    if (btPrinterMac.isNotEmpty) return bt(btPrinterMac);
     if (fallbackLanPrinter.isNotEmpty) return 'lan:$fallbackLanPrinter';
     return null;
   }

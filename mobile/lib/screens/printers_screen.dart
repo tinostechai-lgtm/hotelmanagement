@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../brand/theme.dart';
 import '../core/api_client.dart';
+import '../core/bt_printers.dart';
 import '../core/config.dart';
 import '../core/format.dart';
 import '../core/json.dart';
@@ -55,12 +56,28 @@ class _PrintersScreenState extends State<PrintersScreen> {
     final config = context.read<AppConfig>();
     List<BluetoothInfo> paired = const [];
     String? btError;
-    try {
-      paired = await PrintBluetoothThermal.pairedBluetooths.timeout(const Duration(seconds: 6), onTimeout: () => const []);
-    } catch (e) {
-      btError = 'Bluetooth is off or not allowed';
+    // Android 12+ blocks every Bluetooth printer until "Nearby devices" is allowed - ask first.
+    if (!await BtPrinters.ensurePermissions()) {
+      btError = 'Bluetooth not allowed';
+      final blocked = await BtPrinters.blockedForGood();
+      if (!mounted) return;
+      if (blocked) {
+        final open = await confirm(context, 'Allow Bluetooth for Servora',
+            'Printing needs the "Nearby devices" permission.\n\nTap Open settings > Permissions > Nearby devices > Allow.',
+            ok: 'Open settings');
+        if (open) await BtPrinters.openSettings();
+      }
+    } else {
+      try {
+        paired = await PrintBluetoothThermal.pairedBluetooths.timeout(const Duration(seconds: 6), onTimeout: () => const []);
+      } catch (e) {
+        btError = 'Bluetooth is off';
+      }
     }
     if (!mounted) return;
+    List<FoundPrinter>? nearby;
+    var searching = false;
+    String? searchError;
     final lan = TextEditingController(text: kot ? config.kotLan : config.fallbackLanPrinter);
     final picked = await showSheet<String>(
       context,
@@ -91,6 +108,53 @@ class _PrintersScreenState extends State<PrintersScreen> {
               subtitle: Text(d.macAdress),
               onTap: () => Navigator.pop(ctx, 'bt:${d.macAdress}|${d.name}'),
             ),
+          const Divider(),
+          // Small "mobile printers" (e.g. Posiflow PSF-588) often only show up in a Bluetooth search.
+          StatefulBuilder(
+            builder: (ctx2, setLocal) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: OutlinedButton.icon(
+                  onPressed: searching
+                      ? null
+                      : () async {
+                          setLocal(() {
+                            searching = true;
+                            searchError = null;
+                          });
+                          try {
+                            nearby = await BtPrinters.scan();
+                          } catch (e) {
+                            searchError = e.toString().replaceFirst('Exception: ', '');
+                          }
+                          setLocal(() => searching = false);
+                        },
+                  icon: searching
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.bluetooth_searching),
+                  label: Text(searching ? 'Searching… keep the printer on' : 'Search for printers nearby'),
+                ),
+              ),
+              if (searchError != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text(searchError!, style: const TextStyle(color: Brand.danger)),
+                ),
+              if (nearby != null && nearby!.isEmpty)
+                const ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('No printer found'),
+                  subtitle: Text('Switch the printer on (hold the power button), close other printing apps, and search again.'),
+                ),
+              for (final d in nearby ?? const <FoundPrinter>[])
+                ListTile(
+                  leading: const Icon(Icons.print_outlined),
+                  title: Text(d.name),
+                  subtitle: Text('Found nearby · ${d.id}'),
+                  onTap: () => Navigator.pop(ctx, 'bt:ble:${d.id}|${d.name}'),
+                ),
+            ]),
+          ),
           const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -135,6 +199,12 @@ class _PrintersScreenState extends State<PrintersScreen> {
         await config.setFallbackLanPrinter(picked.substring(4));
       }
     }
+    // Small portable printers (Posiflow PSF-588 / SC588 and similar) use 58 mm paper.
+    final nm = picked.toLowerCase();
+    if (RegExp(r'58|psf|sc5|mobile|mini|mtp|pt-?2').hasMatch(nm.split('|').last) && config.paperWidth != 58) {
+      await config.setPrintOptions(paper: 58);
+      if (mounted) toast(context, 'Paper width set to 58 mm for this printer');
+    }
     if (mounted) context.read<PrintService>().refreshState();
   }
 
@@ -164,7 +234,7 @@ class _PrintersScreenState extends State<PrintersScreen> {
     final mac = kot ? c.kotBtMac : c.btPrinterMac;
     final name = kot ? c.kotBtName : c.btPrinterName;
     final lan = kot ? c.kotLan : c.fallbackLanPrinter;
-    if (mac.isNotEmpty) return 'Bluetooth · ${name.isEmpty ? mac : name}';
+    if (mac.isNotEmpty) return 'Bluetooth · ${name.isEmpty ? mac.replaceFirst('ble:', '') : name}';
     if (lan.isNotEmpty) return 'Wi-Fi · $lan';
     return 'Not set - tap to choose';
   }

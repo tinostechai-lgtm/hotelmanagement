@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/ops.dart';
 import 'api_client.dart';
+import 'bt_printers.dart';
 import 'config.dart';
 import 'json.dart';
 
@@ -150,6 +151,7 @@ class PrintService extends ChangeNotifier {
   /// phone and one arriving from another phone never get mixed on the paper.
   Future<void> sendTo(String target, List<int> bytes) {
     final done = _line.catchError((_) {}).then((_) {
+      if (target.startsWith('ble:')) return BtPrinters.printBle(target.substring(4), bytes);
       if (target.startsWith('bt:')) return sendToBluetooth(target.substring(3), bytes);
       return sendToLan(target.substring(4), bytes);
     });
@@ -183,9 +185,8 @@ class PrintService extends ChangeNotifier {
 
   static Future<void> sendToBluetooth(String mac, List<int> bytes) async {
     if (mac.isEmpty) throw Exception('No Bluetooth printer selected');
-    // Android 12+: without "Nearby devices" permission the plugin never answers.
-    final allowed = await PrintBluetoothThermal.isPermissionBluetoothGranted
-        .timeout(const Duration(seconds: 5), onTimeout: () => false);
+    // Android 12+: without "Nearby devices" permission the plugin never answers - ask for it.
+    final allowed = await BtPrinters.ensurePermissions();
     if (!allowed) {
       throw Exception('Allow "Nearby devices" (Bluetooth) for Servora in phone Settings, then try again');
     }
@@ -199,7 +200,17 @@ class PrintService extends ChangeNotifier {
     if (!connected) {
       final ok = await PrintBluetoothThermal.connect(macPrinterAddress: mac)
           .timeout(const Duration(seconds: 12), onTimeout: () => false);
-      if (!ok) throw Exception('Could not connect to the Bluetooth printer - is it on and nearby?');
+      if (!ok) {
+        // Many small "mobile printers" only talk Bluetooth Low Energy: try that before giving up.
+        if (Platform.isAndroid) {
+          try {
+            await BtPrinters.printBle(mac, bytes);
+            return;
+          } catch (_) {}
+        }
+        throw Exception('Could not connect to the Bluetooth printer - switch it on, keep it close, '
+            'and close any other printing app that may be using it');
+      }
       _connectedMac = mac;
     }
     final ok = await PrintBluetoothThermal.writeBytes(bytes)
